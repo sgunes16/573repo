@@ -16,9 +16,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 def get_tokens_for_user(user):
-    """
-    User için custom claims içeren access ve refresh token oluştur
-    """
+
     refresh = RefreshToken.for_user(user)
 
     refresh['email'] = user.email

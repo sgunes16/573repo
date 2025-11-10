@@ -15,6 +15,28 @@ def check_password(password, hashed_password):
     return password_hash(password) == hashed_password
 
 
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"message": "Me", "user": {
+            "id": request.user.id,
+            "email": request.user.email,
+            "first_name": request.user.first_name,
+            "last_name": request.user.last_name,
+            "created_at": request.user.created_at,
+            "updated_at": request.user.updated_at,
+            "is_active": request.user.is_active,
+            "is_verified": request.user.is_verified,
+            "is_admin": request.user.is_admin,
+            "is_superuser": request.user.is_superuser,
+            "is_deleted": request.user.is_deleted,
+            "is_blocked": request.user.is_blocked,
+            "is_banned": request.user.is_banned,
+            "is_suspended": request.user.is_suspended,
+        }})
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -36,7 +58,12 @@ class LoginView(APIView):
         tokens = get_tokens_for_user(user)
         data = {
             "message": "Login successful",
-            "user": user.id,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
             "access_token": tokens['access'],
             "refresh_token": tokens['refresh'],
         }
@@ -46,15 +73,15 @@ class LoginView(APIView):
             "refresh_token",
             tokens['refresh'],
             httponly=True,
-            secure=True,
-            samesite="Strict"
+            secure=False,  # Set to True in production with HTTPS
+            samesite="Lax"  # Lax allows cookies to be sent with cross-origin GET requests
         )
         response.set_cookie(
             "access_token",
             tokens['access'],
             httponly=True,
-            secure=True,
-            samesite="Strict"
+            secure=False,  # Set to True in production with HTTPS
+            samesite="Lax"  # Lax allows cookies to be sent with cross-origin GET requests
         )
         return response
 
@@ -88,7 +115,12 @@ class RegisterView(APIView):
         tokens = get_tokens_for_user(user)
         data = {
             "message": "Registration successful",
-            "user": user.id,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
             "access_token": tokens['access'],
             "refresh_token": tokens['refresh'],
         }
@@ -97,15 +129,15 @@ class RegisterView(APIView):
             "refresh_token",
             tokens['refresh'],
             httponly=True,
-            secure=True,
-            samesite="Strict"
+            secure=False,  # Set to True in production with HTTPS
+            samesite="Lax"  # Lax allows cookies to be sent with cross-origin GET requests
         )
         response.set_cookie(
             "access_token",
             tokens['access'],
             httponly=True,
-            secure=True,
-            samesite="Strict"
+            secure=False,  # Set to True in production with HTTPS
+            samesite="Lax"  # Lax allows cookies to be sent with cross-origin GET requests
         )
         return response
 
@@ -127,11 +159,56 @@ class LogoutView(APIView):
         response.delete_cookie(
             "refresh_token",
             path="/",
-            samesite="Strict"
+            samesite="Lax"
         )
         response.delete_cookie(
             "access_token",
             path="/",
-            samesite="Strict"
+            samesite="Lax"
         )
         return response
+
+
+class RefreshTokenView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if not refresh_token:
+            return Response({"message": "Refresh token not found"}, status=401)
+
+        try:
+            refresh = RefreshToken(refresh_token)
+
+            user_id = refresh.get('user_id')
+            user = User.objects.get(id=user_id)
+
+            new_tokens = get_tokens_for_user(user)
+
+            data = {
+                "message": "Token refreshed successfully",
+                "access_token": new_tokens['access'],
+                "refresh_token": new_tokens['refresh'],
+            }
+
+            response = Response(data)
+            response.set_cookie(
+                "refresh_token",
+                new_tokens['refresh'],
+                httponly=True,
+                secure=False,  # Set to True in production with HTTPS
+                samesite="Lax"
+            )
+            response.set_cookie(
+                "access_token",
+                new_tokens['access'],
+                httponly=True,
+                secure=False,  # Set to True in production with HTTPS
+                samesite="Lax"
+            )
+
+            return response
+
+        except Exception as e:
+            return Response({"message": "Invalid refresh token"}, status=401)
