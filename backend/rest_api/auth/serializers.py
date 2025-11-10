@@ -11,7 +11,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username if hasattr(user, 'username') else ''
         token['first_name'] = user.first_name
         token['last_name'] = user.last_name
-        
+
         return token
 
 
@@ -25,16 +25,15 @@ def get_tokens_for_user(user):
     refresh['username'] = user.username if hasattr(user, 'username') else ''
     refresh['first_name'] = user.first_name
     refresh['last_name'] = user.last_name
-    
+
     access = refresh.access_token
-    
+
     access['email'] = user.email
     access['username'] = user.username if hasattr(user, 'username') else ''
     access['first_name'] = user.first_name
     access['last_name'] = user.last_name
-    
+
     return {
         'refresh': str(refresh),
         'access': str(access),
     }
-
