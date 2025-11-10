@@ -5,3 +5,8 @@ psycopg==3.2.12
 psycopg2-binary==2.9.11
 python-dotenv==1.2.1
 sqlparse==0.5.3
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+django-filter==24.1
+django-extensions==3.2.3
+djangorestframework-simplejwt==5.3.1

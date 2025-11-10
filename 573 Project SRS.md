@@ -656,6 +656,42 @@ This feature allows admins to flag and report users. Admins can flag and report 
 | Usability       | The flagged and reported users shall be responsive and accessible on desktop and mobile devices.                      | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
+### 3.1.14 Feature 1.14 - Login and Registration
+
+#### 3.1.14.1 Description
+
+This feature allows users to login and register to the platform. Users can login and register to the platform and see the login and registration page. The system stores the login and registration for retrieval, editing, and display on the public feed.
+
+#### 3.1.14.2 User Story
+
+> As a _user_, I want to _login and register to the platform_ so that _I can use the platform_.
+
+#### 3.1.14.3 Acceptance Criteria
+
+- Given a user, when they login and register to the platform, then the login and registration page is displayed in the login and registration page.
+
+- Given no login and registration page are available, the system shall display a message indicating that there are no login and registration page to display.
+
+- Users shall be able to view the details of a login and registration page by clicking on it.
+
+#### 3.1.14.4 Functional Requirements
+
+| ID    | Requirement                                                                                                     | Priority | Notes |
+|-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
+| FR-66 | A user shall be able to login to the platform.                                                                 | High     |       |
+| FR-67 | A user shall be able to register to the platform.                                                               | High     |       |
+| FR-68 | A user shall be able to view the login and registration page by clicking on the login and registration page.    | High     |       |
+| FR-69 | A user shall be able to view the details of a login and registration page by clicking on it.                     | High     |       |
+
+#### 3.1.14.5 Nonfunctional Requirements
+
+| Type            | Description                                                                                                            | Priority |
+|-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
+| Performance     | Login and registration page shall be displayed in the login and registration page within 2 seconds under normal load. | High      |
+| Security        | Only authenticated users shall be able to login and register to the platform.                                          | High      |
+| Usability       | The login and registration page shall be responsive and accessible on desktop and mobile devices.                      | Medium    |
+| Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
+
 ---
 
 ## 4. Nonfunctional Requirements
