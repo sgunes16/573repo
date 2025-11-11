@@ -2,6 +2,37 @@ from django.db import models
 
 # Create your models here.
 
+STATUS_CHOICES = [
+    ('ACTIVE', 'Active'),
+    ('INACTIVE', 'Inactive'),
+    ('COMPLETED', 'Completed'),
+    ('CANCELLED', 'Cancelled'),
+]
+ACTIVITY_TYPE_CHOICES = [
+    ('1to1', '1 to 1'),
+    ('group', 'Group'),
+]
+OFFER_TYPE_CHOICES = [
+    ('1time', '1 time'),
+    ('recurring', 'Recurring'),
+]
+PERSON_COUNT_CHOICES = [
+    ('1', '1'),
+    ('2', '2'),
+    ('3', '3'),
+    ('4', '4'),
+    ('5', '5'),
+]
+LOCATION_TYPE_CHOICES = [
+    ('myLocation', 'My Location'),
+    ('otherLocation', 'Remote'),
+]
+
+OFFER_TYPE = [
+    ('offer', 'Offer'),
+    ('want', 'Want'),
+]
+
 
 class User(models.Model):
     email = models.EmailField(unique=True)
@@ -44,7 +75,6 @@ class UserProfile(models.Model):
     achievements = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
 
     @property
     def time_credits(self):
@@ -58,26 +88,29 @@ class UserProfile(models.Model):
 
 
 class Offer(models.Model):
-    STATUS_CHOICES = [
-        ('ACTIVE', 'Active'),
-        ('INACTIVE', 'Inactive'),
-        ('COMPLETED', 'Completed'),
-        ('CANCELLED', 'Cancelled'),
-    ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='offers')
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='offers')
     title = models.CharField(max_length=255)
-    description = models.TextField()
-    category = models.CharField(max_length=100, blank=True)
+    description = models.TextField(blank=True)
     time_required = models.IntegerField(default=1)
-    location = models.CharField(max_length=255)
-    geo_location = models.CharField(max_length=255, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    location = models.CharField(max_length=255, blank=True)
+    geo_location = models.JSONField(default=list, blank=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    activity_type = models.CharField(
+        max_length=20, choices=ACTIVITY_TYPE_CHOICES, default='1to1')
+    offer_type = models.CharField(
+        max_length=20, choices=OFFER_TYPE_CHOICES, default='1time')
+    person_count = models.IntegerField(default=1)
+    location_type = models.CharField(
+        max_length=20, choices=LOCATION_TYPE_CHOICES, default='myLocation')
     tags = models.JSONField(default=list)
     images = models.JSONField(default=list)
-    videos = models.JSONField(default=list)
-    audio = models.JSONField(default=list)
-    documents = models.JSONField(default=list)
+    date = models.DateField(null=True, blank=True)
+    time = models.TimeField(null=True, blank=True)
+    from_date = models.DateTimeField(null=True, blank=True)
+    to_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -90,35 +123,6 @@ class Offer(models.Model):
     def __str__(self):
         return self.title
 
-
-class Want(models.Model):
-    STATUS_CHOICES = [
-        ('ACTIVE', 'Active'),
-        ('INACTIVE', 'Inactive'),
-        ('COMPLETED', 'Completed'),
-        ('CANCELLED', 'Cancelled'),
-    ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='wants')
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    category = models.CharField(max_length=100, blank=True)
-    time_offered = models.IntegerField(default=1)
-    location = models.CharField(max_length=255)
-    geo_location = models.CharField(max_length=255, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
-    tags = models.JSONField(default=list)
-    images = models.JSONField(default=list)
-    videos = models.JSONField(default=list)
-    audio = models.JSONField(default=list)
-    documents = models.JSONField(default=list)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.title
-
-
 class Exchange(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
@@ -127,12 +131,17 @@ class Exchange(models.Model):
         ('COMPLETED', 'Completed'),
         ('CANCELLED', 'Cancelled'),
     ]
-    
-    offer = models.ForeignKey(Offer, on_delete=models.CASCADE, null=True, blank=True)
-    want = models.ForeignKey(Want, on_delete=models.CASCADE, null=True, blank=True)
-    provider = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exchanges_provided', null=True, blank=True)
-    requester = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exchanges_requested', null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+
+    offer = models.ForeignKey(
+        Offer, on_delete=models.CASCADE, null=True, blank=True)
+    offer_2 = models.ForeignKey(
+        Offer, on_delete=models.CASCADE, null=True, blank=True, related_name='offer_2', limit_choices_to={'offer_type': 'want'})
+    provider = models.ForeignKey(User, on_delete=models.CASCADE,
+                                 related_name='exchanges_provided', null=True, blank=True)
+    requester = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='exchanges_requested', null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='PENDING')
     time_spent = models.IntegerField(null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True)
     feedback = models.TextField(blank=True)
@@ -149,12 +158,16 @@ class TimeBankTransaction(models.Model):
         ('EARN', 'Earn'),
         ('SPEND', 'Spend'),
     ]
-    
-    from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions_sent')
-    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions_received')
-    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE, null=True, blank=True)
+
+    from_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='transactions_sent')
+    to_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='transactions_received')
+    exchange = models.ForeignKey(
+        Exchange, on_delete=models.CASCADE, null=True, blank=True)
     time_amount = models.IntegerField(default=0)
-    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES, default='EARN')
+    transaction_type = models.CharField(
+        max_length=10, choices=TRANSACTION_TYPE_CHOICES, default='EARN')
     description = models.TextField(default='Transaction')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -171,7 +184,7 @@ class Handshake(models.Model):
         "pending", "Pending"), ("accepted", "Accepted"), ("rejected", "Rejected")])
 
     def __str__(self):
-        return f"{self.exchange.offer.title} - {self.exchange.want.title}"
+        return f"{self.exchange.offer.title} - {self.exchange.offer_2.title}"
 
 
 class Comment(models.Model):
@@ -181,11 +194,15 @@ class Comment(models.Model):
         ('want', 'Want'),
         ('user', 'User'),
     ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
-    target_type = models.CharField(max_length=20, choices=TARGET_TYPE_CHOICES, default='exchange')
-    target_id = models.CharField(max_length=50, default='0')  # Generic ID for any target
-    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE, null=True, blank=True, related_name='comments')
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='comments')
+    target_type = models.CharField(
+        max_length=20, choices=TARGET_TYPE_CHOICES, default='exchange')
+    # Generic ID for any target
+    target_id = models.CharField(max_length=50, default='0')
+    exchange = models.ForeignKey(
+        Exchange, on_delete=models.CASCADE, null=True, blank=True, related_name='comments')
     content = models.TextField()
     rating = models.IntegerField(null=True, blank=True)  # 1-5
     created_at = models.DateTimeField(auto_now_add=True)
@@ -203,7 +220,7 @@ class Chat(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.exchange.offer.title} - {self.exchange.want.title}"
+        return f"{self.exchange.offer.title} - {self.exchange.offer_2.title}"
 
 
 class Notification(models.Model):
@@ -224,15 +241,16 @@ class Message(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.chat.exchange.offer.title} - {self.chat.exchange.want.title}"
+        return f"{self.chat.exchange.offer.title} - {self.chat.exchange.offer_2.title}"
 
 
 class TimeBank(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='timebank')
-    amount = models.IntegerField(default=1) 
-    blocked_amount = models.IntegerField(default=0)  
-    available_amount = models.IntegerField(default=1)  
-    total_amount = models.IntegerField(default=1) 
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='timebank')
+    amount = models.IntegerField(default=1)
+    blocked_amount = models.IntegerField(default=0)
+    available_amount = models.IntegerField(default=1)
+    total_amount = models.IntegerField(default=1)
     last_update = models.DateTimeField(auto_now=True)
 
     def add_credit(self, hours=1):
