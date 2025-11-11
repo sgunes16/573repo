@@ -27,6 +27,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
 
+# Deployment configuration
+DEPLOY_TYPE = os.getenv('DEPLOY_TYPE', 'dev')
+IS_PRODUCTION = DEPLOY_TYPE == 'prod'
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
@@ -150,12 +154,14 @@ SIMPLE_JWT = {
 }
 
 # CORS Settings
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite default port
     "http://localhost:3000",  # React/Next.js default port
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
-    "http://192.168.1.106:3000",
+    FRONTEND_URL,  # Custom frontend URL from env
 ]
 
 CORS_ALLOW_CREDENTIALS = True  # Important for cookies
@@ -177,7 +183,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
-    "http://192.168.1.106:3000",
+    FRONTEND_URL,  # Custom frontend URL from env
 ]
 
 AUTO_SLASH = False

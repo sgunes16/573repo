@@ -15,6 +15,10 @@ ENV/
 # Django
 *.log
 
+# Nginx SSL certificates
+nginx/ssl/*.pem
+nginx/ssl/*.crt
+nginx/ssl/*.key
 
 # IDE
 .vscode/

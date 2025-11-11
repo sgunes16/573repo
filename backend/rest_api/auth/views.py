@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_api.models import User
 from rest_api.auth.serializers import get_tokens_for_user
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
 import hashlib
 
 
@@ -13,6 +14,16 @@ def password_hash(password):
 
 def check_password(password, hashed_password):
     return password_hash(password) == hashed_password
+
+
+def get_cookie_settings():
+    """Returns cookie settings based on DEPLOY_TYPE environment variable"""
+    is_production = settings.IS_PRODUCTION
+    return {
+        'httponly': True,
+        'secure': is_production,  # True in prod (HTTPS), False in dev (HTTP)
+        'samesite': 'Strict' if is_production else 'Lax',  # Strict in prod, Lax in dev
+    }
 
 
 class MeView(APIView):
@@ -69,20 +80,10 @@ class LoginView(APIView):
         }
 
         response = Response(data)
-        response.set_cookie(
-            "refresh_token",
-            tokens['refresh'],
-            httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="Lax"  # Lax allows cookies to be sent with cross-origin GET requests
-        )
-        response.set_cookie(
-            "access_token",
-            tokens['access'],
-            httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="Lax"  # Lax allows cookies to be sent with cross-origin GET requests
-        )
+        cookie_settings = get_cookie_settings()
+        
+        response.set_cookie("refresh_token", tokens['refresh'], **cookie_settings)
+        response.set_cookie("access_token", tokens['access'], **cookie_settings)
         return response
 
 
@@ -125,20 +126,10 @@ class RegisterView(APIView):
             "refresh_token": tokens['refresh'],
         }
         response = Response(data)
-        response.set_cookie(
-            "refresh_token",
-            tokens['refresh'],
-            httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="Lax"  # Lax allows cookies to be sent with cross-origin GET requests
-        )
-        response.set_cookie(
-            "access_token",
-            tokens['access'],
-            httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="Lax"  # Lax allows cookies to be sent with cross-origin GET requests
-        )
+        cookie_settings = get_cookie_settings()
+        
+        response.set_cookie("refresh_token", tokens['refresh'], **cookie_settings)
+        response.set_cookie("access_token", tokens['access'], **cookie_settings)
         return response
 
 
@@ -156,16 +147,10 @@ class LogoutView(APIView):
                 pass
 
         response = Response({"message": "Logout successful"})
-        response.delete_cookie(
-            "refresh_token",
-            path="/",
-            samesite="Lax"
-        )
-        response.delete_cookie(
-            "access_token",
-            path="/",
-            samesite="Lax"
-        )
+        cookie_settings = get_cookie_settings()
+        
+        response.delete_cookie("refresh_token", path="/", samesite=cookie_settings['samesite'])
+        response.delete_cookie("access_token", path="/", samesite=cookie_settings['samesite'])
         return response
 
 
@@ -193,21 +178,11 @@ class RefreshTokenView(APIView):
             }
 
             response = Response(data)
-            response.set_cookie(
-                "refresh_token",
-                new_tokens['refresh'],
-                httponly=True,
-                secure=False,  # Set to True in production with HTTPS
-                samesite="Lax"
-            )
-            response.set_cookie(
-                "access_token",
-                new_tokens['access'],
-                httponly=True,
-                secure=False,  # Set to True in production with HTTPS
-                samesite="Lax"
-            )
-
+            cookie_settings = get_cookie_settings()
+            
+            response.set_cookie("refresh_token", new_tokens['refresh'], **cookie_settings)
+            response.set_cookie("access_token", new_tokens['access'], **cookie_settings)
+            
             return response
 
         except Exception as e:
