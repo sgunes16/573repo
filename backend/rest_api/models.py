@@ -12,6 +12,10 @@ ACTIVITY_TYPE_CHOICES = [
     ('1to1', '1 to 1'),
     ('group', 'Group'),
 ]
+TYPE_CHOICES = [
+    ('offer', 'Offer'),
+    ('want', 'Want'),
+]
 OFFER_TYPE_CHOICES = [
     ('1time', '1 time'),
     ('recurring', 'Recurring'),
@@ -91,6 +95,8 @@ class Offer(models.Model):
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='offers')
+    type = models.CharField(
+        max_length=20, choices=TYPE_CHOICES, default='offer')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     time_required = models.IntegerField(default=1)
@@ -135,7 +141,7 @@ class Exchange(models.Model):
     offer = models.ForeignKey(
         Offer, on_delete=models.CASCADE, null=True, blank=True)
     offer_2 = models.ForeignKey(
-        Offer, on_delete=models.CASCADE, null=True, blank=True, related_name='offer_2', limit_choices_to={'offer_type': 'want'})
+        Offer, on_delete=models.CASCADE, null=True, blank=True, related_name='offer_2', limit_choices_to={'type': 'want'})
     provider = models.ForeignKey(User, on_delete=models.CASCADE,
                                  related_name='exchanges_provided', null=True, blank=True)
     requester = models.ForeignKey(
@@ -182,7 +188,7 @@ class Handshake(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     status = models.CharField(max_length=255, choices=[(
         "pending", "Pending"), ("accepted", "Accepted"), ("rejected", "Rejected")])
-
+    
     def __str__(self):
         return f"{self.exchange.offer.title} - {self.exchange.offer_2.title}"
 

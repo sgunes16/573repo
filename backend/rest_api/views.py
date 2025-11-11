@@ -86,6 +86,7 @@ class OffersView(APIView):
                         "rating": offer.user.profile.rating if hasattr(offer.user, 'profile') else 0.0,
                     } if hasattr(offer.user, 'profile') else None
                 },
+                "type": offer.type,
                 "title": offer.title,
                 "description": offer.description,
                 "time_required": offer.time_required,
@@ -153,6 +154,7 @@ class CreateOfferView(APIView):
             
             offer = Offer.objects.create(
                 user=request.user,
+                type=request.data.get('type', 'offer'),
                 title=request.data.get('title', ''),
                 description=request.data.get('description', ''),
                 tags=request.data.get('tags', []),
