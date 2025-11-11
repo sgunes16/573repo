@@ -37,21 +37,42 @@ class UserProfile(models.Model):
     bio = models.TextField(blank=True, null=True)
     location = models.CharField(max_length=255, blank=True)
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    skills = models.JSONField(default=list)
+    rating = models.FloatField(default=0.0)
+    phone_number = models.CharField(max_length=20, blank=True)
     badges = models.JSONField(default=list)
     achievements = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+
+    @property
+    def time_credits(self):
+        try:
+            return self.user.timebank.amount
+        except:
+            return 0
 
     def __str__(self):
-        return self.display_name if self.display_name else self.user.email
+        return f"{self.user.first_name} {self.user.last_name}" if self.user.first_name else self.user.email
 
 
 class Offer(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('INACTIVE', 'Inactive'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='offers')
     title = models.CharField(max_length=255)
     description = models.TextField()
+    category = models.CharField(max_length=100, blank=True)
+    time_required = models.IntegerField(default=1)
     location = models.CharField(max_length=255)
-    geo_location = models.CharField(max_length=255)
+    geo_location = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
     tags = models.JSONField(default=list)
     images = models.JSONField(default=list)
     videos = models.JSONField(default=list)
@@ -60,37 +81,37 @@ class Offer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def update_timebank(self):
-        self.user.timebank.amount -= 1
-        self.user.timebank.blocked_amount += 1
-        self.user.timebank.available_amount -= 1
-        self.user.timebank.total_amount -= 1
-        self.user.timebank.last_update = timezone.now()
-        self.user.timebank.save()
+    def block_time(self):
+        return self.user.timebank.block_credit(self.time_required)
 
-    def release_timebank(self):
-        self.user.timebank.amount += 1
-        self.user.timebank.blocked_amount -= 1
-        self.user.timebank.available_amount += 1
-        self.user.timebank.total_amount += 1
-        self.user.timebank.last_update = timezone.now()
-        self.user.timebank.save()
+    def release_time(self):
+        self.user.timebank.unblock_credit(self.time_required)
 
     def __str__(self):
         return self.title
 
 
 class Want(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('INACTIVE', 'Inactive'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='wants')
     title = models.CharField(max_length=255)
+    description = models.TextField()
+    category = models.CharField(max_length=100, blank=True)
+    time_offered = models.IntegerField(default=1)
     location = models.CharField(max_length=255)
-    geo_location = models.CharField(max_length=255)
+    geo_location = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
     tags = models.JSONField(default=list)
     images = models.JSONField(default=list)
     videos = models.JSONField(default=list)
     audio = models.JSONField(default=list)
     documents = models.JSONField(default=list)
-    description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -99,23 +120,47 @@ class Want(models.Model):
 
 
 class Exchange(models.Model):
-    offer = models.ForeignKey(Offer, on_delete=models.CASCADE)
-    want = models.ForeignKey(Want, on_delete=models.CASCADE)
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('ACCEPTED', 'Accepted'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    
+    offer = models.ForeignKey(Offer, on_delete=models.CASCADE, null=True, blank=True)
+    want = models.ForeignKey(Want, on_delete=models.CASCADE, null=True, blank=True)
+    provider = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exchanges_provided', null=True, blank=True)
+    requester = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exchanges_requested', null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    time_spent = models.IntegerField(null=True, blank=True)
+    rating = models.IntegerField(null=True, blank=True)
+    feedback = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.offer.title} - {self.want.title}"
+        return f"Exchange {self.id} - {self.status}"
 
 
 class TimeBankTransaction(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE)
+    TRANSACTION_TYPE_CHOICES = [
+        ('EARN', 'Earn'),
+        ('SPEND', 'Spend'),
+    ]
+    
+    from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions_sent')
+    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions_received')
+    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE, null=True, blank=True)
+    time_amount = models.IntegerField(default=0)
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES, default='EARN')
+    description = models.TextField(default='Transaction')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.email} - {self.amount}"
+        return f"{self.from_user.email} → {self.to_user.email}: {self.time_amount}h ({self.transaction_type})"
 
 
 class Handshake(models.Model):
@@ -130,14 +175,24 @@ class Handshake(models.Model):
 
 
 class Comment(models.Model):
-    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    TARGET_TYPE_CHOICES = [
+        ('exchange', 'Exchange'),
+        ('offer', 'Offer'),
+        ('want', 'Want'),
+        ('user', 'User'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
+    target_type = models.CharField(max_length=20, choices=TARGET_TYPE_CHOICES, default='exchange')
+    target_id = models.CharField(max_length=50, default='0')  # Generic ID for any target
+    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE, null=True, blank=True, related_name='comments')
     content = models.TextField()
+    rating = models.IntegerField(null=True, blank=True)  # 1-5
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.exchange.offer.title} - {self.exchange.want.title}"
+        return f"Comment by {self.user.email} on {self.target_type} {self.target_id}"
 
 
 class Chat(models.Model):
@@ -173,12 +228,39 @@ class Message(models.Model):
 
 
 class TimeBank(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    amount = models.IntegerField()
-    blocked_amount = models.IntegerField()
-    available_amount = models.IntegerField()
-    total_amount = models.IntegerField()
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='timebank')
+    amount = models.IntegerField(default=1) 
+    blocked_amount = models.IntegerField(default=0)  
+    available_amount = models.IntegerField(default=1)  
+    total_amount = models.IntegerField(default=1) 
     last_update = models.DateTimeField(auto_now=True)
 
+    def add_credit(self, hours=1):
+        self.amount += hours
+        self.available_amount += hours
+        self.total_amount += hours
+        self.save()
+
+    def spend_credit(self, hours=1):
+        if self.available_amount >= hours:
+            self.amount -= hours
+            self.available_amount -= hours
+            self.save()
+            return True
+        return False
+
+    def block_credit(self, hours=1):
+        if self.available_amount >= hours:
+            self.blocked_amount += hours
+            self.available_amount -= hours
+            self.save()
+            return True
+        return False
+
+    def unblock_credit(self, hours=1):
+        self.blocked_amount -= hours
+        self.available_amount += hours
+        self.save()
+
     def __str__(self):
-        return f"{self.user.email} - {self.amount}"
+        return f"{self.user.email} - {self.amount}h"

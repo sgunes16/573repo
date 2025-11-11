@@ -10,7 +10,10 @@ class CookieJWTAuthentication(JWTAuthentication):
         if raw_token is None:
             return None
 
-        validated_token = self.get_validated_token(raw_token)
+        try:
+            validated_token = self.get_validated_token(raw_token)
+        except Exception:
+            return None
 
         user_id = validated_token.get('user_id')
         try:
