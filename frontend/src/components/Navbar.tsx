@@ -15,6 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
+import { profileService } from "@/services/profile.service";
 import {
 
   MdChevronRight,
@@ -25,6 +26,9 @@ import {
   MdStarOutline,
   MdTimeline,
 } from "react-icons/md";
+import { TimeBank, UserProfile } from "@/types";
+import { useEffect, useState } from "react";
+import { useGeoStore } from "@/store/useGeoStore";
 
 interface NavbarProps {
   showUserInfo?: boolean;
@@ -33,6 +37,31 @@ interface NavbarProps {
 const Navbar = ({ showUserInfo = false }: NavbarProps) => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const [userProfile, setUserProfile] = useState<UserProfile | undefined>(undefined);
+  const [timeBank, setTimeBank] = useState<TimeBank | undefined>(undefined);
+
+  const { geoLocation, setGeoLocation } = useGeoStore();
+
+  useEffect(() => {
+    if (user) {
+      fetchUserProfile();
+      if (navigator.geolocation) {
+        fetchGeoLocation();
+      }
+    }
+  }, [user]);
+
+  const fetchUserProfile = async () => {
+    const response = await profileService.getUserProfile();
+    setUserProfile(response[0]);
+    setTimeBank(response[1]);
+  }
+
+  const fetchGeoLocation = async () => {
+    const response = await navigator.geolocation.getCurrentPosition((position) => {
+      setGeoLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+    });
+  }
 
   const handleLogout = () => {
     logout();
@@ -54,7 +83,7 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
           align="center"
           gap={6}
           direction={{ base: "column", md: "row" }}
-          align={{ base: "flex-start", md: "center" }}
+          alignItems={{ base: "flex-start", md: "center" }}
         >
           <HStack
             spacing={4}
@@ -106,7 +135,7 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
                 fontWeight="600"
               >
                 <Icon as={MdOutlineTimer} color="#975A16" boxSize={5} />
-                <Text>{user.profile?.time_credits || 0}H</Text>
+                <Text>{timeBank?.amount || 0}H</Text>
               </HStack>
 
               <Menu>
@@ -128,7 +157,7 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
                     <Avatar
                       name={`${user.first_name} ${user.last_name}`}
                       size="md"
-                      src={user.profile?.avatar_url}
+                      src={userProfile?.profile_picture}
                     >
                       <Box
                         position="absolute"

@@ -26,10 +26,6 @@ export const authService = {
   async refreshToken(): Promise<AuthResponse> {
     const response = await apiService.post<AuthResponse>('/auth/token/refresh')
     return response
-  },
-
-  isAuthenticated(): boolean {
-    return !!apiService.get<MeResponse>('/auth/me')
   }
 }
 

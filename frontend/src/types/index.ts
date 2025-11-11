@@ -1,3 +1,22 @@
+export const activity_type = [
+  '1to1',
+  'group',
+]
+export const offer_type = [
+  '1time',
+  'recurring',
+]
+export const location_type = [
+  'myLocation',
+  'remote',
+]
+export const status = [
+  'ACTIVE',
+  'PENDING',
+  'COMPLETED',
+  'CANCELLED',
+]
+
 // API Error Response
 export interface ApiError {
   message: string
@@ -90,6 +109,7 @@ export interface UserProfile {
   user_id: string
   bio?: string
   profile_picture?: string
+  geo_location?: string
   location?: string
   skills: string[]
   time_credits: number
@@ -97,8 +117,155 @@ export interface UserProfile {
   phone_number?: string
 }
 
+export interface UserProfileResponse {
+  message: string
+  user_profile: UserProfile
+  timebank: TimeBank
+}
 
+// Offer & Want types
+export interface Offer {
+  id: string
+  user_id: string
+  user: User
+  type: 'offer' | 'want'
+  title: string
+  description: string
+  time_required: number 
+  location?: string
+  geo_location?: number[]
+  tags: string[]
+  activity_type: string
+  offer_type: string
+  person_count: number
+  location_type: string
+  date?: string
+  time?: string
+  from_date?: string
+  to_date?: string
+  status: OfferStatus
+  created_at: string
+  updated_at: string
+}
 
+export interface CreateOfferResponse {
+  message: string
+  offer_id: string
+}
+
+export interface Want {
+  id: string
+  user_id: string
+  user: User
+  title: string
+  description: string
+  category: string
+  time_offered: number 
+  location?: string
+  tags: string[]
+  status: WantStatus
+  created_at: string
+  updated_at: string
+}
+
+export enum OfferStatus {
+  ACTIVE = 'active',
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+}
+
+export enum WantStatus {
+  ACTIVE = 'active',
+  PENDING = 'pending',
+  FULFILLED = 'fulfilled',
+  CANCELLED = 'cancelled',
+}
+
+// Exchange types
+export interface Exchange {
+  id: string
+  offer_id: string
+  want_id: string
+  provider_id: string
+  requester_id: string
+  status: ExchangeStatus
+  time_spent: number
+  rating?: number
+  feedback?: string
+  created_at: string
+  completed_at?: string
+}
+
+export enum ExchangeStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+}
+
+// TimeBank types
+export interface TimeBankTransaction {
+  id: string
+  from_user_id: string
+  from_user?: User
+  to_user_id: string
+  to_user?: User
+  exchange_id: string
+  time_amount: number
+  transaction_type: TransactionType
+  description: string
+  created_at: string
+}
+
+export enum TransactionType {
+  EARN = 'earn',
+  SPEND = 'spend',
+  BONUS = 'bonus',
+  PENALTY = 'penalty',
+}
+
+// Chat & Message types
+export interface Chat {
+  id: string
+  participants: User[]
+  last_message?: Message
+  created_at: string
+  updated_at: string
+}
+
+export interface Message {
+  id: string
+  chat_id: string
+  sender_id: string
+  sender: User
+  content: string
+  is_read: boolean
+  created_at: string
+}
+
+// Comment type
+export interface Comment {
+  id: string
+  user_id: string
+  user: User
+  target_type: 'offer' | 'want' | 'user' | 'exchange'
+  target_id: string
+  content: string
+  rating?: number
+  created_at: string
+}
+
+export interface TimeBank {
+  id: string
+  user_id: string
+  user: User
+  amount: number
+  blocked_amount: number
+  available_amount: number
+  total_amount: number
+}
 
 // API Response types
 export interface ApiResponse<T> {

@@ -74,16 +74,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   checkAuth: async () => {
-    if (!authService.isAuthenticated()) {
-      set({ authUser: null, user: null, isAuthenticated: false })
-      return
-    }
-
+    set({ isLoading: true })
     try {
       const userDetails = await authService.getCurrentUser()
-      set({ user: userDetails.user, isAuthenticated: true })
+      set({ user: userDetails.user, isAuthenticated: true, isLoading: false })
     } catch (error) {
-      set({ authUser: null, user: null, isAuthenticated: false })
+      set({ authUser: null, user: null, isAuthenticated: false, isLoading: false })
     }
   },
 }))
