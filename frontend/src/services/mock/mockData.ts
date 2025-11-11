@@ -1,9 +1,32 @@
-import type { User, UserProfile, Offer, Want, Exchange } from '@/types'
+import type { User, Offer, Want, Exchange } from '@/types'
 import { UserRole, OfferStatus, WantStatus, ExchangeStatus } from '@/types'
 
-// Mock Users
+type UserWithoutFlags = Omit<
+  User,
+  | 'is_active'
+  | 'is_verified'
+  | 'is_admin'
+  | 'is_superuser'
+  | 'is_deleted'
+  | 'is_blocked'
+  | 'is_banned'
+  | 'is_suspended'
+>
+
+const withUserDefaults = (user: UserWithoutFlags): User => ({
+  is_active: true,
+  is_verified: true,
+  is_admin: false,
+  is_superuser: false,
+  is_deleted: false,
+  is_blocked: false,
+  is_banned: false,
+  is_suspended: false,
+  ...user,
+})
+
 export const mockUsers: User[] = [
-  {
+  withUserDefaults({
     id: '1',
     email: 'john@example.com',
     username: 'johndoe',
@@ -11,7 +34,7 @@ export const mockUsers: User[] = [
     last_name: 'Doe',
     role: UserRole.REGISTERED,
     created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-02-10T12:00:00Z',
     profile: {
       id: '1',
       user_id: '1',
@@ -22,8 +45,8 @@ export const mockUsers: User[] = [
       rating: 4.8,
       phone_number: '+90 555 123 4567',
     },
-  },
-  {
+  }),
+  withUserDefaults({
     id: '2',
     email: 'ahmet@example.com',
     username: 'ahmet',
@@ -31,7 +54,7 @@ export const mockUsers: User[] = [
     last_name: 'Yılmaz',
     role: UserRole.REGISTERED,
     created_at: '2024-01-02T00:00:00Z',
-    updated_at: '2024-01-02T00:00:00Z',
+    updated_at: '2024-02-08T10:30:00Z',
     profile: {
       id: '2',
       user_id: '2',
@@ -41,8 +64,8 @@ export const mockUsers: User[] = [
       time_credits: 47,
       rating: 5.0,
     },
-  },
-  {
+  }),
+  withUserDefaults({
     id: '3',
     email: 'melissa@example.com',
     username: 'melissa',
@@ -50,7 +73,7 @@ export const mockUsers: User[] = [
     last_name: 'Johnson',
     role: UserRole.REGISTERED,
     created_at: '2024-01-03T00:00:00Z',
-    updated_at: '2024-01-03T00:00:00Z',
+    updated_at: '2024-02-01T15:45:00Z',
     profile: {
       id: '3',
       user_id: '3',
@@ -60,8 +83,8 @@ export const mockUsers: User[] = [
       time_credits: 10,
       rating: 4.9,
     },
-  },
-  {
+  }),
+  withUserDefaults({
     id: '4',
     email: 'murat@example.com',
     username: 'murat',
@@ -69,7 +92,7 @@ export const mockUsers: User[] = [
     last_name: 'Kaya',
     role: UserRole.REGISTERED,
     created_at: '2024-01-04T00:00:00Z',
-    updated_at: '2024-01-04T00:00:00Z',
+    updated_at: '2024-02-05T08:20:00Z',
     profile: {
       id: '4',
       user_id: '4',
@@ -79,8 +102,8 @@ export const mockUsers: User[] = [
       time_credits: 102,
       rating: 4.7,
     },
-  },
-  {
+  }),
+  withUserDefaults({
     id: '5',
     email: 'feride@example.com',
     username: 'feride',
@@ -88,7 +111,7 @@ export const mockUsers: User[] = [
     last_name: 'Arslan',
     role: UserRole.REGISTERED,
     created_at: '2024-01-05T00:00:00Z',
-    updated_at: '2024-01-05T00:00:00Z',
+    updated_at: '2024-02-03T09:10:00Z',
     profile: {
       id: '5',
       user_id: '5',
@@ -98,8 +121,8 @@ export const mockUsers: User[] = [
       time_credits: 50,
       rating: 4.6,
     },
-  },
-  {
+  }),
+  withUserDefaults({
     id: '6',
     email: 'handan@example.com',
     username: 'handan',
@@ -107,7 +130,7 @@ export const mockUsers: User[] = [
     last_name: 'Demir',
     role: UserRole.REGISTERED,
     created_at: '2024-01-06T00:00:00Z',
-    updated_at: '2024-01-06T00:00:00Z',
+    updated_at: '2024-02-04T17:05:00Z',
     profile: {
       id: '6',
       user_id: '6',
@@ -117,8 +140,8 @@ export const mockUsers: User[] = [
       time_credits: 10,
       rating: 4.8,
     },
-  },
-  {
+  }),
+  withUserDefaults({
     id: '7',
     email: 'james@example.com',
     username: 'james',
@@ -126,7 +149,7 @@ export const mockUsers: User[] = [
     last_name: 'Wilson',
     role: UserRole.REGISTERED,
     created_at: '2024-01-07T00:00:00Z',
-    updated_at: '2024-01-07T00:00:00Z',
+    updated_at: '2024-02-06T13:15:00Z',
     profile: {
       id: '7',
       user_id: '7',
@@ -136,8 +159,8 @@ export const mockUsers: User[] = [
       time_credits: 10000,
       rating: 5.0,
     },
-  },
-  {
+  }),
+  withUserDefaults({
     id: '8',
     email: 'gulsum@example.com',
     username: 'gulsum',
@@ -145,7 +168,7 @@ export const mockUsers: User[] = [
     last_name: 'Şahin',
     role: UserRole.REGISTERED,
     created_at: '2024-01-08T00:00:00Z',
-    updated_at: '2024-01-08T00:00:00Z',
+    updated_at: '2024-02-02T19:40:00Z',
     profile: {
       id: '8',
       user_id: '8',
@@ -155,21 +178,25 @@ export const mockUsers: User[] = [
       time_credits: 30,
       rating: 4.9,
     },
-  },
+  }),
 ]
 
-// Mock Offers
 export const mockOffers: Offer[] = [
   {
     id: '1',
     user_id: '2',
     user: mockUsers[1],
+    type: 'offer',
     title: 'Piano Lesson',
     description: 'Teaching piano to beginners and intermediate students',
-    category: 'Music',
     time_required: 60,
     location: 'Beşiktaş',
+    geo_location: [41.043, 29.003],
     tags: ['piano', 'course', 'music'],
+    activity_type: '1to1',
+    offer_type: '1time',
+    person_count: 1,
+    location_type: 'in_person',
     status: OfferStatus.ACTIVE,
     created_at: '2024-11-11T08:00:00Z',
     updated_at: '2024-11-11T08:00:00Z',
@@ -178,12 +205,17 @@ export const mockOffers: Offer[] = [
     id: '2',
     user_id: '3',
     user: mockUsers[2],
+    type: 'offer',
     title: 'Dog Walking',
     description: 'Professional dog walking service in the park',
-    category: 'Pet Care',
     time_required: 60,
     location: 'Bebek',
+    geo_location: [41.074, 29.044],
     tags: ['animals', 'dogs', 'exercise'],
+    activity_type: '1to1',
+    offer_type: 'recurring',
+    person_count: 1,
+    location_type: 'in_person',
     status: OfferStatus.ACTIVE,
     created_at: '2024-10-20T08:00:00Z',
     updated_at: '2024-10-20T08:00:00Z',
@@ -192,12 +224,17 @@ export const mockOffers: Offer[] = [
     id: '3',
     user_id: '4',
     user: mockUsers[3],
+    type: 'offer',
     title: 'English Course',
     description: 'Bi-weekly English conversation practice',
-    category: 'Education',
     time_required: 120,
     location: 'İzmit',
+    geo_location: [40.77, 29.92],
     tags: ['language', 'english'],
+    activity_type: 'group',
+    offer_type: 'recurring',
+    person_count: 5,
+    location_type: 'hybrid',
     status: OfferStatus.ACTIVE,
     created_at: '2024-10-20T08:00:00Z',
     updated_at: '2024-10-20T08:00:00Z',
@@ -206,12 +243,17 @@ export const mockOffers: Offer[] = [
     id: '4',
     user_id: '5',
     user: mockUsers[4],
+    type: 'offer',
     title: 'Gardening',
     description: 'Help with garden maintenance and plant care',
-    category: 'Home',
     time_required: 60,
     location: 'Akyurt',
+    geo_location: [40.14, 33.08],
     tags: ['garden', 'plant'],
+    activity_type: '1to1',
+    offer_type: '1time',
+    person_count: 1,
+    location_type: 'in_person',
     status: OfferStatus.ACTIVE,
     created_at: '2024-10-20T08:00:00Z',
     updated_at: '2024-10-20T08:00:00Z',
@@ -220,12 +262,17 @@ export const mockOffers: Offer[] = [
     id: '5',
     user_id: '6',
     user: mockUsers[5],
+    type: 'offer',
     title: 'Faucet Repair',
     description: 'Quick faucet and plumbing repairs',
-    category: 'Home',
     time_required: 60,
     location: 'İzmit',
+    geo_location: [40.77, 29.94],
     tags: ['repair', 'handmade'],
+    activity_type: '1to1',
+    offer_type: 'on_call',
+    person_count: 1,
+    location_type: 'on_site',
     status: OfferStatus.ACTIVE,
     created_at: '2024-12-12T08:00:00Z',
     updated_at: '2024-12-12T08:00:00Z',
@@ -234,12 +281,17 @@ export const mockOffers: Offer[] = [
     id: '6',
     user_id: '7',
     user: mockUsers[6],
+    type: 'offer',
     title: 'Leadership Seminar',
     description: 'Professional leadership and management training',
-    category: 'Education',
     time_required: 480,
     location: 'Remote',
+    geo_location: [],
     tags: ['professional', 'leadership'],
+    activity_type: 'webinar',
+    offer_type: 'multi_day',
+    person_count: 20,
+    location_type: 'online',
     status: OfferStatus.ACTIVE,
     created_at: '2024-12-21T08:00:00Z',
     updated_at: '2024-12-21T08:00:00Z',
@@ -248,17 +300,25 @@ export const mockOffers: Offer[] = [
     id: '7',
     user_id: '8',
     user: mockUsers[7],
+    type: 'offer',
     title: 'Elderly Care',
     description: 'Caring for elderly people, daily activities help',
-    category: 'Care',
     time_required: 60,
     location: 'Söğütlü',
+    geo_location: [40.95, 30.37],
     tags: ['care', 'elderpeople'],
+    activity_type: '1to1',
+    offer_type: 'recurring',
+    person_count: 1,
+    location_type: 'on_site',
     status: OfferStatus.ACTIVE,
     created_at: '2024-11-11T08:00:00Z',
     updated_at: '2024-11-11T08:00:00Z',
   },
 ]
+
+
+
 
 // Latest Activities (exchanges)
 export const latestActivities = [
@@ -332,7 +392,7 @@ export const mockExchanges: Exchange[] = [
 ]
 
 // Mock current user (Selin from Figma)
-export const mockCurrentUser: User = {
+export const mockCurrentUser: User = withUserDefaults({
   id: '100',
   email: 'selin@example.com',
   username: 'selin',
@@ -340,7 +400,7 @@ export const mockCurrentUser: User = {
   last_name: 'Demir',
   role: UserRole.REGISTERED,
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-02-12T09:00:00Z',
   profile: {
     id: '100',
     user_id: '100',
@@ -350,7 +410,7 @@ export const mockCurrentUser: User = {
     time_credits: 7,
     rating: 4.9,
   },
-}
+})
 
 // Helper function to simulate API delay
 export const delay = (ms: number = 500) => new Promise(resolve => setTimeout(resolve, ms))

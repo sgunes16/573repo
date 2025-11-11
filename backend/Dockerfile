@@ -23,11 +23,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
-# Collect static files
+# Collect static files during build (ignored if it fails)
 RUN python manage.py collectstatic --noinput || true
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
 # Run gunicorn (use CMD for easier override in docker-compose)
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "hive.wsgi:application"]

@@ -72,6 +72,9 @@ VITE_MAPBOX_TOKEN=your-mapbox-token
 Place SSL certificates in `nginx/ssl/`:
 ```bash
 # Self-signed (testing)
+./scripts/generate-dev-cert.sh  # quick helper
+
+# or craft your own certificate manually
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout nginx/ssl/key.pem -out nginx/ssl/cert.pem
 
@@ -79,12 +82,32 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 # See nginx/ssl/README.md for details
 ```
 
-### 3. Deploy
+### 3. Backend Bootstrap Automation
+
+The backend container now runs `backend/entrypoint.sh` before Gunicorn starts. The script retries migrations until Postgres is reachable, collects static files, seeds demo data, and optionally creates a Django superuser. Control it via `.env`:
+
+```env
+DJANGO_SUPERUSER_USERNAME=admin
+DJANGO_SUPERUSER_EMAIL=admin@example.com
+DJANGO_SUPERUSER_PASSWORD=change-me
+RUN_SEED_OFFERS=true  # set to false to skip demo content
+```
+
+Commands executed automatically on container start:
+
+- `python manage.py migrate --noinput`
+- `python manage.py collectstatic --noinput`
+- `python manage.py seed_offers` (skipped if `RUN_SEED_OFFERS=false`)
+- `python manage.py createsuperuser --noinput` (runs only when all `DJANGO_SUPERUSER_*` vars are set)
+
+If you need to rerun them manually, the `docker compose exec backend ...` commands below still work.
+
+### 4. Deploy
 ```bash
 docker-compose -f docker-compose.prod.yml up -d --build
 ```
 
-### 4. Database Setup
+### 5. Database Setup
 ```bash
 docker-compose -f docker-compose.prod.yml exec backend python manage.py migrate
 docker-compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput

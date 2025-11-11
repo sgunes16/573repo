@@ -47,6 +47,12 @@ services:
       - DEBUG=False
       - DEPLOY_TYPE=prod
       - FRONTEND_URL=${FRONTEND_URL}
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
+      - RUN_SEED_OFFERS=${RUN_SEED_OFFERS}
+    networks:
+      - hive_network_prod
 
   postgres:
     image: postgres:16-alpine
@@ -76,4 +82,3 @@ networks:
 volumes:
   postgres_data_hive_prod:
     driver: local
-
