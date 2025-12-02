@@ -22,11 +22,13 @@ import {
   Tag,
   Text,
   Textarea,
+  useToast,
   VStack,
 } from '@chakra-ui/react'
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
+import ImageUpload, { UploadedImage } from '@/components/ImageUpload'
 import { MdCalendarToday, MdLocationOn, MdTag } from 'react-icons/md'
 import { mockOffers } from '@/services/mock/mockData'
 import { activity_type, offer_type, location_type } from '@/types'
@@ -38,6 +40,7 @@ const CreateOfferPage = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { geoLocation } = useGeoStore()
+  const toast = useToast()
   
   const pageType = searchParams.get('type') === 'want' ? 'want' : 'offer'
   
@@ -54,6 +57,8 @@ const CreateOfferPage = () => {
   const [date, setDate] = useState('2025-11-11')
   const [time, setTime] = useState('08:00')
   const [description, setDescription] = useState('')
+  const [images, setImages] = useState<UploadedImage[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
   const [myLocationAddress, setMyLocationAddress] = useState<string>('Loading...')
   const [otherLocationInput, setOtherLocationInput] = useState('')
@@ -132,6 +137,7 @@ const CreateOfferPage = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    setIsSubmitting(true)
     
     let locationData = {
       latitude: 0,
@@ -180,11 +186,51 @@ const CreateOfferPage = () => {
     }
     
     try {
+      // Create the offer first
       const response = await offerService.createOffer(offerData as any)
       console.log('Offer created:', response)
+      
+      // Upload images if any
+      const newImages = images.filter(img => img.isNew && img.file)
+      if (newImages.length > 0 && response.offer_id) {
+        try {
+          const files = newImages.map(img => img.file!).filter(Boolean)
+          await offerService.uploadImages(response.offer_id, files)
+          toast({
+            title: 'Success!',
+            description: `${pageType === 'want' ? 'Want' : 'Offer'} created with ${files.length} image(s)`,
+            status: 'success',
+            duration: 3000,
+          })
+        } catch (imageError) {
+          console.error('Failed to upload images:', imageError)
+          toast({
+            title: 'Partial Success',
+            description: `${pageType === 'want' ? 'Want' : 'Offer'} created but images failed to upload`,
+            status: 'warning',
+            duration: 3000,
+          })
+        }
+      } else {
+        toast({
+          title: 'Success!',
+          description: `${pageType === 'want' ? 'Want' : 'Offer'} created successfully`,
+          status: 'success',
+          duration: 3000,
+        })
+      }
+      
       navigate('/dashboard')
     } catch (error) {
       console.error('Failed to create offer:', error)
+      toast({
+        title: 'Error',
+        description: `Failed to create ${pageType}. Please try again.`,
+        status: 'error',
+        duration: 3000,
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -217,6 +263,19 @@ const CreateOfferPage = () => {
                   onChange={(event) => setDescription(event.target.value)}
                   borderRadius="lg"
                   minH="120px"
+                />
+              </Stack>
+
+              <Stack spacing={2}>
+                <Text fontWeight="600">Images</Text>
+                <Text fontSize="sm" color="gray.500">
+                  Add up to 5 images to showcase your {pageType}
+                </Text>
+                <ImageUpload
+                  images={images}
+                  onChange={setImages}
+                  maxImages={5}
+                  disabled={isSubmitting}
                 />
               </Stack>
 
@@ -477,7 +536,17 @@ const CreateOfferPage = () => {
                 </Stack>
               )}
 
-              <Button type="submit" bg="#ECC94B" color="black" h="52px" borderRadius="xl" fontWeight="600">
+              <Button 
+                type="submit" 
+                bg="#ECC94B" 
+                color="black" 
+                h="52px" 
+                borderRadius="xl" 
+                fontWeight="600"
+                isLoading={isSubmitting}
+                loadingText="Publishing..."
+                isDisabled={isSubmitting || !title.trim()}
+              >
                 {pageType === 'want' ? 'Publish My Want' : 'Publish My Offer'}
               </Button>
             </VStack>

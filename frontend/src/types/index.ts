@@ -153,6 +153,18 @@ export interface CreateOfferResponse {
   offer_id: string
 }
 
+export interface OfferImage {
+  id: number
+  url: string
+  caption: string
+  is_primary: boolean
+}
+
+export interface UploadImageResponse {
+  message: string
+  images: OfferImage[]
+}
+
 export interface Want {
   id: string
   user_id: string
