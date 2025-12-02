@@ -33,7 +33,7 @@ import Navbar from '@/components/Navbar'
 import ImageUpload, { UploadedImage } from '@/components/ImageUpload'
 import { MdCalendarToday, MdLocationOn, MdTag } from 'react-icons/md'
 import { mockOffers } from '@/services/mock/mockData'
-import { activity_type, offer_type, location_type } from '@/types'
+import { activity_type, location_type } from '@/types'
 import { useGeoStore } from '@/store/useGeoStore'
 import { mapboxService } from '@/services/mapbox.service'
 import { offerService } from '@/services/offer.service'
@@ -51,13 +51,10 @@ const CreateOfferPage = () => {
   const [enteredTags, setEnteredTags] = useState<string[]>([])
   const [duration, setDuration] = useState('1 hr.')
   const [activityType, setActivityType] = useState(activity_type[0])
-  const [offerType, setOfferType] = useState(offer_type[0])
   const [personCount, setPersonCount] = useState('1')
   const [locationType, setLocationType] = useState(location_type[0])
-  const [fromDate, setFromDate] = useState('2025-11-11T08:00')
-  const [toDate, setToDate] = useState('2025-11-11T09:00')
-  const [date, setDate] = useState('2025-11-11')
-  const [time, setTime] = useState('08:00')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
   const [description, setDescription] = useState('')
   const [images, setImages] = useState<UploadedImage[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -225,13 +222,10 @@ const CreateOfferPage = () => {
       time_required: durationHours,
       location: locationData,
       activity_type: activityType,
-      offer_type: offerType,
       person_count: parseInt(personCount),
       location_type: locationType,
       date,
       time,
-      from_date: fromDate,
-      to_date: toDate,
       status: 'ACTIVE'
     }
     
@@ -397,29 +391,6 @@ const CreateOfferPage = () => {
                 </Stack>
               </Grid>
 
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
-                <Stack spacing={1}>
-                  <Text fontWeight="600">Starts</Text>
-                  <Input
-                    type="datetime-local"
-                    value={fromDate}
-                    onChange={(event) => setFromDate(event.target.value)}
-                    h="48px"
-                    borderRadius="lg"
-                  />
-                </Stack>
-                <Stack spacing={1}>
-                  <Text fontWeight="600">Ends</Text>
-                  <Input
-                    type="datetime-local"
-                    value={toDate}
-                    onChange={(event) => setToDate(event.target.value)}
-                    h="48px"
-                    borderRadius="lg"
-                  />
-                </Stack>
-              </Grid>
-
               <Stack spacing={1}>
                 <Text fontWeight="600">Duration</Text>
                 <Select value={duration} onChange={(event) => setDuration(event.target.value)} h="48px" borderRadius="lg">
@@ -438,16 +409,6 @@ const CreateOfferPage = () => {
                     <Radio value="group">Group Activity</Radio>
                   </Stack>
                 </RadioGroup>
-              </Stack>
-
-              <Stack spacing={1}>
-                <Text fontWeight="600">Offer Cadence</Text>
-                <Select value={offerType} onChange={(event) => setOfferType(event.target.value)} h="48px" borderRadius="lg">
-                  <option value="1time">One-time</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="biweekly">Bi-weekly</option>
-                  <option value="monthly">Monthly</option>
-                </Select>
               </Stack>
 
               <Stack spacing={1}>

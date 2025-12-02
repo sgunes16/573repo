@@ -10,6 +10,11 @@ export const offerService = {
     return response
   },
 
+  async getOfferById(offerId: string | number): Promise<Offer> {
+    const response = await apiService.get<Offer>(`/offers/${offerId}/`)
+    return response
+  },
+
   async createOffer(offer: Offer): Promise<CreateOfferResponse> {
     const response = await apiService.post<CreateOfferResponse>('/create-offer', offer) 
     return response
