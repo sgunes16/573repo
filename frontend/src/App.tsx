@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import DashboardPage from './pages/DashboardPage'
 import CreateOfferPage from './pages/CreateOfferPage'
+import OfferDetailPage from './pages/OfferDetailPage'
 import TransactionsPage from './pages/TransactionsPage'
 import HandshakePage from './pages/HandshakePage'
 import AchievementTreePage from './pages/AchievementTreePage'
@@ -32,6 +33,14 @@ function App() {
         element={
           <ProtectedRoute>
             <CreateOfferPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/offer/:id"
+        element={
+          <ProtectedRoute>
+            <OfferDetailPage />
           </ProtectedRoute>
         }
       />

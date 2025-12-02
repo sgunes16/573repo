@@ -187,7 +187,7 @@ const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?:
       cursor="pointer"
       transition="all 0.2s"
       _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
-      onClick={() => navigate(`/handshake/${offer.id}`)}
+      onClick={() => navigate(`/offer/${offer.id}`)}
     >
       <Flex gap={4} align="flex-start">
         <Stack spacing={3} flex={1}>
@@ -492,7 +492,7 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
                     cursor="pointer"
                     _hover={{ transform: 'scale(1.15)' }}
                     transition="transform 0.2s"
-                    onClick={() => navigate(`/handshake/${offer.id}`)}
+                    onClick={() => navigate(`/offer/${offer.id}`)}
                   >
                     <Avatar
                       size="md"
