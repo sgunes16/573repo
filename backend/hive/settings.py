@@ -141,14 +141,15 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 
 # MinIO / S3 Storage Settings
+USE_MINIO = os.getenv('USE_MINIO', 'true').lower() == 'true'  # Default: use MinIO
 MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'localhost:9000')
 MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
 MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin123')
 MINIO_BUCKET_NAME = os.getenv('MINIO_BUCKET_NAME', 'hive-media')
 MINIO_USE_SSL = os.getenv('MINIO_USE_SSL', 'false').lower() == 'true'
 
-# Use MinIO for media storage if endpoint is configured
-if MINIO_ENDPOINT and MINIO_ENDPOINT != 'localhost:9000':
+# Use MinIO for media storage
+if USE_MINIO:
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
     AWS_S3_ENDPOINT_URL = f"{'https' if MINIO_USE_SSL else 'http'}://{MINIO_ENDPOINT}"

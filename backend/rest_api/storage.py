@@ -13,11 +13,13 @@ def ensure_minio_bucket():
     Ensure MinIO bucket exists. Creates it if it doesn't.
     Should be called on application startup.
     """
-    # Only run if MinIO is configured
-    minio_endpoint = os.getenv('MINIO_ENDPOINT')
-    if not minio_endpoint or minio_endpoint == 'localhost:9000':
-        logger.info("MinIO not configured, using local storage")
+    # Only run if MinIO is enabled
+    use_minio = os.getenv('USE_MINIO', 'true').lower() == 'true'
+    if not use_minio:
+        logger.info("MinIO disabled, using local storage")
         return False
+    
+    minio_endpoint = os.getenv('MINIO_ENDPOINT', 'localhost:9000')
     
     try:
         import boto3
