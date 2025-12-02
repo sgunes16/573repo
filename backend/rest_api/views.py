@@ -1,8 +1,10 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_api.models import Offer, UserProfile, TimeBank
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_api.models import Offer, UserProfile, TimeBank, OfferImage
 from datetime import datetime
+from django.conf import settings
 
 class HomeView(APIView):
     def get(self, request):
@@ -98,7 +100,15 @@ class OffersView(APIView):
                 "person_count": offer.person_count,
                 "location_type": offer.location_type,
                 "tags": offer.tags,
-                "images": offer.images,
+                "images": [
+                    {
+                        "id": img.id,
+                        "url": request.build_absolute_uri(img.image.url) if img.image else None,
+                        "caption": img.caption,
+                        "is_primary": img.is_primary,
+                    }
+                    for img in offer.offer_images.all()
+                ],
                 "date": offer.date,
                 "time": offer.time,
                 "from_date": offer.from_date,
@@ -181,3 +191,110 @@ class CreateOfferView(APIView):
                 "message": "Failed to create offer",
                 "error": str(e)
             }, status=400)
+
+
+class UploadOfferImageView(APIView):
+    """Upload images for an offer or want"""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, offer_id):
+        try:
+            offer = Offer.objects.get(id=offer_id, user=request.user)
+        except Offer.DoesNotExist:
+            return Response({
+                "message": "Offer not found or you don't have permission"
+            }, status=404)
+
+        images = request.FILES.getlist('images')
+        if not images:
+            return Response({
+                "message": "No images provided"
+            }, status=400)
+
+        # Check max images (limit to 5)
+        existing_count = offer.offer_images.count()
+        if existing_count + len(images) > 5:
+            return Response({
+                "message": f"Maximum 5 images allowed. You have {existing_count}, trying to add {len(images)}"
+            }, status=400)
+
+        created_images = []
+        for i, image in enumerate(images):
+            # Validate file type
+            if not image.content_type.startswith('image/'):
+                continue
+            
+            # Validate file size (max 5MB)
+            if image.size > 5 * 1024 * 1024:
+                continue
+
+            # First image is primary if no existing primary
+            is_primary = (i == 0 and not offer.offer_images.filter(is_primary=True).exists())
+            
+            offer_image = OfferImage.objects.create(
+                offer=offer,
+                image=image,
+                caption=request.data.get('caption', ''),
+                is_primary=is_primary
+            )
+            created_images.append({
+                "id": offer_image.id,
+                "url": request.build_absolute_uri(offer_image.image.url),
+                "caption": offer_image.caption,
+                "is_primary": offer_image.is_primary,
+            })
+
+        return Response({
+            "message": f"{len(created_images)} image(s) uploaded successfully",
+            "images": created_images
+        })
+
+
+class DeleteOfferImageView(APIView):
+    """Delete an image from an offer"""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, offer_id, image_id):
+        try:
+            offer = Offer.objects.get(id=offer_id, user=request.user)
+            image = OfferImage.objects.get(id=image_id, offer=offer)
+        except (Offer.DoesNotExist, OfferImage.DoesNotExist):
+            return Response({
+                "message": "Image not found or you don't have permission"
+            }, status=404)
+
+        was_primary = image.is_primary
+        image.delete()
+
+        # If deleted image was primary, set another as primary
+        if was_primary:
+            next_image = offer.offer_images.first()
+            if next_image:
+                next_image.is_primary = True
+                next_image.save()
+
+        return Response({"message": "Image deleted successfully"})
+
+
+class SetPrimaryImageView(APIView):
+    """Set an image as primary for an offer"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, offer_id, image_id):
+        try:
+            offer = Offer.objects.get(id=offer_id, user=request.user)
+            image = OfferImage.objects.get(id=image_id, offer=offer)
+        except (Offer.DoesNotExist, OfferImage.DoesNotExist):
+            return Response({
+                "message": "Image not found or you don't have permission"
+            }, status=404)
+
+        # Remove primary from other images
+        offer.offer_images.update(is_primary=False)
+        
+        # Set this image as primary
+        image.is_primary = True
+        image.save()
+
+        return Response({"message": "Primary image updated successfully"})

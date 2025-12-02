@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "django_extensions",
+    "storages",
 ]
 
 MIDDLEWARE = [
@@ -130,6 +131,45 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Media files (User uploads)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+# MinIO / S3 Storage Settings (Always use MinIO)
+MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'localhost:9000')
+MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
+MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin123')
+MINIO_BUCKET_NAME = os.getenv('MINIO_BUCKET_NAME', 'hive-media')
+MINIO_USE_SSL = os.getenv('MINIO_USE_SSL', 'false').lower() == 'true'
+
+# AWS/MinIO S3 settings
+AWS_S3_ENDPOINT_URL = f"{'https' if MINIO_USE_SSL else 'http'}://{MINIO_ENDPOINT}"
+AWS_ACCESS_KEY_ID = MINIO_ACCESS_KEY
+AWS_SECRET_ACCESS_KEY = MINIO_SECRET_KEY
+AWS_STORAGE_BUCKET_NAME = MINIO_BUCKET_NAME
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = 'public-read'
+AWS_S3_SIGNATURE_VERSION = 's3v4'
+AWS_S3_REGION_NAME = 'us-east-1'
+AWS_QUERYSTRING_AUTH = False
+
+# Django 4.2+ uses STORAGES dict instead of DEFAULT_FILE_STORAGE
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+# Update MEDIA_URL for MinIO
+MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{MINIO_BUCKET_NAME}/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

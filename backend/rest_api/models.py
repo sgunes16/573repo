@@ -259,6 +259,30 @@ class TimeBank(models.Model):
     total_amount = models.IntegerField(default=1)
     last_update = models.DateTimeField(auto_now=True)
 
+
+def offer_image_path(instance, filename):
+    """Generate upload path for offer images"""
+    import uuid
+    ext = filename.split('.')[-1]
+    new_filename = f"{uuid.uuid4()}.{ext}"
+    return f"offers/{instance.offer.id}/{new_filename}"
+
+
+class OfferImage(models.Model):
+    """Image model for Offers and Wants"""
+    offer = models.ForeignKey(
+        Offer, on_delete=models.CASCADE, related_name='offer_images')
+    image = models.ImageField(upload_to=offer_image_path)
+    caption = models.CharField(max_length=255, blank=True)
+    is_primary = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-is_primary', '-created_at']
+
+    def __str__(self):
+        return f"Image for {self.offer.title}"
+
     def add_credit(self, hours=1):
         self.amount += hours
         self.available_amount += hours
