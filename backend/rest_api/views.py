@@ -118,6 +118,61 @@ class OffersView(APIView):
             }
             for offer in offers
         ])
+
+
+class OfferDetailView(APIView):
+    """Get details of a single offer/want"""
+    
+    def get(self, request, offer_id):
+        try:
+            offer = Offer.objects.select_related('user', 'user__profile').prefetch_related('offer_images').get(id=offer_id)
+        except Offer.DoesNotExist:
+            return Response({"error": "Offer not found"}, status=404)
+        
+        return Response({
+            "id": offer.id,
+            "user_id": offer.user_id,
+            "user": {
+                "id": offer.user.id,
+                "email": offer.user.email,
+                "first_name": offer.user.first_name,
+                "last_name": offer.user.last_name,
+                "profile": {
+                    "time_credits": offer.user.profile.time_credits if hasattr(offer.user, 'profile') else 0,
+                    "rating": offer.user.profile.rating if hasattr(offer.user, 'profile') else 0.0,
+                    "avatar": request.build_absolute_uri(offer.user.profile.avatar.url) if hasattr(offer.user, 'profile') and offer.user.profile.avatar else None,
+                } if hasattr(offer.user, 'profile') else None
+            },
+            "type": offer.type,
+            "title": offer.title,
+            "description": offer.description,
+            "time_required": offer.time_required,
+            "location": offer.location,
+            "geo_location": offer.geo_location,
+            "status": offer.status,
+            "activity_type": offer.activity_type,
+            "offer_type": offer.offer_type,
+            "person_count": offer.person_count,
+            "location_type": offer.location_type,
+            "tags": offer.tags,
+            "images": [
+                {
+                    "id": img.id,
+                    "url": request.build_absolute_uri(img.image.url) if img.image else None,
+                    "caption": img.caption,
+                    "is_primary": img.is_primary,
+                }
+                for img in offer.offer_images.all()
+            ],
+            "date": offer.date,
+            "time": str(offer.time) if offer.time else None,
+            "from_date": offer.from_date,
+            "to_date": offer.to_date,
+            "created_at": offer.created_at,
+            "updated_at": offer.updated_at,
+        })
+
+
 class CreateOfferView(APIView):
     permission_classes = [IsAuthenticated]
     

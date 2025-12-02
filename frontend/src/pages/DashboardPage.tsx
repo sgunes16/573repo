@@ -180,8 +180,16 @@ const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?:
   const displayLocation = locationAddress || offer.location || 'No location'
 
   return (
-    <Box bg="#EDF2F7" borderRadius="lg" p={4}>
-      <Flex gap={4} align="flex-start" onClick={() => navigate(`/handshake/1`)} style={{ cursor: "pointer" }}>
+    <Box 
+      bg="#EDF2F7" 
+      borderRadius="lg" 
+      p={4} 
+      cursor="pointer"
+      transition="all 0.2s"
+      _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
+      onClick={() => navigate(`/handshake/${offer.id}`)}
+    >
+      <Flex gap={4} align="flex-start">
         <Stack spacing={3} flex={1}>
           <HStack spacing={3} flexWrap="wrap">
             <RatingPill rating={rating} />
