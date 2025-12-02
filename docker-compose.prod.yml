@@ -37,6 +37,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_USER=${DB_USER}
@@ -47,6 +49,14 @@ services:
       - DEBUG=False
       - DEPLOY_TYPE=prod
       - FRONTEND_URL=${FRONTEND_URL}
+      # MinIO Settings
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME:-hive-media}
+      - MINIO_USE_SSL=false
+    networks:
+      - hive_network_prod
 
   postgres:
     image: postgres:16-alpine
@@ -69,11 +79,34 @@ services:
     networks:
       - hive_network_prod
 
+  minio:
+    image: minio/minio:latest
+    container_name: hive_minio_prod
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    expose:
+      - "9000"
+      - "9001"
+    volumes:
+      - minio_data_prod:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - hive_network_prod
+
 networks:
   hive_network_prod:
     driver: bridge
 
 volumes:
   postgres_data_hive_prod:
+    driver: local
+  minio_data_prod:
     driver: local
 
