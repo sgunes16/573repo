@@ -40,7 +40,7 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
   const [userProfile, setUserProfile] = useState<UserProfile | undefined>(undefined);
   const [timeBank, setTimeBank] = useState<TimeBank | undefined>(undefined);
 
-  const { geoLocation, setGeoLocation } = useGeoStore();
+  const { setGeoLocation } = useGeoStore();
 
   useEffect(() => {
     if (user) {
@@ -58,7 +58,7 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
   }
 
   const fetchGeoLocation = async () => {
-    const response = await navigator.geolocation.getCurrentPosition((position) => {
+      await navigator.geolocation.getCurrentPosition((position) => {
       setGeoLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
     });
   }
