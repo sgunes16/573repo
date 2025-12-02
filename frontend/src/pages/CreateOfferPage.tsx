@@ -4,6 +4,8 @@ import {
   Button,
   Container,
   Divider,
+  FormControl,
+  FormErrorMessage,
   Grid,
   Heading,
   HStack,
@@ -59,6 +61,7 @@ const CreateOfferPage = () => {
   const [description, setDescription] = useState('')
   const [images, setImages] = useState<UploadedImage[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
   
   const [myLocationAddress, setMyLocationAddress] = useState<string>('Loading...')
   const [otherLocationInput, setOtherLocationInput] = useState('')
@@ -68,6 +71,39 @@ const CreateOfferPage = () => {
   const [showLocationDropdown, setShowLocationDropdown] = useState(false)
 
   const relatedOffers = useMemo(() => mockOffers.slice(0, 2), [])
+
+  // Validation logic
+  const errors = useMemo(() => {
+    const errs: Record<string, string> = {}
+    
+    if (!title.trim()) {
+      errs.title = 'Title is required'
+    }
+    
+    if (!description.trim()) {
+      errs.description = 'Description is required'
+    }
+    
+    if (locationType === 'otherLocation' && !otherLocationCoords) {
+      errs.location = 'Please select a location from the dropdown'
+    }
+    
+    return errs
+  }, [title, description, locationType, otherLocationCoords])
+
+  const isFormValid = Object.keys(errors).length === 0
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }))
+  }
+
+  const validateAllFields = () => {
+    setTouched({
+      title: true,
+      description: true,
+      location: true,
+    })
+  }
 
   useEffect(() => {
     if (!geoLocation || (geoLocation.latitude === 0 && geoLocation.longitude === 0)) {
@@ -137,6 +173,20 @@ const CreateOfferPage = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    
+    // Validate all fields on submit
+    validateAllFields()
+    
+    if (!isFormValid) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fill in all required fields',
+        status: 'error',
+        duration: 3000,
+      })
+      return
+    }
+    
     setIsSubmitting(true)
     
     let locationData = {
@@ -244,27 +294,31 @@ const CreateOfferPage = () => {
               {pageType === 'want' ? 'Publish a New Want' : 'Publish a New Offer'}
             </Heading>
             <VStack spacing={6} align="stretch">
-              <Stack spacing={1}>
-                <Text fontWeight="600">Title</Text>
+              <FormControl isInvalid={touched.title && !!errors.title}>
+                <Text fontWeight="600" mb={1}>Title <Text as="span" color="red.500">*</Text></Text>
                 <Input
                   placeholder={pageType === 'want' ? "What do you need help with?" : "Give your offer a short name"}
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
+                  onBlur={() => handleBlur('title')}
                   h="48px"
                   borderRadius="lg"
                 />
-              </Stack>
+                <FormErrorMessage>{errors.title}</FormErrorMessage>
+              </FormControl>
 
-              <Stack spacing={1}>
-                <Text fontWeight="600">Description</Text>
+              <FormControl isInvalid={touched.description && !!errors.description}>
+                <Text fontWeight="600" mb={1}>Description <Text as="span" color="red.500">*</Text></Text>
                 <Textarea
                   placeholder={pageType === 'want' ? "Describe what kind of help you're looking for" : "Describe the skills or support you want to share"}
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
+                  onBlur={() => handleBlur('description')}
                   borderRadius="lg"
                   minH="120px"
                 />
-              </Stack>
+                <FormErrorMessage>{errors.description}</FormErrorMessage>
+              </FormControl>
 
               <Stack spacing={2}>
                 <Text fontWeight="600">Images</Text>
@@ -447,8 +501,8 @@ const CreateOfferPage = () => {
               </Stack>
 
               {locationType === 'otherLocation' && (
-                <Stack spacing={2}>
-                  <Text fontWeight="600">Other Location</Text>
+                <FormControl isInvalid={touched.location && !!errors.location}>
+                  <Text fontWeight="600" mb={1}>Other Location <Text as="span" color="red.500">*</Text></Text>
                   <Box position="relative">
                     <InputGroup>
                       <InputLeftElement h="48px" pointerEvents="none">
@@ -464,6 +518,7 @@ const CreateOfferPage = () => {
                             setOtherLocationCoords(null)
                           }
                         }}
+                        onBlur={() => handleBlur('location')}
                         h="48px" 
                         borderRadius="lg"
                         pr={isLoadingLocation ? '40px' : '12px'}
@@ -533,7 +588,8 @@ const CreateOfferPage = () => {
                       </Text>
                     </Box>
                   )}
-                </Stack>
+                  <FormErrorMessage>{errors.location}</FormErrorMessage>
+                </FormControl>
               )}
 
               <Button 
@@ -545,7 +601,8 @@ const CreateOfferPage = () => {
                 fontWeight="600"
                 isLoading={isSubmitting}
                 loadingText="Publishing..."
-                isDisabled={isSubmitting || !title.trim()}
+                isDisabled={isSubmitting}
+                _disabled={{ bg: 'gray.300', cursor: 'not-allowed' }}
               >
                 {pageType === 'want' ? 'Publish My Want' : 'Publish My Offer'}
               </Button>
