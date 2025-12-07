@@ -27,6 +27,8 @@ class UserView(APIView):
             },
         })
 class UserProfileView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    
     def get(self, request):
         user = request.user
         
@@ -62,6 +64,90 @@ class UserProfileView(APIView):
                 "badges": user_profile.badges,
                 "achievements": user_profile.achievements,
                 "time_credits": user_profile.time_credits,
+                "avatar": request.build_absolute_uri(user_profile.avatar.url) if user_profile.avatar else None,
+            },
+            "timebank": {
+                "id": timebank.id,
+                "amount": timebank.amount,
+                "blocked_amount": timebank.blocked_amount,
+                "available_amount": timebank.available_amount,
+                "total_amount": timebank.total_amount,
+            },
+        })
+    
+    def put(self, request):
+        """Update user profile"""
+        user = request.user
+        
+        user_profile, _ = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'bio': '',
+                'location': '',
+                'skills': [],
+                'rating': 0.0,
+            }
+        )
+        
+        # Update User fields (first_name, last_name)
+        if 'first_name' in request.data:
+            user.first_name = request.data['first_name']
+        if 'last_name' in request.data:
+            user.last_name = request.data['last_name']
+        user.save()
+        
+        # Update UserProfile fields
+        if 'bio' in request.data:
+            user_profile.bio = request.data['bio']
+        if 'location' in request.data:
+            user_profile.location = request.data['location']
+        if 'skills' in request.data:
+            skills = request.data.get('skills', [])
+            if isinstance(skills, str):
+                import json
+                try:
+                    skills = json.loads(skills)
+                except:
+                    skills = [s.strip() for s in skills.split(',') if s.strip()]
+            user_profile.skills = skills
+        if 'phone_number' in request.data:
+            user_profile.phone_number = request.data['phone_number']
+        
+        # Handle avatar upload
+        if 'avatar' in request.FILES:
+            user_profile.avatar = request.FILES['avatar']
+        
+        user_profile.save()
+        
+        timebank, _ = TimeBank.objects.get_or_create(
+            user=user,
+            defaults={
+                'amount': 1,
+                'blocked_amount': 0,
+                'available_amount': 1,
+                'total_amount': 1,
+            }
+        )
+        
+        return Response({
+            "message": "Profile updated successfully",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
+            "user_profile": {
+                "id": user_profile.id,
+                "bio": user_profile.bio,
+                "location": user_profile.location,
+                "skills": user_profile.skills,
+                "rating": user_profile.rating,
+                "phone_number": user_profile.phone_number,
+                "badges": user_profile.badges,
+                "achievements": user_profile.achievements,
+                "time_credits": user_profile.time_credits,
+                "avatar": request.build_absolute_uri(user_profile.avatar.url) if user_profile.avatar else None,
             },
             "timebank": {
                 "id": timebank.id,

@@ -110,12 +110,15 @@ export interface UserProfile {
   user_id: string
   bio?: string
   profile_picture?: string
+  avatar?: string
   geo_location?: string
   location?: string
   skills: string[]
   time_credits: number
   rating?: number
   phone_number?: string
+  badges?: string[]
+  achievements?: string[]
 }
 
 export interface UserProfileResponse {
