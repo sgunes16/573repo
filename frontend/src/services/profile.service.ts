@@ -24,6 +24,28 @@ export const profileService = {
     return [response.user_profile, response.timebank]
   },
 
+  async getUserProfileDetail(userId: string): Promise<{
+    user: {
+      id: string
+      email: string
+      first_name: string
+      last_name: string
+    }
+    profile: UserProfile | null
+    recent_offers: any[]
+    recent_wants: any[]
+    recent_transactions: any[]
+    comments: any[]
+    ratings_summary: {
+      avg_communication: number
+      avg_punctuality: number
+      total_count: number
+      would_recommend_percentage: number
+    } | null
+  }> {
+    return await apiService.get(`/user-profile/${userId}/`)
+  },
+
   async updateProfile(data: UpdateProfileData): Promise<UpdateProfileResponse> {
     const formData = new FormData()
     

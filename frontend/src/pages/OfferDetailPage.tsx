@@ -341,9 +341,26 @@ const OfferDetailPage = () => {
                   size="lg"
                   name={`${offer.user?.first_name} ${offer.user?.last_name}`}
                   src={offer.user?.profile?.avatar}
+                  cursor="pointer"
+                  onClick={() => {
+                    if (offer.user?.id) {
+                      navigate(`/profile/${offer.user.id}`)
+                    }
+                  }}
+                  _hover={{ opacity: 0.8 }}
                 />
                 <Box>
-                  <Text fontWeight="600" fontSize="lg">
+                  <Text 
+                    fontWeight="600" 
+                    fontSize="lg"
+                    cursor="pointer"
+                    onClick={() => {
+                      if (offer.user?.id) {
+                        navigate(`/profile/${offer.user.id}`)
+                      }
+                    }}
+                    _hover={{ textDecoration: 'underline' }}
+                  >
                     {offer.user?.first_name} {offer.user?.last_name}
                   </Text>
                   <HStack spacing={1}>

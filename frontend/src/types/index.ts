@@ -240,8 +240,23 @@ export enum ExchangeStatus {
 
 export interface ExchangeRating {
   id?: string
-  rater_id: string
-  ratee_id: string
+  rater_id?: string
+  ratee_id?: string
+  rater?: {
+    id: string
+    first_name: string
+    last_name: string
+    profile?: {
+      avatar?: string
+    }
+  }
+  exchange?: {
+    id: string
+    offer: {
+      id: string
+      title: string
+    }
+  }
   communication: number  // 1-5
   punctuality: number    // 1-5
   would_recommend: boolean

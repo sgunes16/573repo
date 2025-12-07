@@ -211,10 +211,30 @@ const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?:
             <Avatar
               size="md"
               name={`${userName} ${userLastName}`}
-              src="https://placehold.co/36x36"
+              src={offer.user?.profile?.avatar || undefined}
+              cursor="pointer"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (offer.user?.id) {
+                  navigate(`/profile/${offer.user.id}`)
+                }
+              }}
+              _hover={{ opacity: 0.8 }}
             />
             <Stack spacing={0} flex={1}>
-              <Text fontSize="lg">{userName}</Text>
+              <Text 
+                fontSize="lg"
+                cursor="pointer"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (offer.user?.id) {
+                    navigate(`/profile/${offer.user.id}`)
+                  }
+                }}
+                _hover={{ textDecoration: 'underline' }}
+              >
+                {userName}
+              </Text>
               <Wrap spacing={2}>
                 {offer.tags && offer.tags.map(tag => (
                   <WrapItem key={tag}>
@@ -286,7 +306,10 @@ const LatestTransactionCard = ({
       _hover={{ bg: '#E2E8F0' }}
       onClick={() => navigate('/transactions')}
     >
-      <Avatar name={`${otherUser.first_name} ${otherUser.last_name}`} />
+      <Avatar 
+        name={`${otherUser.first_name} ${otherUser.last_name}`}
+        src={(otherUser as any)?.profile?.avatar}
+      />
       <Icon as={MdSwapHoriz} boxSize={8} color="gray.600" />
       <VStack align="flex-start" spacing={1} flex={1}>
         <Text fontSize="sm" fontWeight="semibold">

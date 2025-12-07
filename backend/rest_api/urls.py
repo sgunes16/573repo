@@ -1,7 +1,7 @@
 from django.urls import path, include
 
 from .views import (
-    HomeView, UserView, OffersView, OfferDetailView, UserProfileView, CreateOfferView,
+    HomeView, UserView, OffersView, OfferDetailView, UserProfileView, UserProfileDetailView, CreateOfferView,
     UploadOfferImageView, DeleteOfferImageView, SetPrimaryImageView,
     CreateExchangeView, ExchangeDetailView, MyExchangesView, ExchangeByOfferView, ExchangesByOfferView, ProposeDateTimeView,
     AcceptExchangeView, RejectExchangeView, ConfirmCompletionView, SubmitRatingView,
@@ -16,6 +16,7 @@ urlpatterns = [
     path("offers/", OffersView.as_view(), name="offers"),
     path("offers/<int:offer_id>/", OfferDetailView.as_view(), name="offer-detail"),
     path("user-profile/", UserProfileView.as_view(), name="user-profile"),
+    path("user-profile/<int:user_id>/", UserProfileDetailView.as_view(), name="user-profile-detail"),
     path("create-offer", CreateOfferView.as_view(), name="create-offer"),
     
     # Image upload endpoints (works for both offers and wants)

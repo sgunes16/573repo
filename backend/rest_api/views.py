@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_api.models import Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Comment
+from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Comment
 from datetime import datetime, date, time
 from django.conf import settings
 from django.db import transaction, models
@@ -161,7 +161,26 @@ class UserProfileView(APIView):
         })
 class OffersView(APIView):
     def get(self, request):
-        offers = Offer.objects.select_related('user', 'user__profile').all()
+        from datetime import date
+        
+        offers = Offer.objects.select_related('user', 'user__profile').prefetch_related('exchange_set').all()
+        
+        # Filter out offers that have accepted exchanges with future proposed_date
+        available_offers = []
+        today = date.today()
+        
+        for offer in offers:
+            # Check if offer has accepted exchange with future proposed_date
+            has_future_accepted_exchange = Exchange.objects.filter(
+                offer=offer,
+                status='ACCEPTED',
+                proposed_date__gt=today
+            ).exists()
+            
+            # Only include offers that don't have future accepted exchanges
+            if not has_future_accepted_exchange:
+                available_offers.append(offer)
+        
         return Response([
             {
                 "id": offer.id,
@@ -174,6 +193,7 @@ class OffersView(APIView):
                     "profile": {
                         "time_credits": offer.user.profile.time_credits if hasattr(offer.user, 'profile') else 0,
                         "rating": offer.user.profile.rating if hasattr(offer.user, 'profile') else 0.0,
+                        "avatar": request.build_absolute_uri(offer.user.profile.avatar.url) if hasattr(offer.user, 'profile') and offer.user.profile.avatar else None,
                     } if hasattr(offer.user, 'profile') else None
                 },
                 "type": offer.type,
@@ -204,7 +224,7 @@ class OffersView(APIView):
                 "created_at": offer.created_at,
                 "updated_at": offer.updated_at,
             }
-            for offer in offers
+            for offer in available_offers
         ])
 
 
@@ -468,15 +488,16 @@ class CreateExchangeView(APIView):
             if existing:
                 return Response({"error": "Exchange request already exists"}, status=400)
 
-            # Freeze 1H time from requester
+            # Freeze time from requester (based on offer time_required)
+            time_to_block = offer.time_required
             requester_timebank, _ = TimeBank.objects.get_or_create(
                 user=request.user,
                 defaults={'amount': 1, 'blocked_amount': 0, 'available_amount': 1, 'total_amount': 1}
             )
             
-            if not requester_timebank.block_credit(1):
+            if not requester_timebank.block_credit(time_to_block):
                 return Response({
-                    "error": "Insufficient time credits. You need at least 1H available."
+                    "error": f"Insufficient time credits. You need at least {time_to_block}H available."
                 }, status=400)
 
             # Create exchange
@@ -491,7 +512,7 @@ class CreateExchangeView(APIView):
             return Response({
                 "message": "Exchange request created successfully",
                 "exchange_id": exchange.id,
-                "time_frozen": 1
+                "time_frozen": time_to_block
             }, status=201)
 
         except Offer.DoesNotExist:
@@ -841,7 +862,7 @@ class RejectExchangeView(APIView):
 
             # Unfreeze requester's time
             requester_timebank = exchange.requester.timebank
-            requester_timebank.unblock_credit(1)
+            requester_timebank.unblock_credit(exchange.time_spent)
 
             exchange.status = 'CANCELLED'
             exchange.save()
@@ -876,10 +897,36 @@ class ConfirmCompletionView(APIView):
             elif request.user == exchange.provider:
                 exchange.provider_confirmed = True
 
-            # If both confirmed, mark as completed
+            # If both confirmed, mark as completed and transfer time
             if exchange.requester_confirmed and exchange.provider_confirmed:
                 exchange.status = 'COMPLETED'
                 exchange.completed_at = datetime.now()
+                
+                # Unblock and transfer time immediately when completed
+                requester_timebank = exchange.requester.timebank
+                provider_timebank, _ = TimeBank.objects.get_or_create(
+                    user=exchange.provider,
+                    defaults={'amount': 0, 'blocked_amount': 0, 'available_amount': 0, 'total_amount': 0}
+                )
+                
+                # Unfreeze requester's time
+                requester_timebank.unblock_credit(exchange.time_spent)
+                
+                # Transfer time
+                if requester_timebank.amount >= exchange.time_spent:
+                    requester_timebank.spend_credit(exchange.time_spent)
+                    provider_timebank.add_credit(exchange.time_spent)
+                    
+                    # Create transaction record if it doesn't exist
+                    if not TimeBankTransaction.objects.filter(exchange=exchange).exists():
+                        TimeBankTransaction.objects.create(
+                            from_user=exchange.requester,
+                            to_user=exchange.provider,
+                            exchange=exchange,
+                            time_amount=exchange.time_spent,
+                            transaction_type='SPEND',
+                            description=f'Exchange completed: {exchange.offer.title}'
+                        )
 
             exchange.save()
 
@@ -957,41 +1004,8 @@ class SubmitRatingView(APIView):
                     ratee.profile.rating = (avg_comm + avg_punc) / 2
                     ratee.profile.save()
 
-            # If both parties rated, transfer time
-            provider_rated = ExchangeRating.objects.filter(
-                exchange=exchange,
-                rater=exchange.provider
-            ).exists()
-            requester_rated = ExchangeRating.objects.filter(
-                exchange=exchange,
-                rater=exchange.requester
-            ).exists()
-
-            if provider_rated and requester_rated:
-                # Transfer time from requester to provider
-                requester_timebank = exchange.requester.timebank
-                provider_timebank, _ = TimeBank.objects.get_or_create(
-                    user=exchange.provider,
-                    defaults={'amount': 0, 'blocked_amount': 0, 'available_amount': 0, 'total_amount': 0}
-                )
-
-                # Unfreeze requester's time
-                requester_timebank.unblock_credit(exchange.time_spent)
-                
-                # Transfer time
-                if requester_timebank.amount >= exchange.time_spent:
-                    requester_timebank.spend_credit(exchange.time_spent)
-                    provider_timebank.add_credit(exchange.time_spent)
-
-                    # Create single transaction record for the exchange
-                    TimeBankTransaction.objects.create(
-                        from_user=exchange.requester,
-                        to_user=exchange.provider,
-                        exchange=exchange,
-                        time_amount=exchange.time_spent,
-                        transaction_type='SPEND',
-                        description=f'Exchange completed: {exchange.offer.title}'
-                    )
+            # Note: Time transfer is handled when exchange is completed, not when rating is submitted
+            # Rating is optional and can be submitted anytime after completion
 
             return Response({
                 "message": "Rating submitted successfully",
@@ -1073,6 +1087,18 @@ class TransactionsView(APIView):
             else:
                 user_transaction_type = tx.transaction_type
 
+            # Get avatar URLs
+            from_user_profile = None
+            to_user_profile = None
+            try:
+                from_user_profile = tx.from_user.profile
+            except:
+                pass
+            try:
+                to_user_profile = tx.to_user.profile
+            except:
+                pass
+
             transactions_data.append({
                 "id": tx.id,
                 "from_user": {
@@ -1080,12 +1106,18 @@ class TransactionsView(APIView):
                     "first_name": tx.from_user.first_name,
                     "last_name": tx.from_user.last_name,
                     "email": tx.from_user.email,
+                    "profile": {
+                        "avatar": request.build_absolute_uri(from_user_profile.avatar.url) if from_user_profile and from_user_profile.avatar else None,
+                    } if from_user_profile else None,
                 },
                 "to_user": {
                     "id": tx.to_user.id,
                     "first_name": tx.to_user.first_name,
                     "last_name": tx.to_user.last_name,
                     "email": tx.to_user.email,
+                    "profile": {
+                        "avatar": request.build_absolute_uri(to_user_profile.avatar.url) if to_user_profile and to_user_profile.avatar else None,
+                    } if to_user_profile else None,
                 },
                 "exchange": {
                     "id": tx.exchange.id,
@@ -1143,6 +1175,124 @@ class LatestTransactionsView(APIView):
             else:
                 user_transaction_type = tx.transaction_type
 
+            # Get avatar URLs
+            from_user_profile = None
+            to_user_profile = None
+            try:
+                from_user_profile = tx.from_user.profile
+            except:
+                pass
+            try:
+                to_user_profile = tx.to_user.profile
+            except:
+                pass
+
+            transactions_data.append({
+                "id": tx.id,
+                "from_user": {
+                    "id": tx.from_user.id,
+                    "first_name": tx.from_user.first_name,
+                    "last_name": tx.from_user.last_name,
+                    "profile": {
+                        "avatar": request.build_absolute_uri(from_user_profile.avatar.url) if from_user_profile and from_user_profile.avatar else None,
+                    } if from_user_profile else None,
+                },
+                "to_user": {
+                    "id": tx.to_user.id,
+                    "first_name": tx.to_user.first_name,
+                    "last_name": tx.to_user.last_name,
+                    "profile": {
+                        "avatar": request.build_absolute_uri(to_user_profile.avatar.url) if to_user_profile and to_user_profile.avatar else None,
+                    } if to_user_profile else None,
+                },
+                "exchange": {
+                    "id": tx.exchange.id,
+                    "offer": {
+                        "id": tx.exchange.offer.id,
+                        "title": tx.exchange.offer.title,
+                    },
+                } if tx.exchange else None,
+                "time_amount": tx.time_amount,
+                "transaction_type": user_transaction_type,
+                "description": tx.description,
+                "created_at": tx.created_at,
+            })
+
+        return Response(transactions_data)
+
+
+class UserProfileDetailView(APIView):
+    """Get another user's profile details"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        # Get user profile
+        try:
+            user_profile = target_user.profile
+        except:
+            user_profile = None
+
+        # Get user's recent offers (all, not limited)
+        recent_offers = Offer.objects.filter(
+            user=target_user,
+            type='offer'
+        ).prefetch_related('exchange_set').order_by('-created_at')
+
+        # Get user's recent wants (all, not limited)
+        recent_wants = Offer.objects.filter(
+            user=target_user,
+            type='want'
+        ).prefetch_related('exchange_set').order_by('-created_at')
+
+        # Get user's recent transactions (last 5)
+        recent_transactions = TimeBankTransaction.objects.filter(
+            Q(from_user=target_user) | Q(to_user=target_user)
+        ).select_related(
+            'from_user', 'to_user', 'exchange', 'exchange__offer'
+        ).order_by('-created_at')
+
+        # Get comments about this user
+        user_comments = Comment.objects.filter(
+            target_type='user',
+            target_id=str(target_user.id)
+        ).select_related('user').order_by('-created_at')
+
+        # Get average ratings for this user
+        user_ratings = ExchangeRating.objects.filter(ratee=target_user)
+        avg_communication = user_ratings.aggregate(Avg('communication'))['communication__avg'] or 0
+        avg_punctuality = user_ratings.aggregate(Avg('punctuality'))['punctuality__avg'] or 0
+        total_ratings_count = user_ratings.count()
+        would_recommend_count = user_ratings.filter(would_recommend=True).count()
+        would_recommend_percentage = (would_recommend_count / total_ratings_count * 100) if total_ratings_count > 0 else 0
+
+        # Group transactions by exchange to avoid duplicates
+        seen_exchanges = set()
+        transactions_data = []
+        for tx in recent_transactions:
+            if tx.exchange and tx.exchange.id in seen_exchanges:
+                continue
+            if tx.exchange:
+                seen_exchanges.add(tx.exchange.id)
+            
+            if len(transactions_data) >= 5:
+                break
+
+            # Determine transaction type from viewer's perspective
+            if tx.exchange:
+                if tx.exchange.requester.id == target_user.id:
+                    user_transaction_type = 'SPEND'
+                elif tx.exchange.provider.id == target_user.id:
+                    user_transaction_type = 'EARN'
+                else:
+                    user_transaction_type = tx.transaction_type
+            else:
+                user_transaction_type = tx.transaction_type
+
             transactions_data.append({
                 "id": tx.id,
                 "from_user": {
@@ -1168,4 +1318,141 @@ class LatestTransactionsView(APIView):
                 "created_at": tx.created_at,
             })
 
-        return Response(transactions_data)
+        # Format offers with status
+        from datetime import date
+        today = date.today()
+        
+        offers_data = []
+        for offer in recent_offers:
+            # Determine offer status based on exchanges
+            has_completed = Exchange.objects.filter(
+                offer=offer,
+                status='COMPLETED'
+            ).exists()
+            
+            has_future_accepted = Exchange.objects.filter(
+                offer=offer,
+                status='ACCEPTED',
+                proposed_date__gt=today
+            ).exists()
+            
+            has_in_progress = Exchange.objects.filter(
+                offer=offer,
+                status__in=['ACCEPTED', 'IN_PROGRESS'],
+                proposed_date__gte=today
+            ).exists()
+            
+            if has_completed:
+                offer_status = 'completed'
+            elif has_in_progress or has_future_accepted:
+                offer_status = 'in_progress'
+            else:
+                offer_status = 'active'
+            
+            offers_data.append({
+                "id": offer.id,
+                "title": offer.title,
+                "description": offer.description,
+                "time_required": offer.time_required,
+                "location": offer.location,
+                "created_at": offer.created_at,
+                "type": offer.type,
+                "status": offer_status,
+            })
+
+        # Format wants with status
+        wants_data = []
+        for want in recent_wants:
+            # Determine want status based on exchanges
+            has_completed = Exchange.objects.filter(
+                offer=want,
+                status='COMPLETED'
+            ).exists()
+            
+            has_future_accepted = Exchange.objects.filter(
+                offer=want,
+                status='ACCEPTED',
+                proposed_date__gt=today
+            ).exists()
+            
+            has_in_progress = Exchange.objects.filter(
+                offer=want,
+                status__in=['ACCEPTED', 'IN_PROGRESS'],
+                proposed_date__gte=today
+            ).exists()
+            
+            if has_completed:
+                want_status = 'completed'
+            elif has_in_progress or has_future_accepted:
+                want_status = 'in_progress'
+            else:
+                want_status = 'active'
+            
+            wants_data.append({
+                "id": want.id,
+                "title": want.title,
+                "description": want.description,
+                "time_required": want.time_required,
+                "location": want.location,
+                "created_at": want.created_at,
+                "type": want.type,
+                "status": want_status,
+            })
+
+        # Format comments
+        comments_data = []
+        for comment in user_comments:
+            user_profile = None
+            try:
+                user_profile = comment.user.profile
+            except:
+                pass
+            
+            comments_data.append({
+                "id": comment.id,
+                "user": {
+                    "id": comment.user.id,
+                    "first_name": comment.user.first_name,
+                    "last_name": comment.user.last_name,
+                    "email": comment.user.email,
+                    "profile": {
+                        "avatar": request.build_absolute_uri(user_profile.avatar.url) if user_profile and user_profile.avatar else None,
+                    } if user_profile else None,
+                },
+                "content": comment.content,
+                "rating": comment.rating,
+                "created_at": comment.created_at,
+            })
+
+        # Format average ratings
+        ratings_summary = {
+            "avg_communication": round(avg_communication, 1),
+            "avg_punctuality": round(avg_punctuality, 1),
+            "total_count": total_ratings_count,
+            "would_recommend_percentage": round(would_recommend_percentage, 1),
+        }
+
+        return Response({
+            "user": {
+                "id": target_user.id,
+                "email": target_user.email,
+                "first_name": target_user.first_name,
+                "last_name": target_user.last_name,
+            },
+            "profile": {
+                "id": user_profile.id if user_profile else None,
+                "bio": user_profile.bio if user_profile else "",
+                "location": user_profile.location if user_profile else "",
+                "skills": user_profile.skills if user_profile else [],
+                "interests": user_profile.skills if user_profile else [],  # Using skills as interests
+                "rating": user_profile.rating if user_profile else 0.0,
+                "avatar": request.build_absolute_uri(user_profile.avatar.url) if user_profile and user_profile.avatar else None,
+                "badges": user_profile.badges if user_profile else [],
+                "achievements": user_profile.achievements if user_profile else [],
+            } if user_profile else None,
+            "recent_offers": offers_data,
+            "recent_wants": wants_data,
+            "recent_transactions": transactions_data,
+            "comments": comments_data,
+            "ratings_summary": ratings_summary,
+        })

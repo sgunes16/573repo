@@ -286,9 +286,20 @@ class TimeBank(models.Model):
         return False
 
     def unblock_credit(self, hours=1):
-        self.blocked_amount -= hours
-        self.available_amount += hours
-        self.save()
+        # Only unblock if there's enough blocked amount
+        if self.blocked_amount >= hours:
+            self.blocked_amount -= hours
+            self.available_amount += hours
+            self.save()
+            return True
+        # If blocked_amount is less than hours, unblock what's available
+        elif self.blocked_amount > 0:
+            actual_unblocked = self.blocked_amount
+            self.available_amount += actual_unblocked
+            self.blocked_amount = 0
+            self.save()
+            return True
+        return False
 
     def __str__(self):
         return f"{self.user.email} - {self.amount}h"
