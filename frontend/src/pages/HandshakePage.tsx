@@ -54,7 +54,7 @@ import {
 } from 'react-icons/md'
 
 const HandshakePage = () => {
-  const { offerId } = useParams<{ offerId: string }>()
+  const { exchangeId, offerId } = useParams<{ exchangeId?: string; offerId?: string }>()
   const navigate = useNavigate()
   const toast = useToast()
   const { user } = useAuthStore()
@@ -89,29 +89,35 @@ const HandshakePage = () => {
 
   useEffect(() => {
     const fetchExchange = async () => {
-      if (!offerId) return
-      
       setIsLoading(true)
       try {
-        // Try to get existing exchange for this offer
-        const existingExchange = await exchangeService.getExchangeByOfferId(offerId)
+        let exchangeData: Exchange | null = null
 
-        if (existingExchange) {
-          setExchange(existingExchange)
+        // If exchangeId is provided, fetch by exchange ID
+        if (exchangeId) {
+          exchangeData = await exchangeService.getExchange(exchangeId)
+        } 
+        // Otherwise, try to get exchange by offerId (for requester)
+        else if (offerId) {
+          exchangeData = await exchangeService.getExchangeByOfferId(offerId)
+        }
+
+        if (exchangeData) {
+          setExchange(exchangeData)
           
           // Fetch location address
-          if (existingExchange.offer.geo_location && existingExchange.offer.geo_location.length === 2) {
+          if (exchangeData.offer.geo_location && exchangeData.offer.geo_location.length === 2) {
             try {
               const address = await mapboxService.reverseGeocode(
-                existingExchange.offer.geo_location[0],
-                existingExchange.offer.geo_location[1]
+                exchangeData.offer.geo_location[0],
+                exchangeData.offer.geo_location[1]
               )
               setLocationAddress(address)
             } catch (error) {
               console.error('Failed to geocode:', error)
             }
-          } else if (existingExchange.offer.location) {
-            setLocationAddress(existingExchange.offer.location)
+          } else if (exchangeData.offer.location) {
+            setLocationAddress(exchangeData.offer.location)
           }
         }
         // If no exchange found, it will show the "Request Exchange" button
@@ -123,7 +129,7 @@ const HandshakePage = () => {
     }
 
     fetchExchange()
-  }, [offerId])
+  }, [exchangeId, offerId])
 
   const isRequester = exchange?.requester.id === currentUser?.id
   const isProvider = exchange?.provider.id === currentUser?.id
@@ -155,8 +161,8 @@ const HandshakePage = () => {
         duration: 3000,
       })
       
-      const newExchange = await exchangeService.getExchange(response.exchange_id.toString())
-      setExchange(newExchange)
+      // Navigate to exchange page
+      navigate(`/handshake/exchange/${response.exchange_id}`)
     } catch (error: any) {
       toast({
         title: 'Error',

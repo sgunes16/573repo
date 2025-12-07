@@ -88,7 +88,15 @@ function App() {
         }
       />
       <Route
-        path="/handshake/:offerId"
+        path="/handshake/exchange/:exchangeId"
+        element={
+          <ProtectedRoute>
+            <HandshakePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/handshake/offer/:offerId"
         element={
           <ProtectedRoute>
             <HandshakePage />

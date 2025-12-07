@@ -3,7 +3,7 @@ from django.urls import path, include
 from .views import (
     HomeView, UserView, OffersView, OfferDetailView, UserProfileView, CreateOfferView,
     UploadOfferImageView, DeleteOfferImageView, SetPrimaryImageView,
-    CreateExchangeView, ExchangeDetailView, MyExchangesView, ExchangeByOfferView, ProposeDateTimeView,
+    CreateExchangeView, ExchangeDetailView, MyExchangesView, ExchangeByOfferView, ExchangesByOfferView, ProposeDateTimeView,
     AcceptExchangeView, RejectExchangeView, ConfirmCompletionView, SubmitRatingView
 )
 from .auth.views import LoginView, RegisterView, LogoutView
@@ -26,6 +26,7 @@ urlpatterns = [
     path("exchanges/", CreateExchangeView.as_view(), name="create-exchange"),
     path("exchanges/<int:exchange_id>/", ExchangeDetailView.as_view(), name="exchange-detail"),
     path("exchanges/by-offer/<int:offer_id>/", ExchangeByOfferView.as_view(), name="exchange-by-offer"),
+    path("exchanges/for-offer/<int:offer_id>/", ExchangesByOfferView.as_view(), name="exchanges-for-offer"),
     path("my-exchanges/", MyExchangesView.as_view(), name="my-exchanges"),
     path("exchanges/<int:exchange_id>/propose-datetime/", ProposeDateTimeView.as_view(), name="propose-datetime"),
     path("exchanges/<int:exchange_id>/accept/", AcceptExchangeView.as_view(), name="accept-exchange"),

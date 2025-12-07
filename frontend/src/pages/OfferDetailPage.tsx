@@ -19,9 +19,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import { offerService } from '@/services/offer.service'
+import { exchangeService } from '@/services/exchange.service'
 import { mapboxService } from '@/services/mapbox.service'
 import { useAuthStore } from '@/store/useAuthStore'
-import type { Offer, OfferImage } from '@/types'
+import type { Offer, OfferImage, Exchange } from '@/types'
 import {
   MdAccessTime,
   MdArrowBack,
@@ -42,6 +43,7 @@ const OfferDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [locationAddress, setLocationAddress] = useState<string>('')
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [exchanges, setExchanges] = useState<Exchange[]>([])
 
   // Check if current user is the owner of this offer
   const isOwner = user?.id === offer?.user_id || user?.id === offer?.user?.id
@@ -73,6 +75,16 @@ const OfferDetailPage = () => {
         } else if (data.location) {
           setLocationAddress(data.location)
         }
+
+        // Fetch exchanges if user is owner
+        if (user?.id === data.user_id || user?.id === data.user?.id) {
+          try {
+            const exchangesData = await exchangeService.getExchangesForOffer(id)
+            setExchanges(exchangesData)
+          } catch (error) {
+            console.error('Failed to fetch exchanges:', error)
+          }
+        }
       } catch (error) {
         console.error('Failed to fetch offer:', error)
       } finally {
@@ -81,7 +93,7 @@ const OfferDetailPage = () => {
     }
 
     fetchOffer()
-  }, [id])
+  }, [id, user?.id])
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Not specified'
@@ -346,15 +358,82 @@ const OfferDetailPage = () => {
               <Divider my={4} />
 
               {isOwner ? (
-                <Button
-                  w="100%"
-                  colorScheme="purple"
-                  size="lg"
-                  leftIcon={<Icon as={MdEdit} />}
-                  onClick={() => navigate(`/create-offer?edit=${offer.id}`)}
-                >
-                  Edit {offer.type === 'offer' ? 'Offer' : 'Want'}
-                </Button>
+                <>
+                  <Button
+                    w="100%"
+                    colorScheme="purple"
+                    size="lg"
+                    leftIcon={<Icon as={MdEdit} />}
+                    onClick={() => navigate(`/create-offer?edit=${offer.id}`)}
+                    mb={4}
+                  >
+                    Edit {offer.type === 'offer' ? 'Offer' : 'Want'}
+                  </Button>
+                  
+                  {exchanges.length > 0 && (
+                    <Box>
+                      <Text fontSize="sm" color="gray.500" mb={3} fontWeight="600">
+                        Handshake Requests ({exchanges.length})
+                      </Text>
+                      <VStack spacing={2} align="stretch" maxH="300px" overflowY="auto">
+                        {exchanges.map((exchange) => (
+                          <Box
+                            key={exchange.id}
+                            p={3}
+                            bg="gray.50"
+                            borderRadius="lg"
+                            border="1px solid"
+                            borderColor="gray.200"
+                            cursor="pointer"
+                            _hover={{ bg: 'gray.100', borderColor: 'yellow.400' }}
+                            onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
+                          >
+                            <HStack spacing={3} justify="space-between">
+                              <HStack spacing={3}>
+                                <Avatar
+                                  size="sm"
+                                  name={`${exchange.requester.first_name} ${exchange.requester.last_name}`}
+                                  src={(exchange.requester.profile as any)?.avatar}
+                                />
+                                <Box>
+                                  <Text fontSize="sm" fontWeight="600">
+                                    {exchange.requester.first_name} {exchange.requester.last_name}
+                                  </Text>
+                                  <Text fontSize="xs" color="gray.500">
+                                    {new Date(exchange.created_at).toLocaleDateString()}
+                                  </Text>
+                                </Box>
+                              </HStack>
+                              <Badge
+                                colorScheme={
+                                  exchange.status === 'ACCEPTED' ? 'green' :
+                                  exchange.status === 'PENDING' ? 'yellow' :
+                                  exchange.status === 'COMPLETED' ? 'blue' :
+                                  'gray'
+                                }
+                                variant="subtle"
+                              >
+                                {exchange.status}
+                              </Badge>
+                            </HStack>
+                            {exchange.proposed_date && (
+                              <HStack spacing={1} mt={2} fontSize="xs" color="gray.600">
+                                <Icon as={MdCalendarToday} />
+                                <Text>{new Date(exchange.proposed_date).toLocaleDateString()}</Text>
+                                {exchange.proposed_time && (
+                                  <>
+                                    <Text>•</Text>
+                                    <Text>{exchange.proposed_time}</Text>
+                                  </>
+                                )}
+                              </HStack>
+                            )}
+                          </Box>
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+                </>
               ) : (
                 <Button
                   w="100%"
@@ -363,7 +442,7 @@ const OfferDetailPage = () => {
                   size="lg"
                   leftIcon={<Icon as={MdHandshake} />}
                   _hover={{ bg: 'yellow.500' }}
-                  onClick={() => navigate(`/handshake/${offer.id}`)}
+                  onClick={() => navigate(`/handshake/offer/${offer.id}`)}
                 >
                   {offer.type === 'offer' ? 'Request This Offer' : 'Offer Help'}
                 </Button>

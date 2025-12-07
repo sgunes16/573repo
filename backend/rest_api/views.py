@@ -618,8 +618,53 @@ class MyExchangesView(APIView):
         return Response(exchanges_data)
 
 
+class ExchangesByOfferView(APIView):
+    """Get all exchanges for an offer"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, offer_id):
+        try:
+            offer = Offer.objects.get(id=offer_id)
+            
+            # Only offer owner can see all exchanges
+            if offer.user != request.user:
+                return Response({"error": "Not authorized"}, status=403)
+
+            exchanges = Exchange.objects.filter(
+                offer_id=offer_id
+            ).select_related(
+                'provider', 'requester'
+            ).order_by('-created_at')
+
+            exchanges_data = []
+            for exchange in exchanges:
+                exchanges_data.append({
+                    "id": exchange.id,
+                    "requester": {
+                        "id": exchange.requester.id,
+                        "first_name": exchange.requester.first_name,
+                        "last_name": exchange.requester.last_name,
+                        "profile": {
+                            "avatar": request.build_absolute_uri(exchange.requester.profile.avatar.url) if hasattr(exchange.requester, 'profile') and exchange.requester.profile.avatar else None,
+                            "rating": exchange.requester.profile.rating if hasattr(exchange.requester, 'profile') else 0.0,
+                        } if hasattr(exchange.requester, 'profile') else None
+                    },
+                    "status": exchange.status,
+                    "proposed_date": exchange.proposed_date,
+                    "proposed_time": str(exchange.proposed_time) if exchange.proposed_time else None,
+                    "created_at": exchange.created_at,
+                })
+
+            return Response(exchanges_data)
+
+        except Offer.DoesNotExist:
+            return Response({"error": "Offer not found"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
 class ExchangeByOfferView(APIView):
-    """Get exchange by offer_id"""
+    """Get exchange by offer_id (for requester)"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, offer_id):

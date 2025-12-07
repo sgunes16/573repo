@@ -41,6 +41,10 @@ export const exchangeService = {
     }
   },
 
+  async getExchangesForOffer(offerId: string): Promise<Exchange[]> {
+    return await apiService.get(`/exchanges/for-offer/${offerId}/`)
+  },
+
   async proposeDateTime(exchangeId: string, data: ProposeDateTimeData): Promise<{ message: string; proposed_date: string; proposed_time?: string }> {
     return await apiService.post(`/exchanges/${exchangeId}/propose-datetime/`, data)
   },
