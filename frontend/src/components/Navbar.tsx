@@ -72,144 +72,127 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
     <Box
       as="nav"
       bg="white"
-      boxShadow="0px 4px 4px 0px rgba(211,211,211,0.25)"
+      borderBottom="1px solid"
+      borderColor="gray.100"
       position="sticky"
       top={0}
-      zIndex={10}
+      zIndex={100}
+      h="56px"
     >
-      <Container maxW="1440px" py={4} px={8}>
-        <Flex
-          justify="space-between"
-          align="center"
-          gap={6}
-          direction={{ base: "column", md: "row" }}
-          alignItems={{ base: "flex-start", md: "center" }}
+      <Flex
+        h="100%"
+        justify="space-between"
+        align="center"
+        px={4}
+      >
+        {/* Logo */}
+        <HStack
+          spacing={2}
+          cursor="pointer"
+          onClick={() => navigate(showUserInfo ? "/dashboard" : "/")}
         >
-          <HStack
-            spacing={4}
-            cursor="pointer"
-            onClick={() => navigate(showUserInfo ? "/dashboard" : "/")}
+          <Box
+            w="36px"
+            h="36px"
+            borderRadius="10px"
+            overflow="hidden"
           >
-            <Box
-              w="56px"
-              h="56px"
-              borderRadius="16px"
-              bg="#F6AD55"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              overflow="hidden"
+            <Image
+              src="/hive-logo.png"
+              alt="The Hive"
+              objectFit="cover"
+              w="36px"
+              h="36px"
+            />
+          </Box>
+          <Text
+            fontSize="lg"
+            fontFamily="Urbanist, sans-serif"
+            fontWeight="600"
+          >
+            The Hive
+          </Text>
+        </HStack>
+
+        {showUserInfo && user && (
+          <HStack spacing={3}>
+            {/* Time Credits */}
+            <HStack
+              spacing={1}
+              bg="yellow.50"
+              px={3}
+              py={1.5}
+              borderRadius="full"
+              border="1px solid"
+              borderColor="yellow.200"
             >
-              <Image
-                src="/hive-logo.png"
-                alt="The Hive"
-                objectFit="cover"
-                w="56px"
-                h="56px"
-              />
-            </Box>
-            <Box>
-              <Text
-                fontSize="2xl"
-                fontFamily="Urbanist, sans-serif"
-                fontWeight="600"
-              >
-                The Hive
+              <Icon as={MdOutlineTimer} color="yellow.600" boxSize={4} />
+              <Text fontSize="sm" fontWeight="600" color="yellow.700">
+                {timeBank?.amount || 0}H
               </Text>
-              <Text fontSize="sm" color="gray.500">
-                Community Time Exchange
-              </Text>
-            </Box>
-          </HStack>
-
-          {showUserInfo && user && (
-            <HStack spacing={4} align="center">
-              <HStack
-                spacing={2}
-                bg="#FFFFF0"
-                px={4}
-                py={2}
-                borderRadius="full"
-                border="1px solid #F6E05E"
-                color="#276749"
-                fontWeight="600"
-              >
-                <Icon as={MdOutlineTimer} color="#975A16" boxSize={5} />
-                <Text>{timeBank?.amount || 0}H</Text>
-              </HStack>
-
-              <Menu>
-                <MenuButton
-                  as={Button}
-                  variant="ghost"
-                  rightIcon={<Icon as={MdChevronRight} />}
-                  px={0}
-                >
-                  <HStack spacing={3}>
-                    <Box textAlign="right">
-                      <Text fontSize="lg" fontWeight="600">
-                        {user.first_name} {user.last_name}
-                      </Text>
-                      <Text fontSize="sm" color="gray.500">
-                        Active Member
-                      </Text>
-                    </Box>
-                    <Box position="relative">
-                      <UserAvatar
-                        user={{ ...user, profile: userProfile }}
-                        size="md"
-                      />
-                      <Box
-                        position="absolute"
-                        bottom="-2px"
-                        right="-2px"
-                        bg="green.500"
-                        borderRadius="full"
-                        w="18px"
-                        h="18px"
-                        border="2px solid white"
-                      />
-                    </Box>
-                  </HStack>
-                </MenuButton>
-                <MenuList>
-                  <MenuItem onClick={() => navigate("/dashboard")}>
-                    <HStack spacing={3}>
-                      <Icon as={MdDashboard} />
-                      <Text>Dashboard</Text>
-                    </HStack>
-                  </MenuItem>
-                  <MenuItem onClick={() => navigate("/profile")}>
-                    <HStack spacing={3}>
-                      <Icon as={MdPersonOutline} />
-                      <Text>My Profile</Text>
-                    </HStack>
-                  </MenuItem>
-                  <MenuItem onClick={() => navigate("/transactions")}>
-                    <HStack spacing={3}>
-                      <Icon as={MdTimeline} />
-                      <Text>Transactions</Text>
-                    </HStack>
-                  </MenuItem>
-                  <MenuItem onClick={() => navigate("/achievements")}>
-                    <HStack spacing={3}>
-                      <Icon as={MdStarOutline} />
-                      <Text>Achievements</Text>
-                    </HStack>
-                  </MenuItem>
-
-                  <MenuItem onClick={handleLogout} color="red.500">
-                    <HStack spacing={3}>
-                      <Icon as={MdExitToApp} />
-                      <Text>Logout</Text>
-                    </HStack>
-                  </MenuItem>
-                </MenuList>
-              </Menu>
             </HStack>
-          )}
-        </Flex>
-      </Container>
+
+            {/* User Menu */}
+            <Menu>
+              <MenuButton
+                as={Button}
+                variant="ghost"
+                size="sm"
+                px={2}
+                rightIcon={<Icon as={MdChevronRight} boxSize={4} />}
+              >
+                <HStack spacing={2}>
+                  <Text fontSize="sm" fontWeight="500">
+                    {user.first_name}
+                  </Text>
+                  <Box position="relative">
+                    <UserAvatar
+                      user={{ ...user, profile: userProfile }}
+                      size="sm"
+                    />
+                    <Box
+                      position="absolute"
+                      bottom={0}
+                      right={0}
+                      bg="green.400"
+                      borderRadius="full"
+                      w="8px"
+                      h="8px"
+                      border="1.5px solid white"
+                    />
+                  </Box>
+                </HStack>
+              </MenuButton>
+              <MenuList fontSize="sm">
+                <MenuItem onClick={() => navigate("/dashboard")}>
+                  <HStack spacing={2}>
+                    <Icon as={MdDashboard} boxSize={4} />
+                    <Text>Dashboard</Text>
+                  </HStack>
+                </MenuItem>
+                <MenuItem onClick={() => navigate("/profile")}>
+                  <HStack spacing={2}>
+                    <Icon as={MdPersonOutline} boxSize={4} />
+                    <Text>My Profile</Text>
+                  </HStack>
+                </MenuItem>
+                <MenuItem onClick={() => navigate("/transactions")}>
+                  <HStack spacing={2}>
+                    <Icon as={MdTimeline} boxSize={4} />
+                    <Text>Transactions</Text>
+                  </HStack>
+                </MenuItem>
+                <MenuItem onClick={handleLogout} color="red.500">
+                  <HStack spacing={2}>
+                    <Icon as={MdExitToApp} boxSize={4} />
+                    <Text>Logout</Text>
+                  </HStack>
+                </MenuItem>
+              </MenuList>
+            </Menu>
+          </HStack>
+        )}
+      </Flex>
     </Box>
   );
 };

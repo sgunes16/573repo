@@ -2,9 +2,10 @@ import {
   Badge,
   Box,
   Button,
-  Container,
+  Checkbox,
+  CheckboxGroup,
+  Divider,
   Flex,
-  Grid,
   HStack,
   Icon,
   Input,
@@ -13,35 +14,46 @@ import {
   PopoverContent,
   PopoverBody,
   PopoverArrow,
+  PopoverHeader,
+  PopoverCloseButton,
+  Radio,
+  RadioGroup,
   Skeleton,
   SkeletonCircle,
+  Slider,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderTrack,
   Stack,
+  Tag,
+  TagCloseButton,
+  TagLabel,
   Text,
+  useDisclosure,
   VStack,
   Wrap,
   WrapItem,
 } from '@chakra-ui/react'
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import Map, { Marker, Layer, Source } from 'react-map-gl'
 import type { MapRef } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import {
   getUserBadge,
 } from '@/services/mock/mockData'
-import { transactionService } from '@/services/transaction.service'
 import { exchangeService } from '@/services/exchange.service'
-import type { Offer, User, TimeBankTransaction, Exchange } from '@/types'
+import type { Offer, Exchange } from '@/types'
 import {
   MdAdd,
-  MdCalendarToday,
   MdFilterList,
+  MdLocationOn,
   MdMyLocation,
   MdPeople,
-  MdRepeat,
   MdSchedule,
+  MdSortByAlpha,
   MdStar,
-  MdSwapHoriz,
+  MdWifi,
 } from 'react-icons/md'
 import Navbar from '@/components/Navbar'
 import UserAvatar from '@/components/UserAvatar'
@@ -128,81 +140,70 @@ const truncateLocation = (location?: string, maxLength = 30): string => {
 }
 
 const OfferCardSkeleton = () => (
-  <Box bg="#EDF2F7" borderRadius="lg" p={4}>
-    <Flex gap={4} align="flex-start">
-      <Stack spacing={3} flex={1}>
-        <HStack spacing={3}>
-          <Skeleton height="30px" width="80px" borderRadius="md" />
-          <Skeleton height="25px" width="100px" borderRadius="md" />
-          <Skeleton height="25px" width="60px" borderRadius="md" />
+  <Box p={3} borderBottom="1px solid" borderColor="gray.100">
+    <HStack spacing={3} align="flex-start">
+      <SkeletonCircle size="10" />
+      <Stack spacing={2} flex={1}>
+        <HStack spacing={2}>
+          <Skeleton height="18px" width="50px" borderRadius="full" />
+          <Skeleton height="18px" width="70px" borderRadius="full" />
         </HStack>
-        <HStack spacing={3} align="center">
-          <SkeletonCircle size="10" />
-          <Stack spacing={2} flex={1}>
-            <Skeleton height="20px" width="120px" />
-            <HStack spacing={2}>
-              <Skeleton height="18px" width="60px" borderRadius="full" />
-              <Skeleton height="18px" width="70px" borderRadius="full" />
-            </HStack>
-          </Stack>
-        </HStack>
+        <Skeleton height="16px" width="180px" />
+        <Skeleton height="12px" width="140px" />
       </Stack>
-      <Stack spacing={2} align="flex-end" minW="220px">
-        <HStack spacing={4}>
-          <Skeleton height="16px" width="80px" />
-          <Skeleton height="16px" width="70px" />
-        </HStack>
-        <HStack spacing={4}>
-          <Skeleton height="16px" width="60px" />
-          <Skeleton height="16px" width="80px" />
-        </HStack>
-        <Stack spacing={1} align="flex-end">
-          <Skeleton height="20px" width="180px" />
-          <Skeleton height="16px" width="140px" />
-        </Stack>
+      <Stack spacing={1} align="flex-end">
+        <Skeleton height="20px" width="40px" />
+        <Skeleton height="12px" width="60px" />
       </Stack>
-    </Flex>
+    </HStack>
   </Box>
 )
 
 const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locationAddress?: string; myExchange?: Exchange }) => {
-  // Badge calculation without showing time credits
-  const badge = getUserBadge(offer.user?.profile?.time_credits || 0)
-  const rating = offer.user?.profile?.rating ?? 4.8
-  const meta = offerMetaMap[offer.id] ?? {
-    date: offer.date ? new Date(offer.date).toLocaleDateString('tr-TR') : new Date(offer.created_at).toLocaleDateString('tr-TR'),
-    cadence: offer.offer_type === '1time' ? 'One-time' : offer.offer_type,
-    duration: `${offer.time_required} hr`,
-    group: offer.activity_type === '1to1' ? '1 to 1' : `${offer.person_count} person`,
-  }
   const navigate = useNavigate()
-
-  const userName = offer.user?.first_name || 'Unknown User'
-  const userLastName = offer.user?.last_name || ''
-  
-  const displayLocation = locationAddress || offer.location || 'No location'
+  const badge = getUserBadge(offer.user?.profile?.time_credits || 0)
+  const rating = offer.user?.profile?.rating ?? 0
+  const userName = offer.user?.first_name || 'User'
+  const displayLocation = truncateLocation(locationAddress || offer.location || '', 30)
 
   return (
     <Box 
-      bg="#EDF2F7" 
-      borderRadius="lg" 
-      p={4} 
+      p={3}
       cursor="pointer"
-      transition="all 0.2s"
-      _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
+      borderBottom="1px solid"
+      borderColor="gray.100"
+      transition="background 0.15s"
+      _hover={{ bg: 'gray.50' }}
       onClick={() => navigate(`/offer/${offer.id}`)}
     >
-      <Flex gap={4} align="flex-start">
-        <Stack spacing={3} flex={1}>
-          <HStack spacing={3} flexWrap="wrap">
-            <RatingPill rating={rating} />
+      <HStack spacing={3} align="flex-start">
+        {/* Avatar */}
+        <UserAvatar
+          size="md"
+          user={offer.user}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (offer.user?.id) navigate(`/profile/${offer.user.id}`)
+          }}
+        />
+        
+        {/* Content */}
+        <VStack flex={1} align="stretch" spacing={1} minW={0}>
+          {/* Badges Row */}
+          <HStack spacing={2} flexWrap="wrap">
+            {rating > 0 && (
+              <HStack spacing={0.5} bg="yellow.50" px={1.5} py={0.5} borderRadius="full">
+                <Icon as={MdStar} color="yellow.500" boxSize={3} />
+                <Text fontSize="xs" fontWeight="600" color="yellow.700">{rating.toFixed(1)}</Text>
+              </HStack>
+            )}
             <Badge
               colorScheme={badge.color as any}
               variant="subtle"
-              textTransform="uppercase"
-              borderRadius="2px"
-              fontWeight="bold"
-              fontSize="xs"
+              fontSize="10px"
+              fontWeight="600"
+              borderRadius="full"
+              px={2}
             >
               {badge.label}
             </Badge>
@@ -212,188 +213,65 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
                   myExchange.status === 'COMPLETED' ? 'green' :
                   myExchange.status === 'ACCEPTED' ? 'blue' :
                   myExchange.status === 'PENDING' ? 'yellow' :
-                  myExchange.status === 'CANCELLED' ? 'red' :
                   'gray'
                 }
-                variant="solid"
-                borderRadius="2px"
-                fontWeight="bold"
-                fontSize="xs"
+                fontSize="10px"
+                borderRadius="full"
+                px={2}
               >
                 {myExchange.status === 'PENDING' ? 'REQUESTED' : myExchange.status}
               </Badge>
             )}
           </HStack>
 
-          <HStack spacing={3} align="center">
-            <UserAvatar
-              size="md"
-              user={offer.user}
-              cursor="pointer"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (offer.user?.id) {
-                  navigate(`/profile/${offer.user.id}`)
-                }
-              }}
-              _hover={{ opacity: 0.8 }}
-            />
-            <Stack spacing={0} flex={1}>
-              <Text 
-                fontSize="lg"
-                cursor="pointer"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (offer.user?.id) {
-                    navigate(`/profile/${offer.user.id}`)
-                  }
-                }}
-                _hover={{ textDecoration: 'underline' }}
-              >
-                {userName}
-              </Text>
-              <Wrap spacing={2}>
-                {offer.tags && offer.tags.map(tag => (
-                  <WrapItem key={tag}>
-                    <Badge bg="#718096" color="white" borderRadius="2px" px={1.5}>
-                      #{tag}
-                    </Badge>
-                  </WrapItem>
-                ))}
-              </Wrap>
-            </Stack>
-          </HStack>
-        </Stack>
+          {/* Title */}
+          <Text fontSize="sm" fontWeight="600" noOfLines={1}>
+            {offer.title}
+          </Text>
 
-        <Stack spacing={2} align="flex-end" minW="220px">
-          <HStack spacing={4} color="gray.600" fontSize="xs" textTransform="uppercase">
+          {/* User & Location */}
+          <Text fontSize="xs" color="gray.500" noOfLines={1}>
+            {userName} · {displayLocation}
+          </Text>
+
+          {/* Tags */}
+          {offer.tags && offer.tags.length > 0 && (
             <HStack spacing={1}>
-              <Icon as={MdCalendarToday} />
-              <Text letterSpacing="0.6px">{meta.date}</Text>
+              {offer.tags.slice(0, 2).map(tag => (
+                <Badge key={tag} size="sm" variant="outline" colorScheme="gray" fontSize="9px">
+                  {tag}
+                </Badge>
+              ))}
+              {offer.tags.length > 2 && (
+                <Text fontSize="9px" color="gray.400">+{offer.tags.length - 2}</Text>
+              )}
             </HStack>
-            <HStack spacing={1}>
-              <Icon as={MdRepeat} />
-              <Text letterSpacing="0.6px">{meta.cadence}</Text>
-            </HStack>
-          </HStack>
-          <HStack spacing={4} color="gray.600" fontSize="xs" textTransform="uppercase">
-            <HStack spacing={1}>
-              <Icon as={MdSchedule} />
-              <Text letterSpacing="0.6px">{meta.duration}</Text>
-            </HStack>
-            <HStack spacing={1}>
-              <Icon as={MdPeople} />
-              <Text letterSpacing="0.6px">{meta.group}</Text>
-            </HStack>
-          </HStack>
-          <Stack spacing={0} textAlign="right">
-            <Text fontSize="md" fontWeight="semibold">
-              {offer.title}
-            </Text>
-            <Text fontSize="sm" fontStyle="italic" color="gray.600" title={displayLocation}>
-              {truncateLocation(displayLocation)}
-            </Text>
-          </Stack>
-        </Stack>
-      </Flex>
+          )}
+        </VStack>
+
+        {/* Right Side - Duration & Type */}
+        <VStack spacing={1} align="flex-end" flexShrink={0}>
+          <Badge 
+            colorScheme="yellow" 
+            fontSize="sm" 
+            fontWeight="bold"
+            px={2}
+            py={0.5}
+          >
+            {offer.time_required}H
+          </Badge>
+          <Text fontSize="10px" color="gray.500">
+            {offer.activity_type === '1to1' ? '1-to-1' : 'Group'}
+          </Text>
+          <Text fontSize="10px" color="gray.400">
+            {offer.offer_type === '1time' ? 'One-time' : 'Recurring'}
+          </Text>
+        </VStack>
+      </HStack>
     </Box>
   )
 }
 
-const LatestTransactionCard = ({
-  transaction,
-  currentUserId,
-  onNavigate,
-}: {
-  transaction: TimeBankTransaction
-  currentUserId?: string
-  onNavigate: () => void
-}) => {
-  const isEarn = transaction.transaction_type === 'EARN' && transaction.to_user.id === currentUserId
-  const otherUser = transaction.from_user.id === currentUserId ? transaction.to_user : transaction.from_user
-  
-  return (
-    <Flex
-      bg="#EDF2F7"
-      borderRadius="lg"
-      p={4}
-      align="center"
-      gap={4}
-      minH="120px"
-      cursor="pointer"
-      _hover={{ bg: '#E2E8F0' }}
-      onClick={onNavigate}
-    >
-      <UserAvatar 
-        user={otherUser}
-      />
-      <Icon as={MdSwapHoriz} boxSize={8} color="gray.600" />
-      <VStack align="flex-start" spacing={1} flex={1}>
-        <Text fontSize="sm" fontWeight="semibold">
-          {transaction.exchange?.offer.title || transaction.description}
-        </Text>
-        <Text fontSize="xs" color="gray.600">
-          {otherUser.first_name} {otherUser.last_name}
-        </Text>
-        <Text fontSize="xs" color="gray.500">
-          {new Date(transaction.created_at).toLocaleDateString()}
-        </Text>
-      </VStack>
-      <Badge
-        colorScheme={isEarn ? 'green' : 'red'}
-        px={3}
-        py={1}
-        borderRadius="md"
-        fontWeight="bold"
-      >
-        {isEarn ? '+' : '-'}
-        {transaction.time_amount}H
-      </Badge>
-    </Flex>
-  )
-}
-
-const LatestActivityCard = ({
-  from,
-  to,
-  service,
-  hours,
-}: {
-  from: User
-  to: User
-  service: string
-  hours: number
-}) => (
-  <Flex
-    bg="#EDF2F7"
-    borderRadius="lg"
-    p={4}
-    align="center"
-    gap={4}
-    minH="120px"
-  >
-    <UserAvatar user={from} />
-    <Icon as={MdSwapHoriz} boxSize={8} color="gray.600" />
-    <UserAvatar user={to} />
-    <Text fontSize="sm">
-      <Text as="span" color="#276749" fontWeight="semibold">
-        {from.first_name}
-      </Text>{' '}
-      exchanged{' '}
-      <Text as="span" color="#975A16" fontWeight="semibold">
-        {hours} {hours > 1 ? 'hours' : 'hour'}
-      </Text>{' '}
-      with{' '}
-      <Text as="span" color="#2B6CB0" fontWeight="semibold">
-        {to.first_name}
-      </Text>{' '}
-      for a{' '}
-      <Text as="span" color="#6B46C1" fontWeight="semibold">
-        {service}
-      </Text>
-    </Text>
-  </Flex>
-)
 
 const MapPanel = ({ offers }: { offers: Offer[] }) => {
   const { geoLocation } = useGeoStore()
@@ -495,11 +373,10 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
 
   return (
     <Box
-      h="931px"
-      borderRadius="lg"
+      h="100%"
+      w="100%"
       overflow="hidden"
       position="relative"
-      boxShadow="md"
     >
       <Map
         ref={mapRef}
@@ -680,32 +557,29 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
         })}
       </Map>
       
-      <Box
-        position="absolute"
-        top={0}
-        left={0}
-        w="full"
-        bg="#395F3D"
-        px={6}
-        py={5}
-        borderBottomRadius="xl"
+      {/* Legend */}
+      <HStack 
+        position="absolute" 
+        top={4} 
+        left={4} 
+        bg="white" 
+        px={3} 
+        py={2} 
+        borderRadius="lg" 
+        boxShadow="md"
+        spacing={4}
+        fontSize="xs"
       >
-        <HStack justify="space-between">
-          <Text color="white" fontSize="lg" fontWeight="semibold">
-            Hive Map ({offersInRadius.length} items nearby)
-          </Text>
-          <HStack spacing={3} fontSize="xs" color="white">
-            <HStack spacing={1}>
-              <Box w="12px" h="12px" borderRadius="full" bg="#38A169" border="2px solid white" />
-              <Text>Offers</Text>
-            </HStack>
-            <HStack spacing={1}>
-              <Box w="12px" h="12px" borderRadius="full" bg="#2C5282" border="2px solid white" />
-              <Text>Wants</Text>
-            </HStack>
-          </HStack>
+        <HStack spacing={1}>
+          <Box w="10px" h="10px" borderRadius="full" bg="#38A169" />
+          <Text fontWeight="medium">Offers</Text>
         </HStack>
-      </Box>
+        <HStack spacing={1}>
+          <Box w="10px" h="10px" borderRadius="full" bg="#2C5282" />
+          <Text fontWeight="medium">Wants</Text>
+        </HStack>
+        <Text color="gray.500">({offersInRadius.length} nearby)</Text>
+      </HStack>
 
       <Button
         position="absolute"
@@ -728,18 +602,77 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
 }
 
 
+// Filter interface
+interface FilterState {
+  locationType: string[] // 'remote' | 'myLocation'
+  activityType: string[] // '1to1' | 'group'
+  durationRange: [number, number] // [min, max] in hours
+  sortBy: 'newest' | 'oldest' | 'duration_asc' | 'duration_desc'
+  radiusKm: number // 0 means no filter
+}
+
+const defaultFilters: FilterState = {
+  locationType: [],
+  activityType: [],
+  durationRange: [0, 10],
+  sortBy: 'newest',
+  radiusKm: 0,
+}
+
+// Haversine distance calculation (km)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371 // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  return R * c
+}
+
 const DashboardPage = () => {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const { geoLocation } = useGeoStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [offers, setOffers] = useState<Offer[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [activeTab, setActiveTab] = useState<'offers' | 'wants'>('offers')
   const [locationCache, setLocationCache] = useState<Record<string, string>>({})
   const [isLoadingLocations, setIsLoadingLocations] = useState(true)
-  const [latestTransactions, setLatestTransactions] = useState<TimeBankTransaction[]>([])
   const [myExchanges, setMyExchanges] = useState<Record<string, Exchange>>({}) // offer_id -> Exchange
-  const itemsPerPage = 5 // Map height allows ~5 cards
+  const [filters, setFilters] = useState<FilterState>(defaultFilters)
+  const { isOpen: isFilterOpen, onOpen: onFilterOpen, onClose: onFilterClose } = useDisclosure()
+  const itemsPerPage = 5 // 100px per card, fits viewport well
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.locationType.length > 0 ||
+      filters.activityType.length > 0 ||
+      filters.durationRange[0] !== 0 ||
+      filters.durationRange[1] !== 10 ||
+      filters.sortBy !== 'newest' ||
+      filters.radiusKm > 0
+    )
+  }, [filters])
+
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filters.locationType.length > 0) count++
+    if (filters.activityType.length > 0) count++
+    if (filters.durationRange[0] !== 0 || filters.durationRange[1] !== 10) count++
+    if (filters.sortBy !== 'newest') count++
+    if (filters.radiusKm > 0) count++
+    return count
+  }, [filters])
+
+  const resetFilters = () => {
+    setFilters(defaultFilters)
+    onFilterClose()
+  }
 
   useEffect(() => {
     const fetchOffers = async () => {
@@ -790,6 +723,16 @@ const DashboardPage = () => {
   const filteredOffers = useMemo(() => {
     let filtered = offers.filter(offer => offer.type === activeTab.slice(0, -1)) // 'offers' -> 'offer', 'wants' -> 'want'
     
+    // Exclude offers where user has a completed exchange
+    filtered = filtered.filter(offer => {
+      const exchange = myExchanges[offer.id]
+      if (exchange && exchange.status === 'COMPLETED') return false
+      // Also exclude if offer itself is marked completed
+      if (offer.status?.toLowerCase() === 'completed') return false
+      return true
+    })
+    
+    // Search filter
     if (searchQuery.trim()) {
       const searchLower = searchQuery.toLowerCase()
       filtered = filtered.filter((offer) => (
@@ -798,9 +741,65 @@ const DashboardPage = () => {
         offer.description?.toLowerCase().includes(searchLower)
       ))
     }
+
+    // Location type filter (values: 'remote' or 'myLocation')
+    if (filters.locationType.length > 0) {
+      filtered = filtered.filter(offer => 
+        filters.locationType.includes(offer.location_type || 'myLocation')
+      )
+    }
+
+    // Activity type filter
+    if (filters.activityType.length > 0) {
+      filtered = filtered.filter(offer => 
+        filters.activityType.includes(offer.activity_type || '1to1')
+      )
+    }
+
+    // Duration range filter
+    if (filters.durationRange[0] !== 0 || filters.durationRange[1] !== 10) {
+      filtered = filtered.filter(offer => {
+        const duration = offer.time_required || 1
+        return duration >= filters.durationRange[0] && duration <= filters.durationRange[1]
+      })
+    }
+
+    // Radius filter (only for in-person offers with user location)
+    if (filters.radiusKm > 0 && geoLocation && geoLocation.latitude !== 0) {
+      filtered = filtered.filter(offer => {
+        // Skip remote offers for radius filter
+        if (offer.location_type === 'remote') return true
+        
+        // Check if offer has geo_location
+        if (!offer.geo_location || offer.geo_location.length !== 2) return true
+        
+        const [offerLat, offerLng] = offer.geo_location
+        const distance = calculateDistance(
+          geoLocation.latitude, geoLocation.longitude,
+          offerLat, offerLng
+        )
+        return distance <= filters.radiusKm
+      })
+    }
+
+    // Sorting
+    switch (filters.sortBy) {
+      case 'newest':
+        filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        break
+      case 'oldest':
+        filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        break
+      case 'duration_asc':
+        filtered.sort((a, b) => (a.time_required || 1) - (b.time_required || 1))
+        break
+      case 'duration_desc':
+        filtered.sort((a, b) => (b.time_required || 1) - (a.time_required || 1))
+        break
+    }
     
     return filtered
-  }, [searchQuery, offers, activeTab])
+  }, [searchQuery, offers, activeTab, filters, geoLocation, myExchanges])
 
   const totalPages = Math.ceil(filteredOffers.length / itemsPerPage)
   
@@ -811,224 +810,540 @@ const DashboardPage = () => {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, activeTab])
-
-  useEffect(() => {
-    const fetchLatestTransactions = async () => {
-      try {
-        const data = await transactionService.getLatestTransactions(6)
-        setLatestTransactions(data)
-      } catch (error) {
-        console.error('Failed to fetch latest transactions:', error)
-      }
-    }
-    if (user) {
-      fetchLatestTransactions()
-    }
-  }, [user])
+  }, [searchQuery, activeTab, filters])
 
   return (
-    <Box bg="gray.50" minH="100vh" h="full">
+    <Box bg="white" minH="100vh">
       <Navbar showUserInfo={true} />
-      <Container maxW="1440px" px={{ base: 4, md: 6 }} py={10} >
-        <Grid
-          templateColumns={{ base: '1fr', xl: '715px 1fr' }}
-          gap={6}
-          alignItems="flex-start"
-        >
+      
+      {/* Desktop Layout */}
+      <Flex
+        display={{ base: 'none', lg: 'flex' }}
+        h="calc(100vh - 56px)"
+      >
+        {/* Map - Desktop */}
+        <Box w="50%" h="100%">
           <MapPanel offers={offers} />
+        </Box>
 
-          <Flex
-     
-            flexDirection="column"
-            alignItems="flex-start"
-            justifyContent="space-between"
-            gap={3}
-            alignSelf="center"
-            h="full"
+        {/* Cards Panel - Desktop */}
+        <Flex 
+          direction="column"
+          w="50%"
+          h="100%"
+          overflow="hidden"
+          bg="white"
+          borderLeft="1px solid"
+          borderColor="gray.100"
+        >
+          {/* Search & Filter */}
+          <Box
+            px={3} 
+            py={2}
+            borderBottom="1px solid" 
+            borderColor="gray.100"
+            bg="white"
+            flexShrink={0}
           >
-            <VStack spacing={6} align="stretch" h="full" w="full">
-              <Flex
-                bg="#CBD5E0"
-                borderRadius="xl"
-                px={6}
-                py={5}
-                w="full"
-                boxShadow="sm"
-                flexDirection="row"
-                alignItems="center"
-                justifyContent="space-between"
-                gap={3}
-                alignSelf="center"
+            <HStack spacing={2}>
+              <Input
+                flex={1}
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                size="xs"
+                borderRadius="md"
+                bg="gray.50"
+                border="none"
+                _placeholder={{ color: 'gray.400' }}
+                _focus={{ bg: 'white', boxShadow: 'sm' }}
+              />
+              <Popover
+                isOpen={isFilterOpen}
+                onClose={onFilterClose}
+                placement="bottom-end"
+                closeOnBlur={true}
               >
-                <Input
-                  w="full"
-                  placeholder="Search by title, tags or description..."
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  bg="white"
-                  borderColor="#E2E8F0"
-                  h="48px"
-                  fontSize="md"
-                  _placeholder={{ color: '#A0AEC0' }}
-                />
-                <Button
-                  leftIcon={<Icon as={MdFilterList} />}
-                  variant="ghost"
-                  fontWeight="semibold"
-                  color="gray.700"
-                  h="48px"
-                  _hover={{ bg: 'gray.100' }}
-                >
-                  Filter
-                </Button>
-              </Flex>
-
-
-              <Box bg="white" borderRadius="xl" px={6} py={5} boxShadow="sm" h="full">
-                <Flex justify="space-between" align="center" mb={5}>
-                  <HStack spacing={0} borderBottom="1px solid #E2E8F0">
-                    <Button
-                      variant="ghost"
-                      borderRadius="6px 6px 0 0"
-                      border={activeTab === 'offers' ? "1px solid #E2E8F0" : "none"}
-                      borderBottom="none"
-                      color="#B7791F"
-                      bg={activeTab === 'offers' ? 'white' : 'transparent'}
-                      onClick={() => setActiveTab('offers')}
-                    >
-                      Offers
-                    </Button>
-                    <Button 
-                      variant="ghost"
-                      borderRadius="6px 6px 0 0"
-                      border={activeTab === 'wants' ? "1px solid #E2E8F0" : "none"}
-                      borderBottom="none"
-                      color="#B7791F"
-                      bg={activeTab === 'wants' ? 'white' : 'transparent'}
-                      onClick={() => setActiveTab('wants')}
-                    >
-                      Wants
-                    </Button>
-                  </HStack>
+                <PopoverTrigger>
                   <Button
-                    bg="#ECC94B"
-                    rightIcon={<Icon as={MdAdd} />}
-                    fontWeight="semibold"
-                    onClick={() => navigate(activeTab === 'offers' ? '/create-offer' : '/create-offer?type=want')}
+                    leftIcon={<Icon as={MdFilterList} boxSize={4} />}
+                    variant="outline"
+                    size="sm"
+                    color={hasActiveFilters ? 'yellow.600' : 'gray.600'}
+                    borderColor={hasActiveFilters ? 'yellow.400' : 'gray.300'}
+                    onClick={onFilterOpen}
                   >
-                    {activeTab === 'offers' ? 'Add New Offer' : 'Add New Want'}
+                    {activeFilterCount > 0 ? `Filter (${activeFilterCount})` : 'Filter'}
                   </Button>
-                </Flex>
+                </PopoverTrigger>
+                  <PopoverContent w="360px" maxH="500px" overflowY="auto">
+                    <PopoverArrow />
+                    <PopoverCloseButton />
+                    <PopoverHeader fontWeight="semibold" borderBottomWidth="1px">
+                      <HStack justify="space-between" pr={6}>
+                        <Text>Filters</Text>
+                        {hasActiveFilters && (
+                          <Button size="xs" variant="ghost" colorScheme="gray" onClick={resetFilters}>
+                            Reset
+                          </Button>
+                        )}
+                      </HStack>
+                    </PopoverHeader>
+                    <PopoverBody>
+                      <VStack spacing={4} align="stretch" py={2}>
+                        {/* Location Type */}
+                        <Box>
+                          <Text fontWeight="semibold" fontSize="sm" mb={2}>
+                            <Icon as={MdLocationOn} mr={2} />
+                            Location Type
+                          </Text>
+                          <CheckboxGroup 
+                            value={filters.locationType}
+                            onChange={(values) => setFilters(prev => ({ ...prev, locationType: values as string[] }))}
+                          >
+                            <HStack spacing={4}>
+                              <Checkbox value="remote" size="sm">
+                                <HStack spacing={1}>
+                                  <Icon as={MdWifi} color="blue.500" boxSize={3} />
+                                  <Text fontSize="sm">Remote</Text>
+                                </HStack>
+                              </Checkbox>
+                              <Checkbox value="myLocation" size="sm">
+                                <HStack spacing={1}>
+                                  <Icon as={MdLocationOn} color="green.500" boxSize={3} />
+                                  <Text fontSize="sm">In-Person</Text>
+                                </HStack>
+                              </Checkbox>
+                            </HStack>
+                          </CheckboxGroup>
+                        </Box>
 
-                <VStack spacing={4} align="stretch" minH="700px">
-                  {isLoadingLocations ? (
-                    // Show skeletons while loading
-                    Array.from({ length: itemsPerPage }).map((_, i) => (
-                      <OfferCardSkeleton key={i} />
-                    ))
-                  ) : paginatedOffers.length > 0 ? (
-                    paginatedOffers.map((offer) => (
-                      <OfferCard 
-                        key={offer.id} 
-                        offer={offer} 
-                        locationAddress={locationCache[offer.id]}
-                        myExchange={myExchanges[offer.id]}
-                      />
-                    ))
-                  ) : (
-                    <Flex justify="center" align="center" minH="300px">
-                      <Text color="gray.500" fontSize="lg">
-                        No {activeTab} found. Try a different search term.
-                      </Text>
-                    </Flex>
-                  )}
-                </VStack>
+                        <Divider />
 
-                {!isLoadingLocations && totalPages > 1 && (
-                  <Flex justify="space-between" align="center" mt={6} pt={4} borderTop="1px solid #E2E8F0">
-                    <Button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      isDisabled={currentPage === 1}
-                      variant="outline"
-                      colorScheme="yellow"
-                      size="sm"
-                    >
-                      Previous
-                    </Button>
-                    
-                    <HStack spacing={2}>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <Button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          variant={currentPage === page ? 'solid' : 'outline'}
-                          colorScheme="yellow"
-                          bg={currentPage === page ? '#ECC94B' : 'transparent'}
-                          color={currentPage === page ? 'black' : 'gray.600'}
-                          size="sm"
-                          minW="40px"
-                        >
-                          {page}
-                        </Button>
-                      ))}
-                    </HStack>
+                        {/* Activity Type */}
+                        <Box>
+                          <Text fontWeight="semibold" fontSize="sm" mb={2}>
+                            <Icon as={MdPeople} mr={2} />
+                            Activity Type
+                          </Text>
+                          <CheckboxGroup
+                            value={filters.activityType}
+                            onChange={(values) => setFilters(prev => ({ ...prev, activityType: values as string[] }))}
+                          >
+                            <HStack spacing={4}>
+                              <Checkbox value="1to1" size="sm">1-to-1</Checkbox>
+                              <Checkbox value="group" size="sm">Group</Checkbox>
+                            </HStack>
+                          </CheckboxGroup>
+                        </Box>
 
-                    <Button
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      isDisabled={currentPage === totalPages}
-                      variant="outline"
-                      colorScheme="yellow"
-                      size="sm"
-                    >
-                      Next
-                    </Button>
-                  </Flex>
+                        <Divider />
+
+                        {/* Radius Filter */}
+                        <Box>
+                          <Text fontWeight="semibold" fontSize="sm" mb={2}>
+                            <Icon as={MdMyLocation} mr={2} />
+                            Distance: {filters.radiusKm === 0 ? 'Any' : `${filters.radiusKm} km`}
+                          </Text>
+                          <Slider
+                            min={0}
+                            max={50}
+                            step={5}
+                            value={filters.radiusKm}
+                            onChange={(val) => setFilters(prev => ({ ...prev, radiusKm: val }))}
+                            colorScheme="teal"
+                            isDisabled={!geoLocation || geoLocation.latitude === 0}
+                          >
+                            <SliderTrack>
+                              <SliderFilledTrack />
+                            </SliderTrack>
+                            <SliderThumb boxSize={5} />
+                          </Slider>
+                          <HStack justify="space-between" mt={1}>
+                            <Text fontSize="xs" color="gray.500">Any</Text>
+                            <Text fontSize="xs" color="gray.500">50 km</Text>
+                          </HStack>
+                          {(!geoLocation || geoLocation.latitude === 0) && (
+                            <Text fontSize="xs" color="orange.500" mt={1}>
+                              Enable location to use this filter
+                            </Text>
+                          )}
+                        </Box>
+
+                        <Divider />
+
+                        {/* Duration Range */}
+                        <Box>
+                          <Text fontWeight="semibold" fontSize="sm" mb={2}>
+                            <Icon as={MdSchedule} mr={2} />
+                            Duration: {filters.durationRange[0]}h - {filters.durationRange[1]}h
+                          </Text>
+                          <HStack spacing={2}>
+                            <Button
+                              size="xs"
+                              variant={filters.durationRange[0] === 0 && filters.durationRange[1] === 10 ? 'solid' : 'outline'}
+                              colorScheme="yellow"
+                              onClick={() => setFilters(prev => ({ ...prev, durationRange: [0, 10] }))}
+                            >
+                              Any
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant={filters.durationRange[0] === 0 && filters.durationRange[1] === 1 ? 'solid' : 'outline'}
+                              colorScheme="yellow"
+                              onClick={() => setFilters(prev => ({ ...prev, durationRange: [0, 1] }))}
+                            >
+                              &lt;1h
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant={filters.durationRange[0] === 1 && filters.durationRange[1] === 3 ? 'solid' : 'outline'}
+                              colorScheme="yellow"
+                              onClick={() => setFilters(prev => ({ ...prev, durationRange: [1, 3] }))}
+                            >
+                              1-3h
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant={filters.durationRange[0] === 3 && filters.durationRange[1] === 10 ? 'solid' : 'outline'}
+                              colorScheme="yellow"
+                              onClick={() => setFilters(prev => ({ ...prev, durationRange: [3, 10] }))}
+                            >
+                              3h+
+                            </Button>
+                          </HStack>
+                        </Box>
+
+                        <Divider />
+
+                        {/* Sort By */}
+                        <Box>
+                          <Text fontWeight="semibold" fontSize="sm" mb={2}>
+                            <Icon as={MdSortByAlpha} mr={2} />
+                            Sort By
+                          </Text>
+                          <RadioGroup
+                            value={filters.sortBy}
+                            onChange={(value) => setFilters(prev => ({ ...prev, sortBy: value as FilterState['sortBy'] }))}
+                            size="sm"
+                          >
+                            <HStack spacing={3} flexWrap="wrap">
+                              <Radio value="newest">Newest</Radio>
+                              <Radio value="oldest">Oldest</Radio>
+                              <Radio value="duration_asc">Shortest</Radio>
+                              <Radio value="duration_desc">Longest</Radio>
+                            </HStack>
+                          </RadioGroup>
+                        </Box>
+                      </VStack>
+                    </PopoverBody>
+                  </PopoverContent>
+                </Popover>
+            </HStack>
+
+            {/* Active Filters */}
+            {hasActiveFilters && (
+              <Wrap spacing={1} mt={2}>
+                {filters.locationType.map(loc => (
+                  <WrapItem key={loc}>
+                    <Tag size="sm" colorScheme="yellow" borderRadius="full">
+                      <TagLabel>{loc === 'remote' ? 'Remote' : 'In-Person'}</TagLabel>
+                      <TagCloseButton onClick={() => setFilters(prev => ({
+                        ...prev,
+                        locationType: prev.locationType.filter(l => l !== loc)
+                      }))} />
+                    </Tag>
+                  </WrapItem>
+                ))}
+                {filters.activityType.map(act => (
+                  <WrapItem key={act}>
+                    <Tag size="sm" colorScheme="blue" borderRadius="full">
+                      <TagLabel>{act === '1to1' ? '1-to-1' : 'Group'}</TagLabel>
+                      <TagCloseButton onClick={() => setFilters(prev => ({
+                        ...prev,
+                        activityType: prev.activityType.filter(a => a !== act)
+                      }))} />
+                    </Tag>
+                  </WrapItem>
+                ))}
+                {(filters.durationRange[0] !== 0 || filters.durationRange[1] !== 10) && (
+                  <WrapItem>
+                    <Tag size="sm" colorScheme="green" borderRadius="full">
+                      <TagLabel>{filters.durationRange[0]}-{filters.durationRange[1]}h</TagLabel>
+                      <TagCloseButton onClick={() => setFilters(prev => ({
+                        ...prev,
+                        durationRange: [0, 10]
+                      }))} />
+                    </Tag>
+                  </WrapItem>
                 )}
-
-                {!isLoadingLocations && (
-                  <Text fontSize="sm" color="gray.500" textAlign="center" mt={3}>
-                    Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredOffers.length)} of {filteredOffers.length} {activeTab}
-                  </Text>
+                {filters.radiusKm > 0 && (
+                  <WrapItem>
+                    <Tag size="sm" colorScheme="teal" borderRadius="full">
+                      <TagLabel>{filters.radiusKm} km</TagLabel>
+                      <TagCloseButton onClick={() => setFilters(prev => ({
+                        ...prev,
+                        radiusKm: 0
+                      }))} />
+                    </Tag>
+                  </WrapItem>
                 )}
-              </Box>
-            </VStack>
-          </Flex>
-        </Grid>
+                {filters.sortBy !== 'newest' && (
+                  <WrapItem>
+                    <Tag size="sm" colorScheme="purple" borderRadius="full">
+                      <TagLabel>
+                        {filters.sortBy === 'oldest' ? 'Oldest' : 
+                         filters.sortBy === 'duration_asc' ? 'Shortest' : 'Longest'}
+                      </TagLabel>
+                      <TagCloseButton onClick={() => setFilters(prev => ({
+                        ...prev,
+                        sortBy: 'newest'
+                      }))} />
+                    </Tag>
+                  </WrapItem>
+                )}
+                <WrapItem>
+                  <Button size="xs" variant="link" colorScheme="gray" onClick={resetFilters}>
+                    Clear
+                  </Button>
+                </WrapItem>
+              </Wrap>
+            )}
+          </Box>
 
-        <Box mt={10} px={6}>
-          <HStack justify="space-between" mb={4}>
-            <Text fontSize="xl" fontWeight="semibold">
-              Latest Transactions
-            </Text>
+          {/* Tabs */}
+          <HStack 
+            px={3} 
+            py={1.5} 
+            borderBottom="1px solid" 
+            borderColor="gray.100"
+            justify="space-between"
+            bg="white"
+            flexShrink={0}
+          >
+            <HStack spacing={0} bg="gray.100" p={0.5} borderRadius="md">
+              <Button
+                size="xs"
+                variant={activeTab === 'offers' ? 'solid' : 'ghost'}
+                bg={activeTab === 'offers' ? 'white' : 'transparent'}
+                color={activeTab === 'offers' ? 'gray.800' : 'gray.500'}
+                boxShadow={activeTab === 'offers' ? 'sm' : 'none'}
+                onClick={() => setActiveTab('offers')}
+                fontWeight="500"
+                _hover={{ bg: activeTab === 'offers' ? 'white' : 'gray.200' }}
+              >
+                Offers
+              </Button>
+              <Button 
+                size="xs"
+                variant={activeTab === 'wants' ? 'solid' : 'ghost'}
+                bg={activeTab === 'wants' ? 'white' : 'transparent'}
+                color={activeTab === 'wants' ? 'gray.800' : 'gray.500'}
+                boxShadow={activeTab === 'wants' ? 'sm' : 'none'}
+                onClick={() => setActiveTab('wants')}
+                fontWeight="500"
+                _hover={{ bg: activeTab === 'wants' ? 'white' : 'gray.200' }}
+              >
+                Wants
+              </Button>
+            </HStack>
             <Button
-              as={Link}
-              to="/transactions"
-              variant="ghost"
-              size="sm"
-              colorScheme="blue"
+              size="xs"
+              colorScheme="yellow"
+              leftIcon={<Icon as={MdAdd} boxSize={3} />}
+              onClick={() => navigate(activeTab === 'offers' ? '/create-offer' : '/create-offer?type=want')}
             >
-              View All
+              Add
             </Button>
           </HStack>
-          {latestTransactions.length === 0 ? (
-            <Box bg="#F7FAFC" borderRadius="xl" p={6} textAlign="center">
-              <Text color="gray.600">No recent transactions.</Text>
-            </Box>
-          ) : (
-            <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
-              {latestTransactions.map((transaction) => (
-                <LatestTransactionCard
-                  key={transaction.id}
-                  transaction={transaction}
-                  currentUserId={user?.id}
-                  onNavigate={() => navigate('/transactions')}
+
+          {/* Cards List */}
+          <Box flex={1} overflowY="auto">
+            {isLoadingLocations ? (
+              Array.from({ length: itemsPerPage }).map((_, i) => (
+                <OfferCardSkeleton key={i} />
+              ))
+            ) : paginatedOffers.length > 0 ? (
+              paginatedOffers.map((offer) => (
+                <OfferCard 
+                  key={offer.id} 
+                  offer={offer} 
+                  locationAddress={locationCache[offer.id]}
+                  myExchange={myExchanges[offer.id]}
                 />
-              ))}
-            </Grid>
+              ))
+            ) : (
+              <Flex justify="center" align="center" h="200px">
+                <Text color="gray.400" fontSize="sm">No {activeTab} found.</Text>
+              </Flex>
+            )}
+          </Box>
+
+          {/* Pagination - Fixed at bottom */}
+          {!isLoadingLocations && totalPages > 1 && (
+            <HStack 
+              justify="center" 
+              py={2} 
+              borderTop="1px solid" 
+              borderColor="gray.100"
+              bg="white"
+              flexShrink={0}
+            >
+              <Button
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                isDisabled={currentPage === 1}
+                variant="ghost"
+              >
+                ←
+              </Button>
+              <Text fontSize="sm" color="gray.600">
+                {currentPage} / {totalPages}
+              </Text>
+              <Button
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                isDisabled={currentPage === totalPages}
+                variant="ghost"
+              >
+                →
+              </Button>
+            </HStack>
+          )}
+        </Flex>
+      </Flex>
+
+      {/* Mobile Layout */}
+      <Box display={{ base: 'block', lg: 'none' }}>
+        {/* Map - Mobile */}
+        <Box h="250px" w="100%">
+          <MapPanel offers={offers} />
+        </Box>
+
+        {/* Cards Panel - Mobile */}
+        <Box bg="white">
+          {/* Search & Filter - Mobile */}
+          <Box
+            px={3} 
+            py={2}
+            borderBottom="1px solid" 
+            borderColor="gray.100"
+            bg="white"
+          >
+            <HStack spacing={2}>
+              <Input
+                flex={1}
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                size="sm"
+                borderRadius="md"
+                bg="gray.50"
+                border="none"
+                _placeholder={{ color: 'gray.400' }}
+              />
+              <Button
+                leftIcon={<Icon as={MdFilterList} boxSize={4} />}
+                variant="outline"
+                size="sm"
+                onClick={onFilterOpen}
+              >
+                Filter
+              </Button>
+            </HStack>
+          </Box>
+
+          {/* Tabs - Mobile */}
+          <HStack 
+            px={3} 
+            py={2} 
+            borderBottom="1px solid" 
+            borderColor="gray.100"
+            justify="space-between"
+            bg="white"
+          >
+            <HStack spacing={0} bg="gray.100" p={0.5} borderRadius="md">
+              <Button
+                size="xs"
+                variant={activeTab === 'offers' ? 'solid' : 'ghost'}
+                bg={activeTab === 'offers' ? 'white' : 'transparent'}
+                color={activeTab === 'offers' ? 'gray.800' : 'gray.500'}
+                boxShadow={activeTab === 'offers' ? 'sm' : 'none'}
+                onClick={() => setActiveTab('offers')}
+                fontWeight="500"
+              >
+                Offers
+              </Button>
+              <Button 
+                size="xs"
+                variant={activeTab === 'wants' ? 'solid' : 'ghost'}
+                bg={activeTab === 'wants' ? 'white' : 'transparent'}
+                color={activeTab === 'wants' ? 'gray.800' : 'gray.500'}
+                boxShadow={activeTab === 'wants' ? 'sm' : 'none'}
+                onClick={() => setActiveTab('wants')}
+                fontWeight="500"
+              >
+                Wants
+              </Button>
+            </HStack>
+            <Button
+              size="xs"
+              colorScheme="yellow"
+              leftIcon={<Icon as={MdAdd} boxSize={3} />}
+              onClick={() => navigate(activeTab === 'offers' ? '/create-offer' : '/create-offer?type=want')}
+            >
+              Add
+            </Button>
+          </HStack>
+
+          {/* Cards List - Mobile */}
+          <Box>
+            {isLoadingLocations ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <OfferCardSkeleton key={i} />
+              ))
+            ) : paginatedOffers.length > 0 ? (
+              paginatedOffers.map((offer) => (
+                <OfferCard 
+                  key={offer.id} 
+                  offer={offer} 
+                  locationAddress={locationCache[offer.id]}
+                  myExchange={myExchanges[offer.id]}
+                />
+              ))
+            ) : (
+              <Flex justify="center" align="center" h="200px">
+                <Text color="gray.400" fontSize="sm">No {activeTab} found.</Text>
+              </Flex>
+            )}
+          </Box>
+
+          {/* Pagination - Mobile */}
+          {!isLoadingLocations && totalPages > 1 && (
+            <HStack justify="center" py={3} borderTop="1px solid" borderColor="gray.100">
+              <Button
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                isDisabled={currentPage === 1}
+                variant="ghost"
+              >
+                ←
+              </Button>
+              <Text fontSize="sm" color="gray.600">
+                {currentPage} / {totalPages}
+              </Text>
+              <Button
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                isDisabled={currentPage === totalPages}
+                variant="ghost"
+              >
+                →
+              </Button>
+            </HStack>
           )}
         </Box>
-      </Container>
+      </Box>
     </Box>
   )
 }
