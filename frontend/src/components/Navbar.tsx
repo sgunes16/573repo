@@ -157,7 +157,7 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
                     <Avatar
                       name={`${user.first_name} ${user.last_name}`}
                       size="md"
-                      src={userProfile?.profile_picture}
+                      src={(userProfile as any)?.avatar || userProfile?.profile_picture}
                     >
                       <Box
                         position="absolute"

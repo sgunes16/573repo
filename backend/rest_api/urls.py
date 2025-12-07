@@ -2,7 +2,9 @@ from django.urls import path, include
 
 from .views import (
     HomeView, UserView, OffersView, OfferDetailView, UserProfileView, CreateOfferView,
-    UploadOfferImageView, DeleteOfferImageView, SetPrimaryImageView
+    UploadOfferImageView, DeleteOfferImageView, SetPrimaryImageView,
+    CreateExchangeView, ExchangeDetailView, MyExchangesView, ExchangeByOfferView, ProposeDateTimeView,
+    AcceptExchangeView, RejectExchangeView, ConfirmCompletionView, SubmitRatingView
 )
 from .auth.views import LoginView, RegisterView, LogoutView
 
@@ -19,4 +21,15 @@ urlpatterns = [
     path("offers/<int:offer_id>/images/", UploadOfferImageView.as_view(), name="upload-offer-image"),
     path("offers/<int:offer_id>/images/<int:image_id>/", DeleteOfferImageView.as_view(), name="delete-offer-image"),
     path("offers/<int:offer_id>/images/<int:image_id>/primary/", SetPrimaryImageView.as_view(), name="set-primary-image"),
+    
+    # Exchange endpoints
+    path("exchanges/", CreateExchangeView.as_view(), name="create-exchange"),
+    path("exchanges/<int:exchange_id>/", ExchangeDetailView.as_view(), name="exchange-detail"),
+    path("exchanges/by-offer/<int:offer_id>/", ExchangeByOfferView.as_view(), name="exchange-by-offer"),
+    path("my-exchanges/", MyExchangesView.as_view(), name="my-exchanges"),
+    path("exchanges/<int:exchange_id>/propose-datetime/", ProposeDateTimeView.as_view(), name="propose-datetime"),
+    path("exchanges/<int:exchange_id>/accept/", AcceptExchangeView.as_view(), name="accept-exchange"),
+    path("exchanges/<int:exchange_id>/reject/", RejectExchangeView.as_view(), name="reject-exchange"),
+    path("exchanges/<int:exchange_id>/confirm-completion/", ConfirmCompletionView.as_view(), name="confirm-completion"),
+    path("exchanges/<int:exchange_id>/rate/", SubmitRatingView.as_view(), name="submit-rating"),
 ]

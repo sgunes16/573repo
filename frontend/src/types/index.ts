@@ -139,6 +139,7 @@ export interface Offer {
   location?: string
   geo_location?: number[]
   tags: string[]
+  images?: OfferImage[]
   activity_type: string
   offer_type: string
   person_count: number
@@ -201,24 +202,51 @@ export enum WantStatus {
 // Exchange types
 export interface Exchange {
   id: string
-  offer_id: string
-  want_id: string
-  provider_id: string
-  requester_id: string
+  offer: {
+    id: string
+    title: string
+    description: string
+    time_required: number
+    type: 'offer' | 'want'
+    location?: string
+    geo_location?: number[]
+    date?: string
+    time?: string
+    activity_type?: string
+    person_count?: number
+    location_type?: string
+    tags?: string[]
+  }
+  provider: User
+  requester: User
   status: ExchangeStatus
   time_spent: number
-  rating?: number
-  feedback?: string
+  proposed_date?: string
+  proposed_time?: string
+  requester_confirmed: boolean
+  provider_confirmed: boolean
   created_at: string
   completed_at?: string
+  ratings?: ExchangeRating[]
 }
 
 export enum ExchangeStatus {
-  PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export interface ExchangeRating {
+  id?: string
+  rater_id: string
+  ratee_id: string
+  communication: number  // 1-5
+  punctuality: number    // 1-5
+  would_recommend: boolean
+  comment?: string
+  created_at?: string
 }
 
 // TimeBank types

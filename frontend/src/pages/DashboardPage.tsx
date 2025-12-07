@@ -164,6 +164,7 @@ const OfferCardSkeleton = () => (
 )
 
 const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?: string }) => {
+  // Badge calculation without showing time credits
   const badge = getUserBadge(offer.user?.profile?.time_credits || 0)
   const rating = offer.user?.profile?.rating ?? 4.8
   const meta = offerMetaMap[offer.id] ?? {
@@ -203,7 +204,6 @@ const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?:
             >
               {badge.label}
             </Badge>
-            <OutlinePill label={timeCreditTier(offer.user?.profile?.time_credits || 0)} />
           </HStack>
 
           <HStack spacing={3} align="center">

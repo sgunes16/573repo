@@ -11,7 +11,6 @@ import {
   Icon,
   Image,
   Skeleton,
-  Stack,
   Tag,
   Text,
   VStack,
@@ -22,7 +21,7 @@ import Navbar from '@/components/Navbar'
 import { offerService } from '@/services/offer.service'
 import { mapboxService } from '@/services/mapbox.service'
 import { useAuthStore } from '@/store/useAuthStore'
-import type { Offer } from '@/types'
+import type { Offer, OfferImage } from '@/types'
 import {
   MdAccessTime,
   MdArrowBack,
@@ -57,7 +56,7 @@ const OfferDetailPage = () => {
         setOffer(data)
         
         // Set primary image as selected
-        const primaryImage = data.images?.find(img => img.is_primary)
+        const primaryImage = data.images?.find((img: OfferImage) => img.is_primary)
         if (primaryImage) {
           setSelectedImage(primaryImage.url)
         } else if (data.images && data.images.length > 0) {
@@ -192,9 +191,9 @@ const OfferDetailPage = () => {
                   mb={3}
                   fallback={<Skeleton height="350px" borderRadius="xl" />}
                 />
-                {offer.images.length > 1 && (
+                {offer.images && offer.images.length > 1 && (
                   <HStack spacing={2} overflowX="auto" pb={2}>
-                    {offer.images.map((img) => (
+                    {offer.images.map((img: OfferImage) => (
                       <Image
                         key={img.id}
                         src={img.url}
@@ -345,13 +344,6 @@ const OfferDetailPage = () => {
               </HStack>
               
               <Divider my={4} />
-              
-              <HStack justify="space-between" mb={4}>
-                <Text color="gray.600">Time Credits</Text>
-                <Text fontWeight="600" color="yellow.600">
-                  {offer.user?.profile?.time_credits || 0} hrs
-                </Text>
-              </HStack>
 
               {isOwner ? (
                 <Button

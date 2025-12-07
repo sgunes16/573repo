@@ -151,6 +151,10 @@ class Exchange(models.Model):
     time_spent = models.IntegerField(null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True)
     feedback = models.TextField(blank=True)
+    proposed_date = models.DateField(null=True, blank=True)
+    proposed_time = models.TimeField(null=True, blank=True)
+    requester_confirmed = models.BooleanField(default=False)
+    provider_confirmed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -259,30 +263,6 @@ class TimeBank(models.Model):
     total_amount = models.IntegerField(default=1)
     last_update = models.DateTimeField(auto_now=True)
 
-
-def offer_image_path(instance, filename):
-    """Generate upload path for offer images"""
-    import uuid
-    ext = filename.split('.')[-1]
-    new_filename = f"{uuid.uuid4()}.{ext}"
-    return f"offers/{instance.offer.id}/{new_filename}"
-
-
-class OfferImage(models.Model):
-    """Image model for Offers and Wants"""
-    offer = models.ForeignKey(
-        Offer, on_delete=models.CASCADE, related_name='offer_images')
-    image = models.ImageField(upload_to=offer_image_path)
-    caption = models.CharField(max_length=255, blank=True)
-    is_primary = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-is_primary', '-created_at']
-
-    def __str__(self):
-        return f"Image for {self.offer.title}"
-
     def add_credit(self, hours=1):
         self.amount += hours
         self.available_amount += hours
@@ -312,3 +292,47 @@ class OfferImage(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.amount}h"
+
+
+class ExchangeRating(models.Model):
+    exchange = models.ForeignKey(
+        Exchange, on_delete=models.CASCADE, related_name='ratings')
+    rater = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='ratings_given')
+    ratee = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='ratings_received')
+    communication = models.IntegerField()  # 1-5
+    punctuality = models.IntegerField()    # 1-5
+    would_recommend = models.BooleanField()
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('exchange', 'rater', 'ratee')
+
+    def __str__(self):
+        return f"Rating by {self.rater.email} for {self.ratee.email} - Exchange {self.exchange.id}"
+
+
+def offer_image_path(instance, filename):
+    """Generate upload path for offer images"""
+    import uuid
+    ext = filename.split('.')[-1]
+    new_filename = f"{uuid.uuid4()}.{ext}"
+    return f"offers/{instance.offer.id}/{new_filename}"
+
+
+class OfferImage(models.Model):
+    """Image model for Offers and Wants"""
+    offer = models.ForeignKey(
+        Offer, on_delete=models.CASCADE, related_name='offer_images')
+    image = models.ImageField(upload_to=offer_image_path)
+    caption = models.CharField(max_length=255, blank=True)
+    is_primary = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-is_primary', '-created_at']
+
+    def __str__(self):
+        return f"Image for {self.offer.title}"
