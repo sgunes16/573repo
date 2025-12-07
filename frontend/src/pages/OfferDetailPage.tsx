@@ -44,6 +44,7 @@ const OfferDetailPage = () => {
   const [locationAddress, setLocationAddress] = useState<string>('')
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [exchanges, setExchanges] = useState<Exchange[]>([])
+  const [myExchange, setMyExchange] = useState<Exchange | null>(null)
 
   // Check if current user is the owner of this offer
   const isOwner = user?.id === offer?.user_id || user?.id === offer?.user?.id
@@ -84,6 +85,17 @@ const OfferDetailPage = () => {
             setExchanges(exchangesData)
           } catch (error) {
             console.error('Failed to fetch exchanges:', error)
+          }
+        } else {
+          // Check if current user already requested this offer
+          try {
+            const existingExchange = await exchangeService.getExchangeByOfferId(id)
+            if (existingExchange) {
+              setMyExchange(existingExchange)
+            }
+          } catch (error) {
+            // No existing exchange, that's fine
+            console.log('No existing exchange for this offer')
           }
         }
       } catch (error) {
@@ -450,6 +462,65 @@ const OfferDetailPage = () => {
                     </Box>
                   )}
                 </>
+              ) : myExchange ? (
+                // User already has a handshake for this offer
+                <Box>
+                  <Box
+                    p={4}
+                    bg={
+                      myExchange.status === 'COMPLETED' ? 'green.50' :
+                      myExchange.status === 'ACCEPTED' ? 'blue.50' :
+                      myExchange.status === 'PENDING' ? 'yellow.50' :
+                      'gray.50'
+                    }
+                    borderRadius="lg"
+                    border="1px solid"
+                    borderColor={
+                      myExchange.status === 'COMPLETED' ? 'green.200' :
+                      myExchange.status === 'ACCEPTED' ? 'blue.200' :
+                      myExchange.status === 'PENDING' ? 'yellow.200' :
+                      'gray.200'
+                    }
+                    mb={3}
+                  >
+                    <HStack justify="space-between" mb={2}>
+                      <Text fontWeight="600">Your Handshake</Text>
+                      <Badge
+                        colorScheme={
+                          myExchange.status === 'COMPLETED' ? 'green' :
+                          myExchange.status === 'ACCEPTED' ? 'blue' :
+                          myExchange.status === 'PENDING' ? 'yellow' :
+                          'gray'
+                        }
+                      >
+                        {myExchange.status}
+                      </Badge>
+                    </HStack>
+                    {myExchange.proposed_date && (
+                      <HStack fontSize="sm" color="gray.600">
+                        <Icon as={MdCalendarToday} />
+                        <Text>{new Date(myExchange.proposed_date).toLocaleDateString()}</Text>
+                        {myExchange.proposed_time && (
+                          <>
+                            <Text>•</Text>
+                            <Text>{myExchange.proposed_time}</Text>
+                          </>
+                        )}
+                      </HStack>
+                    )}
+                  </Box>
+                  <Button
+                    w="100%"
+                    bg="yellow.400"
+                    color="black"
+                    size="lg"
+                    leftIcon={<Icon as={MdHandshake} />}
+                    _hover={{ bg: 'yellow.500' }}
+                    onClick={() => navigate(`/handshake/exchange/${myExchange.id}`)}
+                  >
+                    View Handshake
+                  </Button>
+                </Box>
               ) : (
                 <Button
                   w="100%"

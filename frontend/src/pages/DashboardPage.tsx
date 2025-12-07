@@ -30,7 +30,8 @@ import {
   getUserBadge,
 } from '@/services/mock/mockData'
 import { transactionService } from '@/services/transaction.service'
-import type { Offer, User, TimeBankTransaction } from '@/types'
+import { exchangeService } from '@/services/exchange.service'
+import type { Offer, User, TimeBankTransaction, Exchange } from '@/types'
 import {
   MdAdd,
   MdCalendarToday,
@@ -164,7 +165,7 @@ const OfferCardSkeleton = () => (
   </Box>
 )
 
-const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?: string }) => {
+const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locationAddress?: string; myExchange?: Exchange }) => {
   // Badge calculation without showing time credits
   const badge = getUserBadge(offer.user?.profile?.time_credits || 0)
   const rating = offer.user?.profile?.rating ?? 4.8
@@ -205,6 +206,23 @@ const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?:
             >
               {badge.label}
             </Badge>
+            {myExchange && (
+              <Badge
+                colorScheme={
+                  myExchange.status === 'COMPLETED' ? 'green' :
+                  myExchange.status === 'ACCEPTED' ? 'blue' :
+                  myExchange.status === 'PENDING' ? 'yellow' :
+                  myExchange.status === 'CANCELLED' ? 'red' :
+                  'gray'
+                }
+                variant="solid"
+                borderRadius="2px"
+                fontWeight="bold"
+                fontSize="xs"
+              >
+                {myExchange.status === 'PENDING' ? 'REQUESTED' : myExchange.status}
+              </Badge>
+            )}
           </HStack>
 
           <HStack spacing={3} align="center">
@@ -285,12 +303,13 @@ const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?:
 const LatestTransactionCard = ({
   transaction,
   currentUserId,
+  onNavigate,
 }: {
   transaction: TimeBankTransaction
   currentUserId?: string
+  onNavigate: () => void
 }) => {
   const isEarn = transaction.transaction_type === 'EARN' && transaction.to_user.id === currentUserId
-  const isSpend = transaction.transaction_type === 'SPEND' && transaction.from_user.id === currentUserId
   const otherUser = transaction.from_user.id === currentUserId ? transaction.to_user : transaction.from_user
   
   return (
@@ -303,7 +322,7 @@ const LatestTransactionCard = ({
       minH="120px"
       cursor="pointer"
       _hover={{ bg: '#E2E8F0' }}
-      onClick={() => navigate('/transactions')}
+      onClick={onNavigate}
     >
       <UserAvatar 
         user={otherUser}
@@ -719,6 +738,7 @@ const DashboardPage = () => {
   const [locationCache, setLocationCache] = useState<Record<string, string>>({})
   const [isLoadingLocations, setIsLoadingLocations] = useState(true)
   const [latestTransactions, setLatestTransactions] = useState<TimeBankTransaction[]>([])
+  const [myExchanges, setMyExchanges] = useState<Record<string, Exchange>>({}) // offer_id -> Exchange
   const itemsPerPage = 5 // Map height allows ~5 cards
 
   useEffect(() => {
@@ -744,6 +764,28 @@ const DashboardPage = () => {
     }
     fetchOffers()
   }, [])
+
+  // Fetch user's exchanges to show handshake status on cards
+  useEffect(() => {
+    const fetchMyExchanges = async () => {
+      try {
+        const exchanges = await exchangeService.getMyExchanges()
+        const exchangeMap: Record<string, Exchange> = {}
+        for (const exchange of exchanges) {
+          // Map by offer_id, store the exchange where user is requester
+          if (exchange.offer?.id && String(exchange.requester?.id) === String(user?.id)) {
+            exchangeMap[exchange.offer.id] = exchange
+          }
+        }
+        setMyExchanges(exchangeMap)
+      } catch (error) {
+        console.error('Failed to fetch exchanges:', error)
+      }
+    }
+    if (user?.id) {
+      fetchMyExchanges()
+    }
+  }, [user?.id])
 
   const filteredOffers = useMemo(() => {
     let filtered = offers.filter(offer => offer.type === activeTab.slice(0, -1)) // 'offers' -> 'offer', 'wants' -> 'want'
@@ -891,6 +933,7 @@ const DashboardPage = () => {
                         key={offer.id} 
                         offer={offer} 
                         locationAddress={locationCache[offer.id]}
+                        myExchange={myExchanges[offer.id]}
                       />
                     ))
                   ) : (
@@ -979,6 +1022,7 @@ const DashboardPage = () => {
                   key={transaction.id}
                   transaction={transaction}
                   currentUserId={user?.id}
+                  onNavigate={() => navigate('/transactions')}
                 />
               ))}
             </Grid>

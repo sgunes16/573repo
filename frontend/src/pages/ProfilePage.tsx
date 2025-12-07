@@ -35,8 +35,9 @@ import Navbar from "@/components/Navbar";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuthStore } from "@/store/useAuthStore";
 
-import { User, UserProfile, TimeBank, TimeBankTransaction, Comment } from "@/types";
+import { User, UserProfile, TimeBank, TimeBankTransaction, Comment, Exchange } from "@/types";
 import { profileService } from "@/services/profile.service";
+import { exchangeService } from "@/services/exchange.service";
 
 
 const StatPill = ({ label, value }: { label: string; value: string }) => (
@@ -62,6 +63,7 @@ const ProfilePage = () => {
   const [timebank, setTimebank] = useState<TimeBank | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<TimeBankTransaction[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [myHandshakes, setMyHandshakes] = useState<Exchange[]>([]);
   const [ratingsSummary, setRatingsSummary] = useState<{
     avg_communication: number
     avg_punctuality: number
@@ -99,6 +101,18 @@ const ProfilePage = () => {
           setRecentTransactions(profileDetail.recent_transactions);
           setComments(profileDetail.comments || []);
           setRatingsSummary(profileDetail.ratings_summary || null);
+          
+          // Fetch my handshakes (exchanges where I'm the requester)
+          try {
+            const exchanges = await exchangeService.getMyExchanges();
+            // Filter to only show exchanges where current user is the requester
+            const requestedExchanges = exchanges.filter(
+              (ex: Exchange) => String(ex.requester?.id) === String(currentUser.id)
+            );
+            setMyHandshakes(requestedExchanges);
+          } catch (error) {
+            console.error('Error fetching handshakes:', error);
+          }
         } else {
           // Fetch other user's profile
           const profileDetail = await profileService.getUserProfileDetail(userId);
@@ -326,6 +340,7 @@ const ProfilePage = () => {
                 <TabList>
                   <Tab>Offers</Tab>
                   <Tab>Wants</Tab>
+                  {isOwnProfile && <Tab>My Handshakes</Tab>}
                   <Tab>Transactions</Tab>
                   <Tab>Comments</Tab>
                 </TabList>
@@ -700,6 +715,74 @@ const ProfilePage = () => {
                       </Box>
                     )}
                   </TabPanel>
+
+                  {/* My Handshakes Tab - Only for own profile */}
+                  {isOwnProfile && (
+                    <TabPanel px={0}>
+                      <Heading size="md" mb={4}>My Handshake Requests</Heading>
+                      {myHandshakes.length > 0 ? (
+                        <VStack spacing={4} align="stretch">
+                          {myHandshakes.map((exchange) => (
+                            <Box
+                              key={exchange.id}
+                              bg="white"
+                              p={4}
+                              borderRadius="lg"
+                              border="1px solid"
+                              borderColor="gray.200"
+                              cursor="pointer"
+                              _hover={{ borderColor: 'yellow.400', bg: 'yellow.50' }}
+                              onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
+                            >
+                              <HStack justify="space-between" mb={2}>
+                                <HStack spacing={3}>
+                                  <UserAvatar size="sm" user={exchange.provider} />
+                                  <Box>
+                                    <Text fontWeight="600">{exchange.offer?.title || 'Untitled Offer'}</Text>
+                                    <Text fontSize="sm" color="gray.600">
+                                      with {exchange.provider?.first_name} {exchange.provider?.last_name}
+                                    </Text>
+                                  </Box>
+                                </HStack>
+                                <Badge
+                                  colorScheme={
+                                    exchange.status === 'COMPLETED' ? 'green' :
+                                    exchange.status === 'ACCEPTED' ? 'blue' :
+                                    exchange.status === 'PENDING' ? 'yellow' :
+                                    exchange.status === 'CANCELLED' ? 'red' :
+                                    'gray'
+                                  }
+                                >
+                                  {exchange.status === 'PENDING' ? 'REQUESTED' : exchange.status}
+                                </Badge>
+                              </HStack>
+                              {exchange.proposed_date && (
+                                <HStack fontSize="sm" color="gray.500" mt={2}>
+                                  <Icon as={MdAccessTime} />
+                                  <Text>
+                                    {new Date(exchange.proposed_date).toLocaleDateString()}
+                                    {exchange.proposed_time && ` at ${exchange.proposed_time}`}
+                                  </Text>
+                                </HStack>
+                              )}
+                            </Box>
+                          ))}
+                        </VStack>
+                      ) : (
+                        <Box textAlign="center" py={8}>
+                          <Text color="gray.500" mb={4}>
+                            You haven't requested any handshakes yet.
+                          </Text>
+                          <Button
+                            colorScheme="yellow"
+                            onClick={() => navigate('/dashboard')}
+                          >
+                            Browse Offers
+                          </Button>
+                        </Box>
+                      )}
+                    </TabPanel>
+                  )}
 
                   {/* Transactions Tab */}
                   <TabPanel px={0}>
