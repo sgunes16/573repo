@@ -7,6 +7,8 @@ from datetime import datetime, date, time
 from django.conf import settings
 from django.db import transaction, models
 from django.db.models import Q, Avg
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 class HomeView(APIView):
     def get(self, request):
@@ -807,6 +809,9 @@ class ProposeDateTimeView(APIView):
             exchange.proposed_date = proposed_date
             exchange.proposed_time = proposed_time
             exchange.save()
+            
+            # Send websocket update
+            self.send_exchange_update(exchange)
 
             return Response({
                 "message": "Date and time proposed successfully",
@@ -816,6 +821,32 @@ class ProposeDateTimeView(APIView):
 
         except Exchange.DoesNotExist:
             return Response({"error": "Exchange not found"}, status=404)
+    
+    def send_exchange_update(self, exchange):
+        """Send exchange update via websocket"""
+        try:
+            channel_layer = get_channel_layer()
+            room_group_name = f'exchange_{exchange.id}'
+            
+            exchange_data = {
+                'id': str(exchange.id),
+                'status': exchange.status,
+                'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
+                'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
+                'requester_confirmed': exchange.requester_confirmed,
+                'provider_confirmed': exchange.provider_confirmed,
+                'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
+            }
+            
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'exchange_update',
+                    'exchange': exchange_data
+                }
+            )
+        except Exception as e:
+            print(f"Error sending websocket update: {e}")
 
 
 class AcceptExchangeView(APIView):
@@ -835,6 +866,9 @@ class AcceptExchangeView(APIView):
 
             exchange.status = 'ACCEPTED'
             exchange.save()
+            
+            # Send websocket update
+            self.send_exchange_update(exchange)
 
             return Response({
                 "message": "Exchange accepted successfully",
@@ -929,6 +963,9 @@ class ConfirmCompletionView(APIView):
                         )
 
             exchange.save()
+            
+            # Send websocket update
+            self.send_exchange_update(exchange)
 
             return Response({
                 "message": "Completion confirmed",
@@ -939,6 +976,32 @@ class ConfirmCompletionView(APIView):
 
         except Exchange.DoesNotExist:
             return Response({"error": "Exchange not found"}, status=404)
+    
+    def send_exchange_update(self, exchange):
+        """Send exchange update via websocket"""
+        try:
+            channel_layer = get_channel_layer()
+            room_group_name = f'exchange_{exchange.id}'
+            
+            exchange_data = {
+                'id': str(exchange.id),
+                'status': exchange.status,
+                'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
+                'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
+                'requester_confirmed': exchange.requester_confirmed,
+                'provider_confirmed': exchange.provider_confirmed,
+                'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
+            }
+            
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'exchange_update',
+                    'exchange': exchange_data
+                }
+            )
+        except Exception as e:
+            print(f"Error sending websocket update: {e}")
 
 
 class SubmitRatingView(APIView):

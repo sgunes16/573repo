@@ -39,6 +39,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_USER=${DB_USER}
@@ -55,6 +57,9 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME:-hive-media}
       - MINIO_USE_SSL=false
+      # Redis Settings
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     networks:
       - hive_network_prod
 
@@ -100,6 +105,23 @@ services:
     networks:
       - hive_network_prod
 
+  redis:
+    image: redis:7-alpine
+    container_name: hive_redis_prod
+    restart: always
+    expose:
+      - "6379"
+    volumes:
+      - redis_data_prod:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hive_network_prod
+
 networks:
   hive_network_prod:
     driver: bridge
@@ -108,5 +130,7 @@ volumes:
   postgres_data_hive_prod:
     driver: local
   minio_data_prod:
+    driver: local
+  redis_data_prod:
     driver: local
 

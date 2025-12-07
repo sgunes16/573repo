@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Badge,
   Box,
   Button,
@@ -44,6 +43,7 @@ import {
   MdSwapHoriz,
 } from 'react-icons/md'
 import Navbar from '@/components/Navbar'
+import UserAvatar from '@/components/UserAvatar'
 import { offerService } from '@/services/offer.service'
 import { useGeoStore } from '@/store/useGeoStore'
 import { useAuthStore } from '@/store/useAuthStore'
@@ -208,10 +208,9 @@ const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?:
           </HStack>
 
           <HStack spacing={3} align="center">
-            <Avatar
+            <UserAvatar
               size="md"
-              name={`${userName} ${userLastName}`}
-              src={offer.user?.profile?.avatar || undefined}
+              user={offer.user}
               cursor="pointer"
               onClick={(e) => {
                 e.stopPropagation()
@@ -306,9 +305,8 @@ const LatestTransactionCard = ({
       _hover={{ bg: '#E2E8F0' }}
       onClick={() => navigate('/transactions')}
     >
-      <Avatar 
-        name={`${otherUser.first_name} ${otherUser.last_name}`}
-        src={(otherUser as any)?.profile?.avatar}
+      <UserAvatar 
+        user={otherUser}
       />
       <Icon as={MdSwapHoriz} boxSize={8} color="gray.600" />
       <VStack align="flex-start" spacing={1} flex={1}>
@@ -355,9 +353,9 @@ const LatestActivityCard = ({
     gap={4}
     minH="120px"
   >
-    <Avatar name={from.first_name} src="https://placehold.co/36x36" />
+    <UserAvatar user={from} />
     <Icon as={MdSwapHoriz} boxSize={8} color="gray.600" />
-    <Avatar name={to.first_name} src="https://placehold.co/36x36" />
+    <UserAvatar user={to} />
     <Text fontSize="sm">
       <Text as="span" color="#276749" fontWeight="semibold">
         {from.first_name}
@@ -568,10 +566,9 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
                     transition="transform 0.2s"
                     onClick={() => navigate(`/offer/${offer.id}`)}
                   >
-                    <Avatar
+                    <UserAvatar
                       size="md"
-                      name={`${userName} ${userLastName}`}
-                      src="https://placehold.co/48x48"
+                      user={offer.user}
                       sx={{
                         border: `4px solid ${borderColor}`,
                         boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
@@ -591,10 +588,9 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
                   <PopoverBody p={4}>
                     <VStack align="stretch" spacing={3}>
                       <HStack spacing={3}>
-                        <Avatar
+                        <UserAvatar
                           size="sm"
-                          name={`${userName} ${userLastName}`}
-                          src="https://placehold.co/32x32"
+                          user={offer.user}
                         />
                         <VStack align="start" spacing={0} flex={1}>
                           <Text fontWeight="bold" fontSize="sm">
@@ -651,7 +647,7 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
                         _hover={{ bg: '#D4A72C' }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          navigate(`/handshake/${offer.id}`)
+                          navigate(`/offer/${offer.id}`)
                         }}
                       >
                         View Details

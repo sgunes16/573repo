@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   Button,
   Container,
@@ -16,6 +15,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 import { profileService } from "@/services/profile.service";
+import UserAvatar from "@/components/UserAvatar";
 import {
 
   MdChevronRight,
@@ -154,11 +154,11 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
                         Active Member
                       </Text>
                     </Box>
-                    <Avatar
-                      name={`${user.first_name} ${user.last_name}`}
-                      size="md"
-                      src={(userProfile as any)?.avatar || userProfile?.profile_picture}
-                    >
+                    <Box position="relative">
+                      <UserAvatar
+                        user={{ ...user, profile: userProfile }}
+                        size="md"
+                      />
                       <Box
                         position="absolute"
                         bottom="-2px"
@@ -169,7 +169,7 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
                         h="18px"
                         border="2px solid white"
                       />
-                    </Avatar>
+                    </Box>
                   </HStack>
                 </MenuButton>
                 <MenuList>

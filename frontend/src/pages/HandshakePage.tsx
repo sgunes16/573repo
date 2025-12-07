@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Badge,
   Box,
   Button,
@@ -35,10 +34,14 @@ import {
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
+import Chat from '@/components/Chat'
+import UserAvatar from '@/components/UserAvatar'
 import { exchangeService } from '@/services/exchange.service'
 import { mapboxService } from '@/services/mapbox.service'
 import { getUserBadge } from '@/services/mock/mockData'
 import { useAuthStore } from '@/store/useAuthStore'
+import { useWebSocket } from '@/hooks/useWebSocket'
+import { getAccessToken } from '@/utils/cookies'
 import type { Exchange, ExchangeStatus, User, ExchangeRating } from '@/types'
 import { 
   MdAccessTime, 
@@ -79,13 +82,56 @@ const HandshakePage = () => {
     comment: '',
   })
 
-  // Chat (mock - will be implemented separately)
-  const [message, setMessage] = useState('')
-  const [chatMessages, setChatMessages] = useState([
-    { id: '1', sender: 'provider', text: `Hi! Thanks for your interest.` },
-    { id: '2', sender: 'requester', text: 'I would love to confirm the next available slot.' },
-    { id: '3', sender: 'provider', text: 'Let me check my calendar real quick.' },
-  ])
+  // WebSocket for exchange state updates
+  const { isConnected: isExchangeConnected } = useWebSocket({
+    url: exchange ? `/ws/exchange/${exchange.id}/` : '',
+    token: getAccessToken() || undefined,
+    onMessage: (message) => {
+      if (message.type === 'exchange_update' && message.data) {
+        // Update exchange state from websocket
+        setExchange((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            status: message.data.status,
+            proposed_date: message.data.proposed_date,
+            proposed_time: message.data.proposed_time,
+            requester_confirmed: message.data.requester_confirmed,
+            provider_confirmed: message.data.provider_confirmed,
+            completed_at: message.data.completed_at,
+          }
+        })
+        
+        toast({
+          title: 'Exchange updated',
+          description: 'The exchange status has been updated.',
+          status: 'info',
+          duration: 3000,
+        })
+      } else if (message.type === 'exchange_state' && message.data) {
+        // Initial state
+        setExchange((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            status: message.data.status,
+            proposed_date: message.data.proposed_date,
+            proposed_time: message.data.proposed_time,
+            requester_confirmed: message.data.requester_confirmed,
+            provider_confirmed: message.data.provider_confirmed,
+            completed_at: message.data.completed_at,
+          }
+        })
+      }
+    },
+    onOpen: () => {
+      console.log('Exchange WebSocket connected')
+    },
+    onClose: () => {
+      console.log('Exchange WebSocket disconnected')
+    },
+    reconnect: !!exchange,
+  })
 
   useEffect(() => {
     const fetchExchange = async () => {
@@ -106,11 +152,12 @@ const HandshakePage = () => {
           setExchange(exchangeData)
           
           // Fetch location address
+          // geo_location is [latitude, longitude], reverseGeocode expects (longitude, latitude)
           if (exchangeData.offer.geo_location && exchangeData.offer.geo_location.length === 2) {
             try {
               const address = await mapboxService.reverseGeocode(
-                exchangeData.offer.geo_location[0],
-                exchangeData.offer.geo_location[1]
+                exchangeData.offer.geo_location[1],  // longitude
+                exchangeData.offer.geo_location[0]   // latitude
               )
               setLocationAddress(address)
             } catch (error) {
@@ -321,15 +368,6 @@ const HandshakePage = () => {
     }
   }
 
-  const sendMessage = () => {
-    if (!message.trim()) return
-    setChatMessages((prev) => [...prev, { 
-      id: Date.now().toString(), 
-      sender: isRequester ? 'requester' : 'provider', 
-      text: message 
-    }])
-    setMessage('')
-  }
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'TBD'
@@ -441,7 +479,7 @@ const HandshakePage = () => {
                       <Badge colorScheme={providerBadge.color as any} variant="subtle" textTransform="uppercase">
                         {providerBadge.label}
                       </Badge>
-                      <Avatar size="sm" name={`${provider.first_name} ${provider.last_name}`} src={(provider.profile as any)?.avatar} />
+                      <UserAvatar size="sm" user={provider} />
                     </HStack>
                   </Flex>
 
@@ -541,7 +579,7 @@ const HandshakePage = () => {
                 <VStack align="stretch" spacing={4}>
                   <Flex align="center" justify="space-between">
                     <HStack spacing={4}>
-                      <Avatar name={`${provider.first_name} ${provider.last_name}`} src={(provider.profile as any)?.avatar} />
+                      <UserAvatar user={provider} />
                       <Box>
                         <Text fontWeight="600">{provider.first_name} {provider.last_name}</Text>
                         <Text fontSize="sm" color="gray.600">Provider</Text>
@@ -551,7 +589,7 @@ const HandshakePage = () => {
                   </Flex>
                   <Flex align="center" justify="space-between">
                     <HStack spacing={4}>
-                      <Avatar name={`${requester.first_name} ${requester.last_name}`} src={(requester.profile as any)?.avatar} />
+                      <UserAvatar user={requester} />
                       <Box>
                         <Text fontWeight="600">{requester.first_name} {requester.last_name}</Text>
                         <Text fontSize="sm" color="gray.600">Requester</Text>
@@ -626,58 +664,8 @@ const HandshakePage = () => {
           <GridItem>
             <Stack spacing={6}>
               {/* Chat */}
-              <Box bg="#E2E8F0" p={6} borderRadius="xl" boxShadow="sm">
-                <Flex align="center" justify="space-between" mb={6}>
-                  <Box>
-                    <Text fontSize="lg" fontWeight="700">Handshake Chat</Text>
-                    <Text color="gray.600" fontSize="sm">Coordinate the final details.</Text>
-                  </Box>
-                </Flex>
-
-                <VStack flex={1} spacing={4} align="stretch" maxH="540px" overflowY="auto" mb={4}>
-                  {chatMessages.map((msg) => (
-                    <Flex key={msg.id} justify={msg.sender === (isRequester ? 'requester' : 'provider') ? 'flex-end' : 'flex-start'}>
-                      <HStack spacing={2} align="flex-start">
-                        {msg.sender === 'provider' && <Avatar size="sm" name={provider.first_name} />}
-                        <Box
-                          bg={msg.sender === (isRequester ? 'requester' : 'provider') ? '#F6AD55' : '#4A5568'}
-                          color="white"
-                          px={4}
-                          py={3}
-                          borderRadius="xl"
-                          maxW="440px"
-                        >
-                          <Text fontSize="sm">{msg.text}</Text>
-                        </Box>
-                        {msg.sender === (isRequester ? 'requester' : 'provider') && <Avatar size="sm" name={isRequester ? requester.first_name : provider.first_name} />}
-                      </HStack>
-                    </Flex>
-                  ))}
-                </VStack>
-
-                <HStack spacing={3}>
-                  <Input
-                    placeholder="Enter a message"
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    onKeyDown={(event) => event.key === 'Enter' && sendMessage()}
-                    bg="#FFFFF0"
-                    borderColor="gray.300"
-                    borderRadius="full"
-                    h="48px"
-                  />
-                  <Button
-                    bg="#F6AD55"
-                    color="white"
-                    h="48px"
-                    px={8}
-                    borderRadius="full"
-                    onClick={sendMessage}
-                    _hover={{ bg: '#ED8936' }}
-                  >
-                    Send
-                  </Button>
-                </HStack>
+              <Box bg="#E2E8F0" p={0} borderRadius="xl" boxShadow="sm" h="600px" overflow="hidden">
+                {exchange && <Chat exchangeId={exchange.id} />}
               </Box>
             </Stack>
           </GridItem>

@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Badge,
   Box,
   Button,
@@ -16,6 +15,7 @@ import {
 } from '@chakra-ui/react'
 import { useMemo, useEffect, useState } from 'react'
 import Navbar from '@/components/Navbar'
+import UserAvatar from '@/components/UserAvatar'
 import { transactionService } from '@/services/transaction.service'
 import { useAuthStore } from '@/store/useAuthStore'
 import type { TimeBankTransaction } from '@/types'
@@ -170,7 +170,7 @@ const TransactionTimeline = ({
           <Box key={transaction.id} bg="#F7FAFC" borderRadius="xl" p={5} border="1px solid #E2E8F0">
             <HStack justify="space-between" align="flex-start">
               <HStack spacing={4} align="flex-start">
-                <Avatar name={`${otherUser?.first_name} ${otherUser?.last_name}`} />
+                <UserAvatar user={otherUser} />
                 <VStack align="flex-start" spacing={1}>
                   <Text fontWeight="600">
                     {otherUser?.first_name} {otherUser?.last_name}
@@ -280,7 +280,7 @@ const FeedbackPanel = ({ recentFeedback }: { recentFeedback: any[] }) => (
         <Box key={feedback.id} bg="#F7FAFC" borderRadius="xl" p={4} border="1px solid #E2E8F0">
           <HStack justify="space-between" mb={2}>
             <HStack spacing={2}>
-              <Avatar size="sm" name={feedback.user.first_name} />
+              <UserAvatar size="sm" user={feedback.user} />
               <Text fontWeight="600">{feedback.user.first_name}</Text>
             </HStack>
             {feedback.rating && (

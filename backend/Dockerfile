@@ -33,6 +33,6 @@ RUN chmod +x /entrypoint.sh
 # Expose port
 EXPOSE 8000
 
-# Run gunicorn (use CMD for easier override in docker-compose)
+# Run daphne (ASGI server for WebSocket support)
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "hive.wsgi:application"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "hive.asgi:application"]

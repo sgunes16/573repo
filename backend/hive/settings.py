@@ -40,6 +40,7 @@ ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",  # Must be before django.contrib.staticfiles for ASGI
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -52,6 +53,7 @@ INSTALLED_APPS = [
     "django_filters",
     "django_extensions",
     "storages",
+    "channels",
 ]
 
 MIDDLEWARE = [
@@ -84,6 +86,21 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "hive.wsgi.application"
+ASGI_APPLICATION = "hive.asgi.application"
+
+# Channels configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(os.getenv('REDIS_HOST', 'localhost'), int(os.getenv('REDIS_PORT', 6379)))],
+        },
+    },
+}
+
+# Redis configuration for Channels
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
 
 
 # Database

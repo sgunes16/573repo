@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Badge,
   Box,
   Button,
@@ -33,6 +32,7 @@ import {
   MdStar,
 } from "react-icons/md";
 import Navbar from "@/components/Navbar";
+import UserAvatar from "@/components/UserAvatar";
 import { useAuthStore } from "@/store/useAuthStore";
 
 import { User, UserProfile, TimeBank, TimeBankTransaction, Comment } from "@/types";
@@ -188,10 +188,9 @@ const ProfilePage = () => {
                 border="1px solid #E2E8F0"
               >
                 <Stack spacing={4} align="center">
-                  <Avatar
+                  <UserAvatar
                     size="xl"
-                    name={`${viewingUser?.first_name || ''} ${viewingUser?.last_name || ''}`}
-                    src={(profile as any)?.avatar}
+                    user={{ ...viewingUser, profile: profile as any }}
                   />
                   <VStack spacing={1}>
                     <Heading size="md">{`${viewingUser?.first_name || ''} ${viewingUser?.last_name || ''}`}</Heading>
@@ -751,7 +750,7 @@ const ProfilePage = () => {
                             >
                               <HStack justify="space-between">
                                 <HStack spacing={3}>
-                                  <Avatar size="sm" name={`${otherUser.first_name} ${otherUser.last_name}`} />
+                                  <UserAvatar size="sm" user={otherUser} />
                                   <VStack align="flex-start" spacing={0}>
                                     <Text fontSize="sm" fontWeight="600">
                                       {tx.exchange?.offer.title || tx.description}
@@ -804,10 +803,9 @@ const ProfilePage = () => {
                             border="1px solid #E2E8F0"
                           >
                             <HStack spacing={3} mb={3}>
-                              <Avatar
+                              <UserAvatar
                                 size="sm"
-                                name={`${comment.user?.first_name || ''} ${comment.user?.last_name || ''}`}
-                                src={(comment.user as any)?.profile?.avatar}
+                                user={comment.user}
                                 cursor="pointer"
                                 onClick={() => {
                                   if (comment.user?.id) {

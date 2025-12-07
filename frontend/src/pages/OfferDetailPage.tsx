@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Badge,
   Box,
   Button,
@@ -18,6 +17,7 @@ import {
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
+import UserAvatar from '@/components/UserAvatar'
 import { offerService } from '@/services/offer.service'
 import { exchangeService } from '@/services/exchange.service'
 import { mapboxService } from '@/services/mapbox.service'
@@ -66,10 +66,11 @@ const OfferDetailPage = () => {
         }
         
         // Fetch location address if geo_location exists
+        // geo_location is [latitude, longitude], reverseGeocode expects (longitude, latitude)
         if (data.geo_location && data.geo_location.length === 2) {
           const address = await mapboxService.reverseGeocode(
-            data.geo_location[0],
-            data.geo_location[1]
+            data.geo_location[1],  // longitude
+            data.geo_location[0]   // latitude
           )
           setLocationAddress(address)
         } else if (data.location) {
@@ -337,10 +338,9 @@ const OfferDetailPage = () => {
                 {offer.type === 'offer' ? 'Offered by' : 'Requested by'}
               </Text>
               <HStack spacing={4} mb={4}>
-                <Avatar
+                <UserAvatar
                   size="lg"
-                  name={`${offer.user?.first_name} ${offer.user?.last_name}`}
-                  src={offer.user?.profile?.avatar}
+                  user={offer.user}
                   cursor="pointer"
                   onClick={() => {
                     if (offer.user?.id) {
@@ -407,10 +407,9 @@ const OfferDetailPage = () => {
                           >
                             <HStack spacing={3} justify="space-between">
                               <HStack spacing={3}>
-                                <Avatar
+                                <UserAvatar
                                   size="sm"
-                                  name={`${exchange.requester.first_name} ${exchange.requester.last_name}`}
-                                  src={(exchange.requester.profile as any)?.avatar}
+                                  user={exchange.requester}
                                 />
                                 <Box>
                                   <Text fontSize="sm" fontWeight="600">

@@ -16,11 +16,11 @@ def check_password(password, hashed_password):
     return password_hash(password) == hashed_password
 
 
-def get_cookie_settings():
+def get_cookie_settings(httponly=True):
     """Returns cookie settings based on DEPLOY_TYPE environment variable"""
     is_production = settings.IS_PRODUCTION
     return {
-        'httponly': True,
+        'httponly': httponly,
         'secure': is_production,  # True in prod (HTTPS), False in dev (HTTP)
         'samesite': 'Strict' if is_production else 'Lax',  # Strict in prod, Lax in dev
     }
@@ -80,10 +80,10 @@ class LoginView(APIView):
         }
 
         response = Response(data)
-        cookie_settings = get_cookie_settings()
         
-        response.set_cookie("refresh_token", tokens['refresh'], **cookie_settings)
-        response.set_cookie("access_token", tokens['access'], **cookie_settings)
+        # refresh_token stays httpOnly for security, access_token readable by JS for WebSocket auth
+        response.set_cookie("refresh_token", tokens['refresh'], **get_cookie_settings(httponly=True))
+        response.set_cookie("access_token", tokens['access'], **get_cookie_settings(httponly=False))
         return response
 
 
@@ -126,10 +126,10 @@ class RegisterView(APIView):
             "refresh_token": tokens['refresh'],
         }
         response = Response(data)
-        cookie_settings = get_cookie_settings()
         
-        response.set_cookie("refresh_token", tokens['refresh'], **cookie_settings)
-        response.set_cookie("access_token", tokens['access'], **cookie_settings)
+        # refresh_token stays httpOnly for security, access_token readable by JS for WebSocket auth
+        response.set_cookie("refresh_token", tokens['refresh'], **get_cookie_settings(httponly=True))
+        response.set_cookie("access_token", tokens['access'], **get_cookie_settings(httponly=False))
         return response
 
 
@@ -178,10 +178,10 @@ class RefreshTokenView(APIView):
             }
 
             response = Response(data)
-            cookie_settings = get_cookie_settings()
             
-            response.set_cookie("refresh_token", new_tokens['refresh'], **cookie_settings)
-            response.set_cookie("access_token", new_tokens['access'], **cookie_settings)
+            # refresh_token stays httpOnly for security, access_token readable by JS for WebSocket auth
+            response.set_cookie("refresh_token", new_tokens['refresh'], **get_cookie_settings(httponly=True))
+            response.set_cookie("access_token", new_tokens['access'], **get_cookie_settings(httponly=False))
             
             return response
 
