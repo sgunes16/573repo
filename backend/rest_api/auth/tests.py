@@ -241,3 +241,61 @@ class LoginViewTests(TestCase):
         # Check cookies were set (response.cookies is a dict-like object)
         self.assertIn('access_token', response.cookies)
         self.assertIn('refresh_token', response.cookies)
+
+class RegisterViewTests(TestCase):
+    """Unit tests for RegisterView.post method using mocks"""
+    
+    def setUp(self):
+        """Set up test fixtures"""
+        self.view = RegisterView()
+        self.test_email = 'test@example.com'
+        self.test_password = 'testpassword123'
+        self.hashed_password = password_hash(self.test_password)
+        
+        # Create a mock user object
+        self.mock_user = MagicMock()
+        self.mock_user.id = 1
+        self.mock_user.email = self.test_email
+        self.mock_user.password = self.hashed_password
+        self.mock_user.first_name = 'Test'
+        self.mock_user.last_name = 'User'
+    
+    def _create_mock_request(self, data):
+        """Helper to create a mock request object"""
+        request = MagicMock()
+        request.data = data
+        return request
+    
+    def test_register_missing_email_returns_400(self):
+        """Test that missing email returns 400"""
+        request = self._create_mock_request({'password': 'somepassword', 'check_password': 'somepassword', 'full_name': 'Test User'})
+        response = self.view.post(request)
+        
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Email, password, check_password, first and last name are required.')
+    
+    def test_register_missing_password_returns_400(self):
+        """Test that missing password returns 400"""
+        request = self._create_mock_request({'email': 'test@example.com', 'check_password': 'somepassword', 'full_name': 'Test User'})
+        response = self.view.post(request)
+        
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Email, password, check_password, first and last name are required.')
+    
+    def test_register_missing_check_password_returns_400(self):
+        """Test that missing check password returns 400"""
+        request = self._create_mock_request({'email': 'test@example.com', 'password': 'somepassword', 'full_name': 'Test User'})
+        response = self.view.post(request)
+        
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Email, password, check_password, first and last name are required.')
+    
+    def test_register_missing_full_name_returns_400(self):
+        """Test that missing full name returns 400"""
+        request = self._create_mock_request({'email': 'test@example.com', 'password': 'somepassword', 'check_password': 'somepassword'})
+        response = self.view.post(request)
+        
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['message'], 'Email, password, check_password, first and last name are required.')
+    
+    

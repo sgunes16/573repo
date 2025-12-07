@@ -10,7 +10,7 @@ import {
   VStack,
   useToast,
 } from '@chakra-ui/react'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { MdAdd, MdClose, MdStarOutline } from 'react-icons/md'
 
 export interface UploadedImage {

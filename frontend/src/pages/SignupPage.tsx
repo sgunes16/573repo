@@ -65,12 +65,12 @@ const SignupPage = () => {
       })
       toast({
         title: 'Welcome to The Hive!',
-        description: 'Your account has been created.',
+        description: "Let's set up your profile.",
         status: 'success',
         duration: 3000,
         isClosable: true,
       })
-      navigate('/dashboard')
+      navigate('/onboarding')
     } catch (error: any) {
       toast({
         title: 'Registration failed',

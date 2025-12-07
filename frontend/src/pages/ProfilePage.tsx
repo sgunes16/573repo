@@ -10,6 +10,9 @@ import {
   HStack,
   Icon,
   SimpleGrid,
+  Skeleton,
+  SkeletonCircle,
+  SkeletonText,
   Stack,
   Tag,
   Text,
@@ -29,8 +32,9 @@ import {
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/store/useAuthStore";
 
-import { Offer, User } from "@/types";
+import { Offer, User, UserProfile, TimeBank } from "@/types";
 import { offerService } from "@/services/offer.service";
+import { profileService } from "@/services/profile.service";
 
 
 const StatPill = ({ label, value }: { label: string; value: string }) => (
@@ -99,32 +103,75 @@ const ProfilePage = () => {
   const { user } = useAuthStore();
   const currentUser = user as unknown as User;
   const [offers, setOffers] = useState<Offer[]>([]);
-
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [timebank, setTimebank] = useState<TimeBank | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchOffers = async () => {
-      const offers = await offerService.getOffers()
-      const filteredOffers = offers.filter((offer) => offer.user_id === currentUser.id)
-      setOffers(filteredOffers)
-    }
-    fetchOffers()
-  }, [])
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch profile and timebank data
+        const [profileData, timebankData] = await profileService.getUserProfile();
+        setProfile(profileData);
+        setTimebank(timebankData);
+        
+        // Fetch user's offers
+        const allOffers = await offerService.getOffers();
+        const filteredOffers = allOffers.filter((offer) => offer.user_id === currentUser.id);
+        setOffers(filteredOffers);
+      } catch (error) {
+        console.error('Error fetching profile data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [currentUser.id]);
 
+  const completedCount = offers.filter(o => 
+    String(o.status).toUpperCase() === 'COMPLETED'
+  ).length;
 
   const stats = [
     {
       label: "Time Credits",
-      value: `${currentUser.profile?.time_credits ?? 0}H`,
+      value: `${timebank?.amount ?? profile?.time_credits ?? 0}H`,
     },
-    { label: "Rating", value: `${currentUser.profile?.rating ?? 0} ★` },
-    { label: "Completed Exchanges", value: "32" },
+    { label: "Rating", value: `${profile?.rating ?? 0} ★` },
+    { label: "Completed Exchanges", value: String(completedCount) },
   ];
 
-  const skillTags = currentUser.profile?.skills ?? [
-    "Design",
-    "Community",
-    "Mentoring",
-  ];
+  const skillTags = profile?.skills ?? [];
+
+  if (isLoading) {
+    return (
+      <Box bg="white" minH="100vh">
+        <Navbar showUserInfo={true} />
+        <Container maxW="1440px" px={{ base: 4, md: 8 }} py={10}>
+          <Grid templateColumns={{ base: "1fr", lg: "360px 1fr" }} gap={6}>
+            <VStack spacing={6} align="stretch">
+              <Box bg="#F7FAFC" borderRadius="2xl" p={6} border="1px solid #E2E8F0">
+                <Stack spacing={4} align="center">
+                  <SkeletonCircle size="96px" />
+                  <Skeleton height="24px" width="150px" />
+                  <Skeleton height="16px" width="100px" />
+                  <Skeleton height="32px" width="full" />
+                </Stack>
+              </Box>
+              <Box bg="#F7FAFC" borderRadius="2xl" p={6} border="1px solid #E2E8F0">
+                <SkeletonText noOfLines={4} spacing="4" />
+              </Box>
+            </VStack>
+            <Stack spacing={6}>
+              <Skeleton height="200px" borderRadius="xl" />
+              <Skeleton height="200px" borderRadius="xl" />
+            </Stack>
+          </Grid>
+        </Container>
+      </Box>
+    );
+  }
 
   return (
     <Box bg="white" minH="100vh">
@@ -148,18 +195,26 @@ const ProfilePage = () => {
                   <Avatar
                     size="xl"
                     name={`${currentUser.first_name} ${currentUser.last_name}`}
-                    src={currentUser.profile?.profile_picture}
+                    src={(profile as any)?.avatar || currentUser.profile?.profile_picture}
                   />
                   <VStack spacing={1}>
                     <Heading size="md">{`${currentUser.first_name} ${currentUser.last_name}`}</Heading>
                     <Text color="gray.600">
-                      {currentUser.profile?.location ?? "Istanbul"}
+                      {profile?.location || "Location not specified"}
                     </Text>
                   </VStack>
                   <HStack spacing={2}>
-                    <Badge colorScheme="purple" variant="subtle">
-                      Community Lead
-                    </Badge>
+                    {(profile as any)?.badges?.length > 0 ? (
+                      (profile as any).badges.map((badge: string, index: number) => (
+                        <Badge key={index} colorScheme="purple" variant="subtle">
+                          {badge}
+                        </Badge>
+                      ))
+                    ) : (
+                      <Badge colorScheme="purple" variant="subtle">
+                        Member
+                      </Badge>
+                    )}
                   </HStack>
                   <SimpleGrid columns={3} w="full">
                     {stats.map((stat) => (
@@ -169,7 +224,7 @@ const ProfilePage = () => {
                   <Button
                     leftIcon={<MdEdit />}
                     variant="outline"
-                    colorScheme="gray"
+                    colorScheme="yellow"
                     onClick={() => navigate("/profile/edit")}
                     alignSelf="stretch"
                   >
@@ -188,20 +243,24 @@ const ProfilePage = () => {
                   About
                 </Heading>
                 <Text color="gray.600" fontSize="sm">
-                  Passionate about connecting neighbors and designing equitable
-                  systems. Always up for a creative collaboration or mentoring
-                  session over coffee.
+                  {profile?.bio || "No bio added yet. Edit your profile to introduce yourself!"}
                 </Text>
                 <Divider my={4} />
                 <Heading size="sm" mb={2}>
                   Skills & Interests
                 </Heading>
-                <HStack spacing={2} flexWrap="wrap">
-                  {skillTags.map((tag) => (
-                    <Tag key={tag} size="md" borderRadius="full" bg="#E2E8F0">
-                      {tag}
-                    </Tag>
-                  ))}
+                <HStack spacing={2} flexWrap="wrap" gap={2}>
+                  {skillTags.length > 0 ? (
+                    skillTags.map((tag) => (
+                      <Tag key={tag} size="md" borderRadius="full" bg="#E2E8F0">
+                        {tag}
+                      </Tag>
+                    ))
+                  ) : (
+                    <Text color="gray.400" fontSize="sm">
+                      No skills added yet
+                    </Text>
+                  )}
                 </HStack>
               </Box>
             </VStack>
@@ -289,10 +348,10 @@ const ProfilePage = () => {
                 <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
                   <StatPill
                     label="Available Credits"
-                    value={`${currentUser.profile?.time_credits ?? 0}H`}
+                    value={`${timebank?.available_amount ?? 0}H`}
                   />
-                  <StatPill label="Frozen" value="1H" />
-                  <StatPill label="Pending Requests" value="2" />
+                  <StatPill label="Blocked" value={`${timebank?.blocked_amount ?? 0}H`} />
+                  <StatPill label="Total" value={`${timebank?.total_amount ?? 0}H`} />
                 </SimpleGrid>
                 <Button
                   variant="ghost"

@@ -10,6 +10,8 @@ import HandshakePage from './pages/HandshakePage'
 import AchievementTreePage from './pages/AchievementTreePage'
 import WantsPage from './pages/WantsPage'
 import ProfilePage from './pages/ProfilePage'
+import EditProfilePage from './pages/EditProfilePage'
+import OnboardingPage from './pages/OnboardingPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -18,6 +20,14 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute>
+            <OnboardingPage />
+          </ProtectedRoute>
+        }
+      />
       
       {/* Protected Routes */}
       <Route
@@ -58,6 +68,14 @@ function App() {
         element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/edit"
+        element={
+          <ProtectedRoute>
+            <EditProfilePage />
           </ProtectedRoute>
         }
       />
