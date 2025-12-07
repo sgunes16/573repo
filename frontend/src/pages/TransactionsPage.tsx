@@ -14,11 +14,11 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react'
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import Navbar from '@/components/Navbar'
-import { mockTransactions, mockComments } from '@/services/mock/mockTransactions'
-import { mockCurrentUser } from '@/services/mock/mockData'
+import { transactionService } from '@/services/transaction.service'
 import { useAuthStore } from '@/store/useAuthStore'
+import type { TimeBankTransaction } from '@/types'
 import { MdArrowDownward, MdArrowUpward, MdChatBubbleOutline, MdStar } from 'react-icons/md'
 
 const formatDate = (value: string) =>
@@ -32,26 +32,68 @@ const formatDate = (value: string) =>
 
 const TransactionsPage = () => {
   const { user } = useAuthStore()
-  const currentUser = user ?? mockCurrentUser
+  const currentUser = user as any
+  const [transactions, setTransactions] = useState<TimeBankTransaction[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const userTransactions = useMemo(
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      setIsLoading(true)
+      try {
+        const data = await transactionService.getTransactions()
+        setTransactions(data)
+      } catch (error) {
+        console.error('Failed to fetch transactions:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (currentUser) {
+      fetchTransactions()
+    }
+  }, [currentUser])
+
+  const totalEarned = useMemo(
     () =>
-      mockTransactions.filter(
-        (tx) => tx.from_user?.id === currentUser.id || tx.to_user?.id === currentUser.id,
-      ),
-    [currentUser.id],
+      transactions
+        .filter((tx) => tx.transaction_type === 'EARN' && tx.to_user.id === currentUser?.id)
+        .reduce((sum, tx) => sum + tx.time_amount, 0),
+    [transactions, currentUser?.id]
   )
 
-  const totalEarned = userTransactions
-    .filter((tx) => tx.to_user?.id === currentUser.id)
-    .reduce((sum, tx) => sum + tx.time_amount, 0)
-  const totalSpent = userTransactions
-    .filter((tx) => tx.from_user?.id === currentUser.id)
-    .reduce((sum, tx) => sum + tx.time_amount, 0)
-
-  const userFeedback = mockComments.filter((comment) =>
-    userTransactions.some((tx) => tx.exchange_id === comment.target_id),
+  const totalSpent = useMemo(
+    () =>
+      transactions
+        .filter((tx) => tx.transaction_type === 'SPEND' && tx.from_user.id === currentUser?.id)
+        .reduce((sum, tx) => sum + tx.time_amount, 0),
+    [transactions, currentUser?.id]
   )
+
+  const userFeedback = useMemo(
+    () =>
+      transactions
+        .filter((tx) => tx.comments && tx.comments.length > 0)
+        .flatMap((tx) => tx.comments || []),
+    [transactions]
+  )
+
+  if (isLoading) {
+    return (
+      <Box bg="white" minH="100vh">
+        <Navbar showUserInfo={true} />
+        <Container maxW="1200px" py={10} px={{ base: 4, md: 8 }}>
+          <Stack spacing={10}>
+            <VStack align="flex-start" spacing={2}>
+              <Heading size="xl">Time Bank</Heading>
+              <Text color="gray.600">Keep track of every hour you give and receive.</Text>
+            </VStack>
+            <Text>Loading transactions...</Text>
+          </Stack>
+        </Container>
+      </Box>
+    )
+  }
 
   return (
     <Box bg="white" minH="100vh">
@@ -68,9 +110,9 @@ const TransactionsPage = () => {
 
           <Grid templateColumns={{ base: '1fr', xl: '2fr 1fr' }} gap={6} alignItems="flex-start">
             <TransactionTimeline
-              transactions={userTransactions}
-              currentUserId={currentUser.id}
-              feedbackByExchange={mockComments}
+              transactions={transactions}
+              currentUserId={currentUser?.id}
+              feedbackByExchange={userFeedback}
             />
             <FeedbackPanel recentFeedback={userFeedback} />
           </Grid>
@@ -104,9 +146,9 @@ const TransactionTimeline = ({
   currentUserId,
   feedbackByExchange,
 }: {
-  transactions: typeof mockTransactions
-  currentUserId: string
-  feedbackByExchange: typeof mockComments
+  transactions: TimeBankTransaction[]
+  currentUserId?: string
+  feedbackByExchange: any[]
 }) => (
   <Stack spacing={4}>
     <Heading size="md">Recent Transactions</Heading>
@@ -117,13 +159,13 @@ const TransactionTimeline = ({
         </Box>
       )}
       {transactions.map((transaction) => {
-        const isEarn = transaction.to_user?.id === currentUserId
+        const isEarn = transaction.transaction_type === 'EARN' && transaction.to_user.id === currentUserId
+        const isSpend = transaction.transaction_type === 'SPEND' && transaction.from_user.id === currentUserId
         const otherUser =
-          transaction.from_user?.id === currentUserId ? transaction.to_user : transaction.from_user
+          transaction.from_user.id === currentUserId ? transaction.to_user : transaction.from_user
 
-        const relatedComments = feedbackByExchange.filter(
-          (comment) => comment.target_id === transaction.exchange_id,
-        )
+        const relatedComments = transaction.comments || []
+        const relatedRatings = transaction.ratings || []
         return (
           <Box key={transaction.id} bg="#F7FAFC" borderRadius="xl" p={5} border="1px solid #E2E8F0">
             <HStack justify="space-between" align="flex-start">
@@ -158,36 +200,69 @@ const TransactionTimeline = ({
                 />
               </VStack>
             </HStack>
-            {relatedComments.length > 0 && (
+            {(relatedComments.length > 0 || relatedRatings.length > 0) && (
               <Box mt={4}>
                 <Divider mb={3} />
-                <HStack spacing={2} mb={2}>
-                  <Icon as={MdChatBubbleOutline} color="gray.500" />
-                  <Text fontWeight="600" fontSize="sm">
-                    Feedback
-                  </Text>
-                </HStack>
-                <VStack align="stretch" spacing={2}>
-                  {relatedComments.map((comment) => (
-                    <Box key={comment.id} bg="white" borderRadius="md" p={3}>
-                      <HStack justify="space-between">
-                        <Text fontSize="sm" fontWeight="600">
-                          {comment.user.first_name}
-                        </Text>
-                        {comment.rating && (
-                          <HStack spacing={0.5}>
-                            {[...Array(comment.rating)].map((_, index) => (
-                              <Icon key={index} as={MdStar} color="#ECC94B" boxSize={3} />
-                            ))}
-                          </HStack>
-                        )}
-                      </HStack>
-                      <Text fontSize="sm" color="gray.700">
-                        {comment.content}
+                {relatedRatings.length > 0 && (
+                  <>
+                    <HStack spacing={2} mb={2}>
+                      <Icon as={MdStar} color="yellow.500" />
+                      <Text fontWeight="600" fontSize="sm">
+                        Ratings
                       </Text>
-                    </Box>
-                  ))}
-                </VStack>
+                    </HStack>
+                    <VStack align="stretch" spacing={2} mb={3}>
+                      {relatedRatings.map((rating: any, idx: number) => (
+                        <Box key={idx} bg="white" borderRadius="md" p={3}>
+                          <HStack justify="space-between" mb={1}>
+                            <Text fontSize="sm" fontWeight="600">
+                              Communication: {rating.communication}/5
+                            </Text>
+                            <Text fontSize="sm" fontWeight="600">
+                              Punctuality: {rating.punctuality}/5
+                            </Text>
+                          </HStack>
+                          {rating.comment && (
+                            <Text fontSize="sm" color="gray.700" mt={1}>
+                              {rating.comment}
+                            </Text>
+                          )}
+                        </Box>
+                      ))}
+                    </VStack>
+                  </>
+                )}
+                {relatedComments.length > 0 && (
+                  <>
+                    <HStack spacing={2} mb={2}>
+                      <Icon as={MdChatBubbleOutline} color="gray.500" />
+                      <Text fontWeight="600" fontSize="sm">
+                        Comments
+                      </Text>
+                    </HStack>
+                    <VStack align="stretch" spacing={2}>
+                      {relatedComments.map((comment: any) => (
+                        <Box key={comment.id} bg="white" borderRadius="md" p={3}>
+                          <HStack justify="space-between">
+                            <Text fontSize="sm" fontWeight="600">
+                              {comment.user.first_name} {comment.user.last_name}
+                            </Text>
+                            {comment.rating && (
+                              <HStack spacing={0.5}>
+                                {[...Array(comment.rating)].map((_, index) => (
+                                  <Icon key={index} as={MdStar} color="#ECC94B" boxSize={3} />
+                                ))}
+                              </HStack>
+                            )}
+                          </HStack>
+                          <Text fontSize="sm" color="gray.700">
+                            {comment.content}
+                          </Text>
+                        </Box>
+                      ))}
+                    </VStack>
+                  </>
+                )}
               </Box>
             )}
           </Box>
@@ -197,7 +272,7 @@ const TransactionTimeline = ({
   </Stack>
 )
 
-const FeedbackPanel = ({ recentFeedback }: { recentFeedback: typeof mockComments }) => (
+const FeedbackPanel = ({ recentFeedback }: { recentFeedback: any[] }) => (
   <Stack spacing={4}>
     <Heading size="md">Latest Comments</Heading>
     <VStack spacing={4} align="stretch">

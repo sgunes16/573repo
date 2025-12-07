@@ -23,15 +23,15 @@ import {
   WrapItem,
 } from '@chakra-ui/react'
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import Map, { Marker, Layer, Source } from 'react-map-gl'
 import type { MapRef } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import {
   getUserBadge,
-  latestActivities,
 } from '@/services/mock/mockData'
-import type { Offer, User } from '@/types'
+import { transactionService } from '@/services/transaction.service'
+import type { Offer, User, TimeBankTransaction } from '@/types'
 import {
   MdAdd,
   MdCalendarToday,
@@ -46,6 +46,7 @@ import {
 import Navbar from '@/components/Navbar'
 import { offerService } from '@/services/offer.service'
 import { useGeoStore } from '@/store/useGeoStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import { mapboxService } from '@/services/mapbox.service'
 
 // @ts-ignore
@@ -259,6 +260,56 @@ const OfferCard = ({ offer, locationAddress }: { offer: Offer; locationAddress?:
         </Stack>
       </Flex>
     </Box>
+  )
+}
+
+const LatestTransactionCard = ({
+  transaction,
+  currentUserId,
+}: {
+  transaction: TimeBankTransaction
+  currentUserId?: string
+}) => {
+  const isEarn = transaction.transaction_type === 'EARN' && transaction.to_user.id === currentUserId
+  const isSpend = transaction.transaction_type === 'SPEND' && transaction.from_user.id === currentUserId
+  const otherUser = transaction.from_user.id === currentUserId ? transaction.to_user : transaction.from_user
+  
+  return (
+    <Flex
+      bg="#EDF2F7"
+      borderRadius="lg"
+      p={4}
+      align="center"
+      gap={4}
+      minH="120px"
+      cursor="pointer"
+      _hover={{ bg: '#E2E8F0' }}
+      onClick={() => navigate('/transactions')}
+    >
+      <Avatar name={`${otherUser.first_name} ${otherUser.last_name}`} />
+      <Icon as={MdSwapHoriz} boxSize={8} color="gray.600" />
+      <VStack align="flex-start" spacing={1} flex={1}>
+        <Text fontSize="sm" fontWeight="semibold">
+          {transaction.exchange?.offer.title || transaction.description}
+        </Text>
+        <Text fontSize="xs" color="gray.600">
+          {otherUser.first_name} {otherUser.last_name}
+        </Text>
+        <Text fontSize="xs" color="gray.500">
+          {new Date(transaction.created_at).toLocaleDateString()}
+        </Text>
+      </VStack>
+      <Badge
+        colorScheme={isEarn ? 'green' : 'red'}
+        px={3}
+        py={1}
+        borderRadius="md"
+        fontWeight="bold"
+      >
+        {isEarn ? '+' : '-'}
+        {transaction.time_amount}H
+      </Badge>
+    </Flex>
   )
 }
 
@@ -641,12 +692,14 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
 
 const DashboardPage = () => {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [offers, setOffers] = useState<Offer[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [activeTab, setActiveTab] = useState<'offers' | 'wants'>('offers')
   const [locationCache, setLocationCache] = useState<Record<string, string>>({})
   const [isLoadingLocations, setIsLoadingLocations] = useState(true)
+  const [latestTransactions, setLatestTransactions] = useState<TimeBankTransaction[]>([])
   const itemsPerPage = 5 // Map height allows ~5 cards
 
   useEffect(() => {
@@ -698,6 +751,20 @@ const DashboardPage = () => {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchQuery, activeTab])
+
+  useEffect(() => {
+    const fetchLatestTransactions = async () => {
+      try {
+        const data = await transactionService.getLatestTransactions(6)
+        setLatestTransactions(data)
+      } catch (error) {
+        console.error('Failed to fetch latest transactions:', error)
+      }
+    }
+    if (user) {
+      fetchLatestTransactions()
+    }
+  }, [user])
 
   return (
     <Box bg="gray.50" minH="100vh" h="full">
@@ -868,20 +935,35 @@ const DashboardPage = () => {
         </Grid>
 
         <Box mt={10} px={6}>
-          <Text fontSize="xl" fontWeight="semibold" mb={4}>
-            Latest Activities
-          </Text>
-          <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
-            {latestActivities.map((activity) => (
-              <LatestActivityCard
-                key={activity.id}
-                from={activity.from}
-                to={activity.to}
-                service={activity.service}
-                hours={activity.hours}
-              />
-            ))}
-          </Grid>
+          <HStack justify="space-between" mb={4}>
+            <Text fontSize="xl" fontWeight="semibold">
+              Latest Transactions
+            </Text>
+            <Button
+              as={Link}
+              to="/transactions"
+              variant="ghost"
+              size="sm"
+              colorScheme="blue"
+            >
+              View All
+            </Button>
+          </HStack>
+          {latestTransactions.length === 0 ? (
+            <Box bg="#F7FAFC" borderRadius="xl" p={6} textAlign="center">
+              <Text color="gray.600">No recent transactions.</Text>
+            </Box>
+          ) : (
+            <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
+              {latestTransactions.map((transaction) => (
+                <LatestTransactionCard
+                  key={transaction.id}
+                  transaction={transaction}
+                  currentUserId={user?.id}
+                />
+              ))}
+            </Grid>
+          )}
         </Box>
       </Container>
     </Box>

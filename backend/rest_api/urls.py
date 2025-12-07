@@ -4,7 +4,8 @@ from .views import (
     HomeView, UserView, OffersView, OfferDetailView, UserProfileView, CreateOfferView,
     UploadOfferImageView, DeleteOfferImageView, SetPrimaryImageView,
     CreateExchangeView, ExchangeDetailView, MyExchangesView, ExchangeByOfferView, ExchangesByOfferView, ProposeDateTimeView,
-    AcceptExchangeView, RejectExchangeView, ConfirmCompletionView, SubmitRatingView
+    AcceptExchangeView, RejectExchangeView, ConfirmCompletionView, SubmitRatingView,
+    TransactionsView, LatestTransactionsView
 )
 from .auth.views import LoginView, RegisterView, LogoutView
 
@@ -33,4 +34,8 @@ urlpatterns = [
     path("exchanges/<int:exchange_id>/reject/", RejectExchangeView.as_view(), name="reject-exchange"),
     path("exchanges/<int:exchange_id>/confirm-completion/", ConfirmCompletionView.as_view(), name="confirm-completion"),
     path("exchanges/<int:exchange_id>/rate/", SubmitRatingView.as_view(), name="submit-rating"),
+    
+    # Transaction endpoints
+    path("transactions/", TransactionsView.as_view(), name="transactions"),
+    path("transactions/latest/", LatestTransactionsView.as_view(), name="latest-transactions"),
 ]

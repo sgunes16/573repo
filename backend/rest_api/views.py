@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_api.models import Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction
+from rest_api.models import Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Comment
 from datetime import datetime, date, time
 from django.conf import settings
 from django.db import transaction, models
@@ -983,21 +983,13 @@ class SubmitRatingView(APIView):
                     requester_timebank.spend_credit(exchange.time_spent)
                     provider_timebank.add_credit(exchange.time_spent)
 
-                    # Create transaction record
+                    # Create single transaction record for the exchange
                     TimeBankTransaction.objects.create(
                         from_user=exchange.requester,
                         to_user=exchange.provider,
                         exchange=exchange,
                         time_amount=exchange.time_spent,
                         transaction_type='SPEND',
-                        description=f'Exchange completed: {exchange.offer.title}'
-                    )
-                    TimeBankTransaction.objects.create(
-                        from_user=exchange.requester,
-                        to_user=exchange.provider,
-                        exchange=exchange,
-                        time_amount=exchange.time_spent,
-                        transaction_type='EARN',
                         description=f'Exchange completed: {exchange.offer.title}'
                     )
 
@@ -1014,3 +1006,166 @@ class SubmitRatingView(APIView):
 
         except Exchange.DoesNotExist:
             return Response({"error": "Exchange not found"}, status=404)
+
+
+class TransactionsView(APIView):
+    """Get user's transactions"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        transactions = TimeBankTransaction.objects.filter(
+            Q(from_user=request.user) | Q(to_user=request.user)
+        ).select_related(
+            'from_user', 'to_user', 'exchange', 'exchange__offer'
+        ).prefetch_related(
+            'exchange__ratings'
+        ).order_by('-created_at')
+
+        # Group transactions by exchange to avoid duplicates
+        seen_exchanges = set()
+        transactions_data = []
+        for tx in transactions:
+            # Skip if we've already seen this exchange
+            if tx.exchange and tx.exchange.id in seen_exchanges:
+                continue
+            if tx.exchange:
+                seen_exchanges.add(tx.exchange.id)
+            # Get related ratings/comments if exchange exists
+            ratings_data = []
+            comments_data = []
+            if tx.exchange:
+                ratings = tx.exchange.ratings.all()
+                for rating in ratings:
+                    ratings_data.append({
+                        "rater_id": rating.rater.id,
+                        "ratee_id": rating.ratee.id,
+                        "communication": rating.communication,
+                        "punctuality": rating.punctuality,
+                        "would_recommend": rating.would_recommend,
+                        "comment": rating.comment,
+                        "created_at": rating.created_at,
+                    })
+                
+                comments = Comment.objects.filter(exchange=tx.exchange)
+                for comment in comments:
+                    comments_data.append({
+                        "id": comment.id,
+                        "user": {
+                            "id": comment.user.id,
+                            "first_name": comment.user.first_name,
+                            "last_name": comment.user.last_name,
+                        },
+                        "content": comment.content,
+                        "rating": comment.rating,
+                        "created_at": comment.created_at,
+                    })
+
+            # Determine transaction type from user's perspective
+            # If user is the requester (from_user), it's a SPEND
+            # If user is the provider (to_user), it's an EARN
+            if tx.exchange:
+                if tx.exchange.requester.id == request.user.id:
+                    user_transaction_type = 'SPEND'
+                elif tx.exchange.provider.id == request.user.id:
+                    user_transaction_type = 'EARN'
+                else:
+                    user_transaction_type = tx.transaction_type
+            else:
+                user_transaction_type = tx.transaction_type
+
+            transactions_data.append({
+                "id": tx.id,
+                "from_user": {
+                    "id": tx.from_user.id,
+                    "first_name": tx.from_user.first_name,
+                    "last_name": tx.from_user.last_name,
+                    "email": tx.from_user.email,
+                },
+                "to_user": {
+                    "id": tx.to_user.id,
+                    "first_name": tx.to_user.first_name,
+                    "last_name": tx.to_user.last_name,
+                    "email": tx.to_user.email,
+                },
+                "exchange": {
+                    "id": tx.exchange.id,
+                    "offer": {
+                        "id": tx.exchange.offer.id,
+                        "title": tx.exchange.offer.title,
+                    },
+                } if tx.exchange else None,
+                "time_amount": tx.time_amount,
+                "transaction_type": user_transaction_type,
+                "description": tx.description,
+                "created_at": tx.created_at,
+                "ratings": ratings_data,
+                "comments": comments_data,
+            })
+
+        return Response(transactions_data)
+
+
+class LatestTransactionsView(APIView):
+    """Get latest N transactions for dashboard"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        limit = int(request.query_params.get('limit', 10))
+        
+        transactions = TimeBankTransaction.objects.filter(
+            Q(from_user=request.user) | Q(to_user=request.user)
+        ).select_related(
+            'from_user', 'to_user', 'exchange', 'exchange__offer'
+        ).order_by('-created_at')
+
+        # Group transactions by exchange to avoid duplicates
+        seen_exchanges = set()
+        transactions_data = []
+        for tx in transactions:
+            # Skip if we've already seen this exchange
+            if tx.exchange and tx.exchange.id in seen_exchanges:
+                continue
+            if tx.exchange:
+                seen_exchanges.add(tx.exchange.id)
+            
+            # Stop if we've reached the limit
+            if len(transactions_data) >= limit:
+                break
+
+            # Determine transaction type from user's perspective
+            if tx.exchange:
+                if tx.exchange.requester.id == request.user.id:
+                    user_transaction_type = 'SPEND'
+                elif tx.exchange.provider.id == request.user.id:
+                    user_transaction_type = 'EARN'
+                else:
+                    user_transaction_type = tx.transaction_type
+            else:
+                user_transaction_type = tx.transaction_type
+
+            transactions_data.append({
+                "id": tx.id,
+                "from_user": {
+                    "id": tx.from_user.id,
+                    "first_name": tx.from_user.first_name,
+                    "last_name": tx.from_user.last_name,
+                },
+                "to_user": {
+                    "id": tx.to_user.id,
+                    "first_name": tx.to_user.first_name,
+                    "last_name": tx.to_user.last_name,
+                },
+                "exchange": {
+                    "id": tx.exchange.id,
+                    "offer": {
+                        "id": tx.exchange.offer.id,
+                        "title": tx.exchange.offer.title,
+                    },
+                } if tx.exchange else None,
+                "time_amount": tx.time_amount,
+                "transaction_type": user_transaction_type,
+                "description": tx.description,
+                "created_at": tx.created_at,
+            })
+
+        return Response(transactions_data)

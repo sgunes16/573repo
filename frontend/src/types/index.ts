@@ -252,20 +252,26 @@ export interface ExchangeRating {
 // TimeBank types
 export interface TimeBankTransaction {
   id: string
-  from_user_id: string
-  from_user?: User
-  to_user_id: string
-  to_user?: User
-  exchange_id: string
+  from_user: User
+  to_user: User
+  exchange?: {
+    id: string
+    offer: {
+      id: string
+      title: string
+    }
+  }
   time_amount: number
   transaction_type: TransactionType
   description: string
   created_at: string
+  ratings?: ExchangeRating[]
+  comments?: Comment[]
 }
 
 export enum TransactionType {
-  EARN = 'earn',
-  SPEND = 'spend',
+  EARN = 'EARN',
+  SPEND = 'SPEND',
   BONUS = 'bonus',
   PENALTY = 'penalty',
 }
