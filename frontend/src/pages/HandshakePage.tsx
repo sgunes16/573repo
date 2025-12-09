@@ -31,6 +31,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import Chat from '@/components/Chat'
 import UserAvatar from '@/components/UserAvatar'
+import ReportModal from '@/components/ReportModal'
 import { exchangeService } from '@/services/exchange.service'
 import { mapboxService } from '@/services/mapbox.service'
 import { getUserBadge } from '@/services/mock/mockData'
@@ -43,6 +44,7 @@ import {
   MdCalendarToday, 
   MdLocationPin, 
   MdPeople,
+  MdReport,
 } from 'react-icons/md'
 
 const HandshakePage = () => {
@@ -61,6 +63,7 @@ const HandshakePage = () => {
 
   const { isOpen: isProposeOpen, onOpen: onProposeOpen, onClose: onProposeClose } = useDisclosure()
   const { isOpen: isRatingOpen, onOpen: onRatingOpen, onClose: onRatingClose } = useDisclosure()
+  const { isOpen: isReportExchangeOpen, onOpen: onReportExchangeOpen, onClose: onReportExchangeClose } = useDisclosure()
 
   const [proposedDate, setProposedDate] = useState('')
   const [proposedTime, setProposedTime] = useState('')
@@ -481,7 +484,7 @@ const HandshakePage = () => {
 
             {/* Participants */}
             <Box p={3} borderRadius="lg" border="1px solid" borderColor="gray.100">
-              <Text fontWeight="500" fontSize="xs" mb={2} color="gray.500">Participants</Text>
+              <Text fontWeight="500" fontSize="xs" color="gray.500" mb={2}>Participants</Text>
               <VStack spacing={2} align="stretch">
                 <Flex align="center" justify="space-between">
                   <HStack spacing={2}>
@@ -498,6 +501,19 @@ const HandshakePage = () => {
                   <Badge colorScheme="blue" fontSize="9px">Requester</Badge>
                 </Flex>
               </VStack>
+              {exchange && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  colorScheme="red"
+                  leftIcon={<Icon as={MdReport} boxSize={3} />}
+                  onClick={onReportExchangeOpen}
+                  mt={3}
+                  w="100%"
+                >
+                  Report Exchange
+                </Button>
+              )}
             </Box>
 
             {/* Actions */}
@@ -621,6 +637,16 @@ const HandshakePage = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Report Exchange Modal */}
+      {exchange && (
+        <ReportModal
+          isOpen={isReportExchangeOpen}
+          onClose={onReportExchangeClose}
+          targetType="exchange"
+          targetId={parseInt(exchange.id)}
+        />
+      )}
     </Box>
   )
 }

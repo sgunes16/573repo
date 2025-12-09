@@ -51,6 +51,7 @@ class User(models.Model):
     is_blocked = models.BooleanField(default=False)
     is_banned = models.BooleanField(default=False)
     is_suspended = models.BooleanField(default=False)
+    warning_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -347,3 +348,47 @@ class OfferImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.offer.title}"
+
+
+REPORT_REASON_CHOICES = [
+    ('SPAM', 'Spam'),
+    ('INAPPROPRIATE', 'Inappropriate Content'),
+    ('FAKE_PROFILE', 'Fake Profile'),
+    ('HARASSMENT', 'Harassment'),
+    ('FRAUD', 'Fraud'),
+    ('OTHER', 'Other'),
+]
+
+REPORT_STATUS_CHOICES = [
+    ('PENDING', 'Pending'),
+    ('REVIEWED', 'Reviewed'),
+    ('RESOLVED', 'Resolved'),
+    ('DISMISSED', 'Dismissed'),
+]
+
+REPORT_TARGET_CHOICES = [
+    ('offer', 'Offer'),
+    ('want', 'Want'),
+    ('exchange', 'Exchange'),
+    ('user', 'User'),
+]
+
+
+class Report(models.Model):
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports_made')
+    reported_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports_received', null=True, blank=True)
+    target_type = models.CharField(max_length=20, choices=REPORT_TARGET_CHOICES)
+    target_id = models.IntegerField()
+    reason = models.CharField(max_length=20, choices=REPORT_REASON_CHOICES)
+    description = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=REPORT_STATUS_CHOICES, default='PENDING')
+    admin_notes = models.TextField(blank=True)
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reports_resolved')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Report #{self.id} - {self.reason} on {self.target_type} {self.target_id}"

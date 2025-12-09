@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Comment
+from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Comment, Report, Notification, Chat, Message
 from datetime import datetime, date, time
 from django.conf import settings
 from django.db import transaction, models
@@ -1501,6 +1501,7 @@ class UserProfileDetailView(APIView):
                 "email": target_user.email,
                 "first_name": target_user.first_name,
                 "last_name": target_user.last_name,
+                "warning_count": target_user.warning_count or 0,
             },
             "profile": {
                 "id": user_profile.id if user_profile else None,
@@ -1519,3 +1520,708 @@ class UserProfileDetailView(APIView):
             "comments": comments_data,
             "ratings_summary": ratings_summary,
         })
+
+
+class CreateReportView(APIView):
+    """Create a report (for users)"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            target_type = request.data.get('target_type')
+            target_id = request.data.get('target_id')
+            reason = request.data.get('reason')
+            description = request.data.get('description', '')
+
+            if not all([target_type, target_id, reason]):
+                return Response({
+                    "error": "target_type, target_id, and reason are required"
+                }, status=400)
+
+            # Validate target_type
+            valid_target_types = ['offer', 'want', 'exchange', 'user']
+            if target_type not in valid_target_types:
+                return Response({
+                    "error": f"target_type must be one of: {', '.join(valid_target_types)}"
+                }, status=400)
+
+            # Validate reason
+            valid_reasons = ['SPAM', 'INAPPROPRIATE', 'FAKE_PROFILE', 'HARASSMENT', 'FRAUD', 'OTHER']
+            if reason not in valid_reasons:
+                return Response({
+                    "error": f"reason must be one of: {', '.join(valid_reasons)}"
+                }, status=400)
+
+            # Check if target exists and determine reported user
+            target_id_int = int(target_id)
+            reported_user = None
+            
+            if target_type in ['offer', 'want']:
+                try:
+                    offer = Offer.objects.get(id=target_id_int)
+                    # Prevent user from reporting their own offer/want
+                    if offer.user == request.user:
+                        return Response({
+                            "error": "You cannot report your own offer/want"
+                        }, status=400)
+                    reported_user = offer.user
+                except Offer.DoesNotExist:
+                    return Response({"error": f"{target_type.capitalize()} not found"}, status=404)
+            elif target_type == 'exchange':
+                try:
+                    exchange = Exchange.objects.get(id=target_id_int)
+                    # User can report their own exchange (to report the other party)
+                    # Determine which user is being reported
+                    if exchange.provider == request.user:
+                        reported_user = exchange.requester
+                    elif exchange.requester == request.user:
+                        reported_user = exchange.provider
+                    else:
+                        # If user is not part of exchange, they can't report it
+                        return Response({
+                            "error": "You can only report exchanges you are part of"
+                        }, status=400)
+                except Exchange.DoesNotExist:
+                    return Response({"error": "Exchange not found"}, status=404)
+            elif target_type == 'user':
+                try:
+                    target_user = User.objects.get(id=target_id_int)
+                    # Prevent user from reporting themselves
+                    if target_user == request.user:
+                        return Response({
+                            "error": "You cannot report yourself"
+                        }, status=400)
+                    reported_user = target_user
+                except User.DoesNotExist:
+                    return Response({"error": "User not found"}, status=404)
+
+            # Check if user already reported this target
+            existing_report = Report.objects.filter(
+                reporter=request.user,
+                target_type=target_type,
+                target_id=target_id_int,
+                status='PENDING'
+            ).first()
+
+            if existing_report:
+                return Response({
+                    "error": "You have already reported this item"
+                }, status=400)
+
+            # Create report
+            report = Report.objects.create(
+                reporter=request.user,
+                reported_user=reported_user,
+                target_type=target_type,
+                target_id=target_id_int,
+                reason=reason,
+                description=description,
+                status='PENDING'
+            )
+
+            return Response({
+                "message": "Report submitted successfully",
+                "report_id": report.id
+            }, status=201)
+
+        except ValueError:
+            return Response({"error": "Invalid target_id"}, status=400)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class AdminReportsListView(APIView):
+    """List all reports (admin only)"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_admin:
+            return Response({"error": "Admin access required"}, status=403)
+
+        reports = Report.objects.select_related('reporter', 'reported_user', 'resolved_by').all().order_by('-created_at')
+
+        reports_data = []
+        for report in reports:
+            # Get target info
+            target_info = None
+            try:
+                if report.target_type in ['offer', 'want']:
+                    target = Offer.objects.get(id=report.target_id)
+                    target_info = {
+                        "id": target.id,
+                        "title": target.title,
+                        "type": target.type,
+                    }
+                elif report.target_type == 'exchange':
+                    target = Exchange.objects.get(id=report.target_id)
+                    target_info = {
+                        "id": target.id,
+                        "offer_title": target.offer.title if target.offer else None,
+                    }
+                elif report.target_type == 'user':
+                    target = User.objects.get(id=report.target_id)
+                    target_info = {
+                        "id": target.id,
+                        "email": target.email,
+                        "first_name": target.first_name,
+                        "last_name": target.last_name,
+                    }
+            except:
+                target_info = {"id": report.target_id, "deleted": True}
+
+            reports_data.append({
+                "id": report.id,
+                "reporter": {
+                    "id": report.reporter.id,
+                    "email": report.reporter.email,
+                    "first_name": report.reporter.first_name,
+                    "last_name": report.reporter.last_name,
+                },
+                "reported_user": {
+                    "id": report.reported_user.id,
+                    "email": report.reported_user.email,
+                    "first_name": report.reported_user.first_name,
+                    "last_name": report.reported_user.last_name,
+                } if report.reported_user else None,
+                "target_type": report.target_type,
+                "target_id": report.target_id,
+                "target_info": target_info,
+                "reason": report.reason,
+                "description": report.description,
+                "status": report.status,
+                "admin_notes": report.admin_notes,
+                "resolved_by": {
+                    "id": report.resolved_by.id,
+                    "email": report.resolved_by.email,
+                } if report.resolved_by else None,
+                "created_at": report.created_at,
+                "updated_at": report.updated_at,
+            })
+
+        return Response(reports_data)
+
+
+class AdminReportUpdateView(APIView):
+    """Update report status (admin only)"""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, report_id):
+        if not request.user.is_admin:
+            return Response({"error": "Admin access required"}, status=403)
+
+        try:
+            report = Report.objects.get(id=report_id)
+        except Report.DoesNotExist:
+            return Response({"error": "Report not found"}, status=404)
+
+        status = request.data.get('status')
+        admin_notes = request.data.get('admin_notes', '')
+
+        if status:
+            valid_statuses = ['PENDING', 'REVIEWED', 'RESOLVED', 'DISMISSED']
+            if status not in valid_statuses:
+                return Response({
+                    "error": f"status must be one of: {', '.join(valid_statuses)}"
+                }, status=400)
+            report.status = status
+
+        if admin_notes:
+            report.admin_notes = admin_notes
+
+        if status in ['RESOLVED', 'DISMISSED']:
+            report.resolved_by = request.user
+
+        report.save()
+
+        return Response({
+            "message": "Report updated successfully",
+            "report": {
+                "id": report.id,
+                "status": report.status,
+                "admin_notes": report.admin_notes,
+            }
+        })
+
+
+class AdminReportResolveView(APIView):
+    """Resolve report and take action (admin only)"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, report_id):
+        if not request.user.is_admin:
+            return Response({"error": "Admin access required"}, status=403)
+
+        try:
+            report = Report.objects.get(id=report_id)
+        except Report.DoesNotExist:
+            return Response({"error": "Report not found"}, status=404)
+
+        action = request.data.get('action')  # 'remove_content', 'ban_user', 'warn_user', 'dismiss'
+        admin_notes = request.data.get('admin_notes', '')
+
+        if not action:
+            return Response({"error": "action is required"}, status=400)
+
+        try:
+            if action == 'remove_content':
+                # Remove the reported content
+                if report.target_type in ['offer', 'want']:
+                    try:
+                        offer = Offer.objects.get(id=report.target_id)
+                        offer.status = 'CANCELLED'
+                        offer.save()
+                        # Notify content owner
+                        Notification.objects.create(
+                            user=offer.user,
+                            content=f"Your {report.target_type} '{offer.title}' has been removed due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
+                        )
+                    except Offer.DoesNotExist:
+                        pass
+                elif report.target_type == 'exchange':
+                    try:
+                        exchange = Exchange.objects.get(id=report.target_id)
+                        exchange.status = 'CANCELLED'
+                        exchange.save()
+                        # Notify both participants
+                        if exchange.provider:
+                            Notification.objects.create(
+                                user=exchange.provider,
+                                content=f"Exchange #{exchange.id} has been cancelled due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
+                            )
+                        if exchange.requester:
+                            Notification.objects.create(
+                                user=exchange.requester,
+                                content=f"Exchange #{exchange.id} has been cancelled due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
+                            )
+                    except Exchange.DoesNotExist:
+                        pass
+
+                # Send notification to reporter
+                Notification.objects.create(
+                    user=report.reporter,
+                    content=f"Action has been taken on your report #{report.id}. The reported content has been removed."
+                )
+
+                report.status = 'RESOLVED'
+                report.resolved_by = request.user
+                report.admin_notes = admin_notes or "Content removed"
+                report.save()
+
+            elif action == 'ban_user':
+                # Ban the reported user
+                banned_user = None
+                if report.reported_user:
+                    report.reported_user.is_banned = True
+                    report.reported_user.save()
+                    banned_user = report.reported_user
+                elif report.target_type == 'user':
+                    try:
+                        target_user = User.objects.get(id=report.target_id)
+                        target_user.is_banned = True
+                        target_user.save()
+                        banned_user = target_user
+                    except User.DoesNotExist:
+                        pass
+                else:
+                    # Get user from target (fallback)
+                    if report.target_type in ['offer', 'want']:
+                        try:
+                            offer = Offer.objects.get(id=report.target_id)
+                            offer.user.is_banned = True
+                            offer.user.save()
+                            banned_user = offer.user
+                        except Offer.DoesNotExist:
+                            pass
+
+                # Send notification to banned user
+                if banned_user:
+                    Notification.objects.create(
+                        user=banned_user,
+                        content=f"Your account has been banned. Reason: {admin_notes or 'Violation of community guidelines'}"
+                    )
+
+                # Send notification to reporter
+                Notification.objects.create(
+                    user=report.reporter,
+                    content=f"Action has been taken on your report #{report.id}. The reported user has been banned."
+                )
+
+                report.status = 'RESOLVED'
+                report.resolved_by = request.user
+                report.admin_notes = admin_notes or "User banned"
+                report.save()
+
+            elif action == 'warn_user':
+                # Send warning to reported user
+                warned_user = None
+                if report.reported_user:
+                    warned_user = report.reported_user
+                    # Increment warning count
+                    if not hasattr(warned_user, 'warning_count'):
+                        warned_user.warning_count = 0
+                    warned_user.warning_count = (warned_user.warning_count or 0) + 1
+                    warned_user.save()
+                    
+                    Notification.objects.create(
+                        user=warned_user,
+                        content=f"Admin Warning: {admin_notes or 'You have been warned due to a report.'}"
+                    )
+                report.status = 'RESOLVED'
+                report.resolved_by = request.user
+                report.admin_notes = admin_notes or "User warned"
+                report.save()
+
+                # Send notification to reporter
+                Notification.objects.create(
+                    user=report.reporter,
+                    content=f"Action has been taken on your report #{report.id}. The reported user has been warned."
+                )
+
+            elif action == 'dismiss':
+                # Dismiss the report
+                report.status = 'DISMISSED'
+                report.resolved_by = request.user
+                report.admin_notes = admin_notes or "Report dismissed"
+                report.save()
+
+                # Send notification to reporter
+                Notification.objects.create(
+                    user=report.reporter,
+                    content=f"Your report #{report.id} has been reviewed and dismissed. {admin_notes or 'Thank you for your report.'}"
+                )
+
+            else:
+                return Response({"error": "Invalid action"}, status=400)
+
+            return Response({
+                "message": f"Report {action} completed successfully",
+                "report_id": report.id,
+                "status": report.status,
+            })
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class AdminKPIView(APIView):
+    """Get KPI data for admin dashboard"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_admin:
+            return Response({"error": "Admin access required"}, status=403)
+
+        from django.db.models import Count, Sum
+
+        # Total users
+        total_users = User.objects.filter(is_deleted=False).count()
+
+        # Active offers
+        active_offers = Offer.objects.filter(
+            status='ACTIVE',
+            type='offer'
+        ).count()
+
+        # Active wants
+        active_wants = Offer.objects.filter(
+            status='ACTIVE',
+            type='want'
+        ).count()
+
+        # Completed exchanges
+        completed_exchanges = Exchange.objects.filter(
+            status='COMPLETED'
+        ).count()
+
+        # Pending reports
+        pending_reports = Report.objects.filter(
+            status='PENDING'
+        ).count()
+
+        # Total time credits (sum of all transactions)
+        total_time_credits = TimeBankTransaction.objects.aggregate(
+            total=Sum('time_amount')
+        )['total'] or 0
+
+        # Recent reports (last 10)
+        recent_reports = Report.objects.select_related(
+            'reporter', 'reported_user'
+        ).order_by('-created_at')[:10]
+
+        recent_reports_data = []
+        for report in recent_reports:
+            recent_reports_data.append({
+                "id": report.id,
+                "reporter": {
+                    "id": report.reporter.id,
+                    "email": report.reporter.email,
+                    "first_name": report.reporter.first_name,
+                    "last_name": report.reporter.last_name,
+                },
+                "reported_user": {
+                    "id": report.reported_user.id,
+                    "email": report.reported_user.email,
+                    "first_name": report.reported_user.first_name,
+                    "last_name": report.reported_user.last_name,
+                } if report.reported_user else None,
+                "target_type": report.target_type,
+                "target_id": report.target_id,
+                "reason": report.reason,
+                "status": report.status,
+                "created_at": report.created_at,
+            })
+
+        return Response({
+            "total_users": total_users,
+            "active_offers": active_offers,
+            "active_wants": active_wants,
+            "completed_exchanges": completed_exchanges,
+            "pending_reports": pending_reports,
+            "total_time_credits": total_time_credits,
+            "recent_reports": recent_reports_data,
+        })
+
+
+class AdminBanUserView(APIView):
+    """Ban a user (admin only)"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, user_id):
+        if not request.user.is_admin:
+            return Response({"error": "Admin access required"}, status=403)
+
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        reason = request.data.get('reason', '')
+        duration_days = request.data.get('duration_days', None)  # None = permanent
+
+        target_user.is_banned = True
+        target_user.save()
+
+        return Response({
+            "message": f"User {target_user.email} has been banned",
+            "user": {
+                "id": target_user.id,
+                "email": target_user.email,
+                "is_banned": target_user.is_banned,
+            },
+            "reason": reason,
+            "duration_days": duration_days,
+        })
+
+
+class AdminWarnUserView(APIView):
+    """Send warning to a user (admin only)"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, user_id):
+        if not request.user.is_admin:
+            return Response({"error": "Admin access required"}, status=403)
+
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        message = request.data.get('message', '')
+        if not message:
+            return Response({"error": "message is required"}, status=400)
+
+        # Increment warning count
+        target_user.warning_count = (target_user.warning_count or 0) + 1
+        target_user.save()
+
+        # Create a notification for the user
+        Notification.objects.create(
+            user=target_user,
+            content=f"Admin Warning: {message}"
+        )
+
+        return Response({
+            "message": f"Warning sent to {target_user.email}",
+            "user": {
+                "id": target_user.id,
+                "email": target_user.email,
+                "warning_count": target_user.warning_count,
+            },
+        })
+
+
+class AdminDeleteOfferView(APIView):
+    """Delete/remove an offer or want (admin only)"""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, offer_id):
+        if not request.user.is_admin:
+            return Response({"error": "Admin access required"}, status=403)
+
+        try:
+            offer = Offer.objects.get(id=offer_id)
+        except Offer.DoesNotExist:
+            return Response({"error": "Offer not found"}, status=404)
+
+        # Cancel the offer instead of deleting (to preserve data)
+        offer.status = 'CANCELLED'
+        offer.save()
+
+        return Response({
+            "message": f"{offer.type.capitalize()} has been removed",
+            "offer": {
+                "id": offer.id,
+                "title": offer.title,
+                "status": offer.status,
+            },
+        })
+
+
+class AdminExchangeDetailView(APIView):
+    """Get exchange details with messages for admin"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, exchange_id):
+        if not request.user.is_admin:
+            return Response({"error": "Admin access required"}, status=403)
+
+        try:
+            exchange = Exchange.objects.select_related(
+                'offer', 'provider', 'requester',
+                'offer__user', 'offer__user__profile'
+            ).prefetch_related('ratings').get(id=exchange_id)
+
+            # Get messages
+            try:
+                chat = Chat.objects.filter(exchange=exchange).first()
+                messages = []
+                if chat:
+                    messages_queryset = Message.objects.filter(chat=chat).select_related('user', 'user__profile').order_by('created_at')
+                    for msg in messages_queryset:
+                        avatar_url = None
+                        try:
+                            if hasattr(msg.user, 'profile') and msg.user.profile and msg.user.profile.avatar:
+                                avatar_url = request.build_absolute_uri(msg.user.profile.avatar.url)
+                        except Exception:
+                            pass
+                        
+                        messages.append({
+                            'id': msg.id,
+                            'user_id': msg.user.id,
+                            'user': {
+                                'id': msg.user.id,
+                                'first_name': msg.user.first_name,
+                                'last_name': msg.user.last_name,
+                                'email': msg.user.email,
+                                'profile': {
+                                    'avatar': avatar_url,
+                                }
+                            },
+                            'content': msg.content,
+                            'created_at': msg.created_at.isoformat(),
+                        })
+            except Exception as e:
+                messages = []
+
+            ratings_data = []
+            for rating in exchange.ratings.all():
+                ratings_data.append({
+                    "rater_id": rating.rater.id,
+                    "ratee_id": rating.ratee.id,
+                    "communication": rating.communication,
+                    "punctuality": rating.punctuality,
+                    "would_recommend": rating.would_recommend,
+                    "comment": rating.comment,
+                    "created_at": rating.created_at,
+                })
+
+            return Response({
+                "id": exchange.id,
+                "offer": {
+                    "id": exchange.offer.id if exchange.offer else None,
+                    "title": exchange.offer.title if exchange.offer else None,
+                    "description": exchange.offer.description if exchange.offer else None,
+                    "time_required": exchange.offer.time_required if exchange.offer else None,
+                    "type": exchange.offer.type if exchange.offer else None,
+                    "location": exchange.offer.location if exchange.offer else None,
+                    "geo_location": exchange.offer.geo_location if exchange.offer else None,
+                    "date": exchange.offer.date if exchange.offer else None,
+                    "time": str(exchange.offer.time) if exchange.offer and exchange.offer.time else None,
+                    "activity_type": exchange.offer.activity_type if exchange.offer else None,
+                    "person_count": exchange.offer.person_count if exchange.offer else None,
+                    "location_type": exchange.offer.location_type if exchange.offer else None,
+                    "tags": exchange.offer.tags if exchange.offer else None,
+                    "user": {
+                        "id": exchange.offer.user.id if exchange.offer else None,
+                        "email": exchange.offer.user.email if exchange.offer else None,
+                        "first_name": exchange.offer.user.first_name if exchange.offer else None,
+                        "last_name": exchange.offer.user.last_name if exchange.offer else None,
+                    } if exchange.offer else None,
+                },
+                "provider": {
+                    "id": exchange.provider.id if exchange.provider else None,
+                    "email": exchange.provider.email if exchange.provider else None,
+                    "first_name": exchange.provider.first_name if exchange.provider else None,
+                    "last_name": exchange.provider.last_name if exchange.provider else None,
+                    "profile": {
+                        "rating": exchange.provider.profile.rating if exchange.provider and hasattr(exchange.provider, 'profile') else 0.0,
+                        "time_credits": exchange.provider.profile.time_credits if exchange.provider and hasattr(exchange.provider, 'profile') else 0,
+                        "avatar": request.build_absolute_uri(exchange.provider.profile.avatar.url) if exchange.provider and hasattr(exchange.provider, 'profile') and exchange.provider.profile.avatar else None,
+                    } if exchange.provider and hasattr(exchange.provider, 'profile') else None
+                } if exchange.provider else None,
+                "requester": {
+                    "id": exchange.requester.id if exchange.requester else None,
+                    "email": exchange.requester.email if exchange.requester else None,
+                    "first_name": exchange.requester.first_name if exchange.requester else None,
+                    "last_name": exchange.requester.last_name if exchange.requester else None,
+                    "profile": {
+                        "rating": exchange.requester.profile.rating if exchange.requester and hasattr(exchange.requester, 'profile') else 0.0,
+                        "time_credits": exchange.requester.profile.time_credits if exchange.requester and hasattr(exchange.requester, 'profile') else 0,
+                        "avatar": request.build_absolute_uri(exchange.requester.profile.avatar.url) if exchange.requester and hasattr(exchange.requester, 'profile') and exchange.requester.profile.avatar else None,
+                    } if exchange.requester and hasattr(exchange.requester, 'profile') else None
+                } if exchange.requester else None,
+                "status": exchange.status,
+                "time_spent": exchange.time_spent,
+                "proposed_date": exchange.proposed_date.isoformat() if exchange.proposed_date else None,
+                "proposed_time": str(exchange.proposed_time) if exchange.proposed_time else None,
+                "requester_confirmed": exchange.requester_confirmed,
+                "provider_confirmed": exchange.provider_confirmed,
+                "created_at": exchange.created_at.isoformat(),
+                "completed_at": exchange.completed_at.isoformat() if exchange.completed_at else None,
+                "ratings": ratings_data,
+                "messages": messages,
+            })
+
+        except Exchange.DoesNotExist:
+            return Response({"error": "Exchange not found"}, status=404)
+
+
+class NotificationsView(APIView):
+    """Get user's notifications"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+        
+        notifications_data = []
+        for notification in notifications:
+            notifications_data.append({
+                "id": notification.id,
+                "content": notification.content,
+                "created_at": notification.created_at.isoformat(),
+            })
+        
+        return Response(notifications_data)
+
+
+class MarkNotificationReadView(APIView):
+    """Mark notification as read (delete it)"""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, notification_id):
+        try:
+            notification = Notification.objects.get(id=notification_id, user=request.user)
+            notification.delete()
+            return Response({"message": "Notification deleted"})
+        except Notification.DoesNotExist:
+            return Response({"error": "Notification not found"}, status=404)

@@ -97,6 +97,7 @@ export interface User {
   is_blocked: boolean
   is_banned: boolean
   is_suspended: boolean
+  warning_count?: number
 }
 
 export enum UserRole {
@@ -344,4 +345,40 @@ export interface PaginatedResponse<T> {
   count: number
   next?: string
   previous?: string
+}
+
+// Report types
+export type ReportReason = 'SPAM' | 'INAPPROPRIATE' | 'FAKE_PROFILE' | 'HARASSMENT' | 'FRAUD' | 'OTHER'
+export type ReportStatus = 'PENDING' | 'REVIEWED' | 'RESOLVED' | 'DISMISSED'
+export type ReportTargetType = 'offer' | 'want' | 'exchange' | 'user'
+
+export interface Report {
+  id: string
+  reporter: User
+  reported_user?: User
+  target_type: ReportTargetType
+  target_id: number
+  target_info?: {
+    id: number
+    title?: string
+    type?: string
+    email?: string
+    first_name?: string
+    last_name?: string
+    deleted?: boolean
+  }
+  reason: ReportReason
+  description: string
+  status: ReportStatus
+  admin_notes?: string
+  resolved_by?: User
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateReportData {
+  target_type: ReportTargetType
+  target_id: number
+  reason: ReportReason
+  description?: string
 }

@@ -111,10 +111,8 @@ const ProfilePage = () => {
           const profileDetail = await profileService.getUserProfileDetail(userId);
           setProfile(profileDetail.profile);
           setViewingUser({
-            id: profileDetail.user.id,
-            email: profileDetail.user.email,
-            first_name: profileDetail.user.first_name,
-            last_name: profileDetail.user.last_name,
+            ...profileDetail.user,
+            warning_count: profileDetail.user.warning_count || 0,
           } as User);
           setOffers(profileDetail.recent_offers);
           setWants(profileDetail.recent_wants);
@@ -170,7 +168,7 @@ const ProfilePage = () => {
                 <Badge colorScheme="purple" fontSize="xs">Member</Badge>
                 
                 {/* Stats */}
-                <SimpleGrid columns={isOwnProfile ? 3 : 2} w="full" gap={2} pt={2}>
+                <SimpleGrid columns={isOwnProfile ? 4 : 3} w="full" gap={2} pt={2}>
                   {isOwnProfile && (
                     <Box textAlign="center">
                       <Text fontSize="lg" fontWeight="700">{timebank?.amount ?? 0}H</Text>
@@ -185,6 +183,14 @@ const ProfilePage = () => {
                     <Text fontSize="lg" fontWeight="700">{completedCount}</Text>
                     <Text fontSize="xs" color="gray.500">Done</Text>
                   </Box>
+                  {viewingUser?.warning_count !== undefined && viewingUser.warning_count > 0 && (
+                    <Box textAlign="center">
+                      <Text fontSize="lg" fontWeight="700" color="yellow.600">
+                        {viewingUser.warning_count}⚠️
+                      </Text>
+                      <Text fontSize="xs" color="gray.500">Warnings</Text>
+                    </Box>
+                  )}
                 </SimpleGrid>
 
                 {/* Rating Details */}

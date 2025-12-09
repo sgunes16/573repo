@@ -12,7 +12,10 @@ import WantsPage from './pages/WantsPage'
 import ProfilePage from './pages/ProfilePage'
 import EditProfilePage from './pages/EditProfilePage'
 import OnboardingPage from './pages/OnboardingPage'
+import AdminPage from './pages/AdminPage'
+import NotificationsPage from './pages/NotificationsPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminProtectedRoute from './components/AdminProtectedRoute'
 
 function App() {
   return (
@@ -96,6 +99,14 @@ function App() {
         }
       />
       <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/handshake/exchange/:exchangeId"
         element={
           <ProtectedRoute>
@@ -117,6 +128,14 @@ function App() {
           <ProtectedRoute>
             <AchievementTreePage />
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <AdminProtectedRoute>
+            <AdminPage />
+          </AdminProtectedRoute>
         }
       />
     </Routes>

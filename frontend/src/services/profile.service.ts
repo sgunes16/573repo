@@ -30,6 +30,7 @@ export const profileService = {
       email: string
       first_name: string
       last_name: string
+      warning_count?: number
     }
     profile: UserProfile | null
     recent_offers: any[]

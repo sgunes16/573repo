@@ -9,6 +9,7 @@ import {
   MenuItem,
   MenuList,
   Text,
+  IconButton,
 } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -21,6 +22,8 @@ import {
   MdOutlineTimer,
   MdPersonOutline,
   MdTimeline,
+  MdAdminPanelSettings,
+  MdNotifications,
 } from "react-icons/md";
 import { TimeBank, UserProfile } from "@/types";
 import { useEffect, useState } from "react";
@@ -111,6 +114,17 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
 
         {showUserInfo && user && (
           <HStack spacing={3}>
+            {/* Notifications */}
+            <IconButton
+              aria-label="Notifications"
+              icon={<MdNotifications />}
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/notifications")}
+              color="gray.600"
+              _hover={{ bg: 'gray.50', color: 'yellow.600' }}
+            />
+            
             {/* Time Credits */}
             <HStack
               spacing={1}
@@ -178,6 +192,20 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
                     <Text>Transactions</Text>
                   </HStack>
                 </MenuItem>
+                <MenuItem onClick={() => navigate("/notifications")} _hover={{ bg: 'gray.50' }}>
+                  <HStack spacing={2}>
+                    <Icon as={MdNotifications} boxSize={4} color="gray.500" />
+                    <Text>Notifications</Text>
+                  </HStack>
+                </MenuItem>
+                {user?.is_admin && (
+                  <MenuItem onClick={() => navigate("/admin")} _hover={{ bg: 'purple.50' }}>
+                    <HStack spacing={2}>
+                      <Icon as={MdAdminPanelSettings} boxSize={4} color="purple.500" />
+                      <Text fontWeight="500" color="purple.600">Admin Panel</Text>
+                    </HStack>
+                  </MenuItem>
+                )}
                 <MenuItem onClick={handleLogout} color="red.500" _hover={{ bg: 'red.50' }}>
                   <HStack spacing={2}>
                     <Icon as={MdExitToApp} boxSize={4} />

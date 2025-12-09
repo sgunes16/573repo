@@ -9,15 +9,21 @@ import {
   HStack,
   Icon,
   Image,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Skeleton,
   Tag,
   Text,
   VStack,
+  useDisclosure,
 } from '@chakra-ui/react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import UserAvatar from '@/components/UserAvatar'
+import ReportModal from '@/components/ReportModal'
 import { offerService } from '@/services/offer.service'
 import { exchangeService } from '@/services/exchange.service'
 import { mapboxService } from '@/services/mapbox.service'
@@ -31,7 +37,9 @@ import {
   MdGroup,
   MdHandshake,
   MdLocationOn,
+  MdMoreVert,
   MdPerson,
+  MdReport,
   MdStar,
 } from 'react-icons/md'
 
@@ -45,6 +53,7 @@ const OfferDetailPage = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [exchanges, setExchanges] = useState<Exchange[]>([])
   const [myExchange, setMyExchange] = useState<Exchange | null>(null)
+  const { isOpen: isReportOpen, onOpen: onReportOpen, onClose: onReportClose } = useDisclosure()
 
   const isOwner = user?.id === offer?.user_id || user?.id === offer?.user?.id
 
@@ -163,21 +172,41 @@ const OfferDetailPage = () => {
           {/* Main Content */}
           <Box>
             {/* Type & Title */}
-            <HStack mb={3} spacing={2}>
-              <Badge
-                colorScheme={offer.type === 'offer' ? 'green' : 'blue'}
-                fontSize="xs"
-                px={2}
-                borderRadius="full"
-              >
-                {offer.type === 'offer' ? '🤝 Offer' : '🙋 Want'}
-              </Badge>
-              {isOwner && (
-                <Badge colorScheme="purple" fontSize="xs" px={2} borderRadius="full">
-                  Yours
+            <Flex justify="space-between" align="flex-start" mb={3}>
+              <HStack spacing={2}>
+                <Badge
+                  colorScheme={offer.type === 'offer' ? 'green' : 'blue'}
+                  fontSize="xs"
+                  px={2}
+                  borderRadius="full"
+                >
+                  {offer.type === 'offer' ? '🤝 Offer' : '🙋 Want'}
                 </Badge>
+                {isOwner && (
+                  <Badge colorScheme="purple" fontSize="xs" px={2} borderRadius="full">
+                    Yours
+                  </Badge>
+                )}
+              </HStack>
+              {!isOwner && (
+                <Menu>
+                  <MenuButton
+                    as={Button}
+                    variant="ghost"
+                    size="sm"
+                    minW="auto"
+                    px={2}
+                  >
+                    <Icon as={MdMoreVert} boxSize={5} />
+                  </MenuButton>
+                  <MenuList>
+                    <MenuItem icon={<Icon as={MdReport} />} onClick={onReportOpen}>
+                      Report
+                    </MenuItem>
+                  </MenuList>
+                </Menu>
               )}
-            </HStack>
+            </Flex>
 
             <Heading size="lg" mb={4}>{offer.title}</Heading>
 
@@ -442,6 +471,16 @@ const OfferDetailPage = () => {
           </VStack>
         </Grid>
       </Box>
+
+      {/* Report Modal */}
+      {offer && (
+        <ReportModal
+          isOpen={isReportOpen}
+          onClose={onReportClose}
+          targetType={offer.type}
+          targetId={parseInt(offer.id)}
+        />
+      )}
     </Box>
   )
 }

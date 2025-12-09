@@ -5,7 +5,10 @@ from .views import (
     UploadOfferImageView, DeleteOfferImageView, SetPrimaryImageView,
     CreateExchangeView, ExchangeDetailView, MyExchangesView, ExchangeByOfferView, ExchangesByOfferView, ProposeDateTimeView,
     AcceptExchangeView, RejectExchangeView, ConfirmCompletionView, SubmitRatingView,
-    TransactionsView, LatestTransactionsView
+    TransactionsView, LatestTransactionsView,
+    CreateReportView, AdminReportsListView, AdminReportUpdateView, AdminReportResolveView,
+    AdminKPIView, AdminBanUserView, AdminWarnUserView, AdminDeleteOfferView, AdminExchangeDetailView,
+    NotificationsView, MarkNotificationReadView
 )
 from .auth.views import LoginView, RegisterView, LogoutView
 
@@ -39,4 +42,21 @@ urlpatterns = [
     # Transaction endpoints
     path("transactions/", TransactionsView.as_view(), name="transactions"),
     path("transactions/latest/", LatestTransactionsView.as_view(), name="latest-transactions"),
+    
+    # Notification endpoints
+    path("notifications/", NotificationsView.as_view(), name="notifications"),
+    path("notifications/<int:notification_id>/", MarkNotificationReadView.as_view(), name="mark-notification-read"),
+    
+    # Report endpoints
+    path("reports/", CreateReportView.as_view(), name="create-report"),
+    
+    # Admin endpoints
+    path("admin/kpi/", AdminKPIView.as_view(), name="admin-kpi"),
+    path("admin/reports/", AdminReportsListView.as_view(), name="admin-reports-list"),
+    path("admin/reports/<int:report_id>/", AdminReportUpdateView.as_view(), name="admin-report-update"),
+    path("admin/reports/<int:report_id>/resolve/", AdminReportResolveView.as_view(), name="admin-report-resolve"),
+    path("admin/users/<int:user_id>/ban/", AdminBanUserView.as_view(), name="admin-ban-user"),
+    path("admin/users/<int:user_id>/warn/", AdminWarnUserView.as_view(), name="admin-warn-user"),
+    path("admin/offers/<int:offer_id>/", AdminDeleteOfferView.as_view(), name="admin-delete-offer"),
+    path("admin/exchanges/<int:exchange_id>/", AdminExchangeDetailView.as_view(), name="admin-exchange-detail"),
 ]
