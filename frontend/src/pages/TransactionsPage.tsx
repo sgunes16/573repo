@@ -1,14 +1,10 @@
 import {
   Badge,
   Box,
-  Button,
-  Container,
-  Divider,
-  Grid,
+  Flex,
   Heading,
   HStack,
   Icon,
-  Stack,
   SimpleGrid,
   Text,
   VStack,
@@ -19,16 +15,15 @@ import UserAvatar from '@/components/UserAvatar'
 import { transactionService } from '@/services/transaction.service'
 import { useAuthStore } from '@/store/useAuthStore'
 import type { TimeBankTransaction } from '@/types'
-import { MdArrowDownward, MdArrowUpward, MdChatBubbleOutline, MdStar } from 'react-icons/md'
+import { MdArrowDownward, MdArrowUpward, MdStar } from 'react-icons/md'
 
 const formatDate = (value: string) =>
-  new Date(value).toLocaleDateString('tr-TR', {
-    year: 'numeric',
+  new Date(value).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  })  
+  })
 
 const TransactionsPage = () => {
   const { user } = useAuthStore()
@@ -70,240 +65,114 @@ const TransactionsPage = () => {
     [transactions, currentUser?.id]
   )
 
-  const userFeedback = useMemo(
-    () =>
-      transactions
-        .filter((tx) => tx.comments && tx.comments.length > 0)
-        .flatMap((tx) => tx.comments || []),
-    [transactions]
-  )
-
-  if (isLoading) {
-    return (
-      <Box bg="white" minH="100vh">
-        <Navbar showUserInfo={true} />
-        <Container maxW="1200px" py={10} px={{ base: 4, md: 8 }}>
-          <Stack spacing={10}>
-            <VStack align="flex-start" spacing={2}>
-              <Heading size="xl">Time Bank</Heading>
-              <Text color="gray.600">Keep track of every hour you give and receive.</Text>
-            </VStack>
-            <Text>Loading transactions...</Text>
-          </Stack>
-        </Container>
-      </Box>
-    )
-  }
-
   return (
     <Box bg="white" minH="100vh">
       <Navbar showUserInfo={true} />
 
-      <Container maxW="1200px" py={10} px={{ base: 4, md: 8 }}>
-        <Stack spacing={10}>
-          <VStack align="flex-start" spacing={2}>
-            <Heading size="xl">Time Bank</Heading>
-            <Text color="gray.600">Keep track of every hour you give and receive.</Text>
+      <Box maxW="1000px" mx="auto" px={4} py={6}>
+        {/* Header */}
+        <VStack align="flex-start" spacing={1} mb={6}>
+          <Heading size="md">Time Bank</Heading>
+          <Text fontSize="sm" color="gray.500">Track your time credits</Text>
+        </VStack>
+
+        {/* Summary Cards */}
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3} mb={6}>
+          <Box bg="green.50" borderRadius="lg" p={4} border="1px solid" borderColor="green.100">
+            <Text fontSize="xs" color="gray.600" mb={1}>Earned</Text>
+            <Text fontSize="xl" fontWeight="700" color="green.600">+{totalEarned}H</Text>
+          </Box>
+          <Box bg="red.50" borderRadius="lg" p={4} border="1px solid" borderColor="red.100">
+            <Text fontSize="xs" color="gray.600" mb={1}>Spent</Text>
+            <Text fontSize="xl" fontWeight="700" color="red.500">-{totalSpent}H</Text>
+          </Box>
+          <Box bg="yellow.50" borderRadius="lg" p={4} border="1px solid" borderColor="yellow.200">
+            <Text fontSize="xs" color="gray.600" mb={1}>Balance</Text>
+            <Text fontSize="xl" fontWeight="700" color="yellow.600">{totalEarned - totalSpent}H</Text>
+          </Box>
+        </SimpleGrid>
+
+        {/* Transactions List */}
+        <Text fontWeight="600" fontSize="sm" mb={3}>Transactions</Text>
+        
+        {isLoading ? (
+          <Text fontSize="sm" color="gray.500">Loading...</Text>
+        ) : transactions.length === 0 ? (
+          <Box bg="gray.50" borderRadius="lg" p={6} textAlign="center">
+            <Text color="gray.500" fontSize="sm">No transactions yet</Text>
+          </Box>
+        ) : (
+          <VStack spacing={2} align="stretch">
+            {transactions.map((tx) => {
+              const isEarn = tx.transaction_type === 'EARN' && tx.to_user.id === currentUser?.id
+              const otherUser = tx.from_user.id === currentUser?.id ? tx.to_user : tx.from_user
+              const relatedRatings = tx.ratings || []
+
+              return (
+                <Box
+                  key={tx.id}
+                  p={3}
+                  borderRadius="lg"
+                  border="1px solid"
+                  borderColor="gray.100"
+                  _hover={{ bg: 'gray.50' }}
+                  transition="background 0.15s"
+                >
+                  <Flex justify="space-between" align="flex-start">
+                    <HStack spacing={3}>
+                      <UserAvatar size="sm" user={otherUser} />
+                      <Box>
+                        <Text fontSize="sm" fontWeight="500">
+                          {otherUser?.first_name} {otherUser?.last_name}
+                        </Text>
+                        <Text fontSize="xs" color="gray.500" noOfLines={1}>
+                          {tx.description}
+                        </Text>
+                        <Text fontSize="xs" color="gray.400">
+                          {formatDate(tx.created_at)}
+                        </Text>
+                      </Box>
+                    </HStack>
+                    <HStack spacing={2}>
+                      <Badge
+                        colorScheme={isEarn ? 'green' : 'red'}
+                        px={2}
+                        py={0.5}
+                        borderRadius="md"
+                        fontSize="xs"
+                      >
+                        {isEarn ? '+' : '-'}{tx.time_amount}H
+                      </Badge>
+                      <Icon
+                        as={isEarn ? MdArrowDownward : MdArrowUpward}
+                        color={isEarn ? 'green.500' : 'red.500'}
+                        boxSize={4}
+                      />
+                    </HStack>
+                  </Flex>
+
+                  {relatedRatings.length > 0 && (
+                    <Box mt={3} pt={2} borderTop="1px solid" borderColor="gray.100">
+                      <HStack spacing={1} mb={1}>
+                        <Icon as={MdStar} color="yellow.400" boxSize={3} />
+                        <Text fontSize="xs" fontWeight="500">Rating</Text>
+                      </HStack>
+                      {relatedRatings.map((rating: any, idx: number) => (
+                        <HStack key={idx} fontSize="xs" color="gray.600" spacing={3}>
+                          <Text>Communication: {rating.communication}/5</Text>
+                          <Text>Punctuality: {rating.punctuality}/5</Text>
+                        </HStack>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              )
+            })}
           </VStack>
-
-          <SimpleSummary totalEarned={totalEarned} totalSpent={totalSpent} />
-
-          <Grid templateColumns={{ base: '1fr', xl: '2fr 1fr' }} gap={6} alignItems="flex-start">
-            <TransactionTimeline
-              transactions={transactions}
-              currentUserId={currentUser?.id}
-              feedbackByExchange={userFeedback}
-            />
-            <FeedbackPanel recentFeedback={userFeedback} />
-          </Grid>
-        </Stack>
-      </Container>
+        )}
+      </Box>
     </Box>
   )
 }
-
-const SimpleSummary = ({ totalEarned, totalSpent }: { totalEarned: number; totalSpent: number }) => (
-  <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-    <SummaryCard label="Total Earned" value={`+${totalEarned}H`} accent="green.500" />
-    <SummaryCard label="Total Spent" value={`-${totalSpent}H`} accent="red.500" />
-    <SummaryCard label="Balance" value={`${totalEarned - totalSpent}H`} accent="yellow.500" />
-  </SimpleGrid>
-)
-
-const SummaryCard = ({ label, value, accent }: { label: string; value: string; accent: string }) => (
-  <Box bg="#F7FAFC" borderRadius="xl" p={5} border="1px solid #E2E8F0">
-    <Text fontSize="sm" color="gray.600">
-      {label}
-    </Text>
-    <Text fontSize="2xl" fontWeight="700" color={accent}>
-      {value}
-    </Text>
-  </Box>
-)
-
-const TransactionTimeline = ({
-  transactions,
-  currentUserId,
-  feedbackByExchange,
-}: {
-  transactions: TimeBankTransaction[]
-  currentUserId?: string
-  feedbackByExchange: any[]
-}) => (
-  <Stack spacing={4}>
-    <Heading size="md">Recent Transactions</Heading>
-    <VStack spacing={4} align="stretch">
-      {transactions.length === 0 && (
-        <Box bg="#F7FAFC" borderRadius="xl" p={6} textAlign="center">
-          <Text color="gray.600">You have no transactions yet.</Text>
-        </Box>
-      )}
-      {transactions.map((transaction) => {
-        const isEarn = transaction.transaction_type === 'EARN' && transaction.to_user.id === currentUserId
-        const isSpend = transaction.transaction_type === 'SPEND' && transaction.from_user.id === currentUserId
-        const otherUser =
-          transaction.from_user.id === currentUserId ? transaction.to_user : transaction.from_user
-
-        const relatedComments = transaction.comments || []
-        const relatedRatings = transaction.ratings || []
-        return (
-          <Box key={transaction.id} bg="#F7FAFC" borderRadius="xl" p={5} border="1px solid #E2E8F0">
-            <HStack justify="space-between" align="flex-start">
-              <HStack spacing={4} align="flex-start">
-                <UserAvatar user={otherUser} />
-                <VStack align="flex-start" spacing={1}>
-                  <Text fontWeight="600">
-                    {otherUser?.first_name} {otherUser?.last_name}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">
-                    {transaction.description}
-                  </Text>
-                  <Text fontSize="xs" color="gray.500">
-                    {formatDate(transaction.created_at)}
-                  </Text>
-                </VStack>
-              </HStack>
-              <VStack align="flex-end">
-                <Badge
-                  colorScheme={isEarn ? 'green' : 'red'}
-                  px={3}
-                  py={1}
-                  borderRadius="md"
-                  fontWeight="bold"
-                >
-                  {isEarn ? '+' : '-'}
-                  {transaction.time_amount}H
-                </Badge>
-                <Icon
-                  as={isEarn ? MdArrowDownward : MdArrowUpward}
-                  color={isEarn ? 'green.500' : 'red.500'}
-                />
-              </VStack>
-            </HStack>
-            {(relatedComments.length > 0 || relatedRatings.length > 0) && (
-              <Box mt={4}>
-                <Divider mb={3} />
-                {relatedRatings.length > 0 && (
-                  <>
-                    <HStack spacing={2} mb={2}>
-                      <Icon as={MdStar} color="yellow.500" />
-                      <Text fontWeight="600" fontSize="sm">
-                        Ratings
-                      </Text>
-                    </HStack>
-                    <VStack align="stretch" spacing={2} mb={3}>
-                      {relatedRatings.map((rating: any, idx: number) => (
-                        <Box key={idx} bg="white" borderRadius="md" p={3}>
-                          <HStack justify="space-between" mb={1}>
-                            <Text fontSize="sm" fontWeight="600">
-                              Communication: {rating.communication}/5
-                            </Text>
-                            <Text fontSize="sm" fontWeight="600">
-                              Punctuality: {rating.punctuality}/5
-                            </Text>
-                          </HStack>
-                          {rating.comment && (
-                            <Text fontSize="sm" color="gray.700" mt={1}>
-                              {rating.comment}
-                            </Text>
-                          )}
-                        </Box>
-                      ))}
-                    </VStack>
-                  </>
-                )}
-                {relatedComments.length > 0 && (
-                  <>
-                    <HStack spacing={2} mb={2}>
-                      <Icon as={MdChatBubbleOutline} color="gray.500" />
-                      <Text fontWeight="600" fontSize="sm">
-                        Comments
-                      </Text>
-                    </HStack>
-                    <VStack align="stretch" spacing={2}>
-                      {relatedComments.map((comment: any) => (
-                        <Box key={comment.id} bg="white" borderRadius="md" p={3}>
-                          <HStack justify="space-between">
-                            <Text fontSize="sm" fontWeight="600">
-                              {comment.user.first_name} {comment.user.last_name}
-                            </Text>
-                            {comment.rating && (
-                              <HStack spacing={0.5}>
-                                {[...Array(comment.rating)].map((_, index) => (
-                                  <Icon key={index} as={MdStar} color="#ECC94B" boxSize={3} />
-                                ))}
-                              </HStack>
-                            )}
-                          </HStack>
-                          <Text fontSize="sm" color="gray.700">
-                            {comment.content}
-                          </Text>
-                        </Box>
-                      ))}
-                    </VStack>
-                  </>
-                )}
-              </Box>
-            )}
-          </Box>
-        )
-      })}
-    </VStack>
-  </Stack>
-)
-
-const FeedbackPanel = ({ recentFeedback }: { recentFeedback: any[] }) => (
-  <Stack spacing={4}>
-    <Heading size="md">Latest Comments</Heading>
-    <VStack spacing={4} align="stretch">
-      {recentFeedback.map((feedback) => (
-        <Box key={feedback.id} bg="#F7FAFC" borderRadius="xl" p={4} border="1px solid #E2E8F0">
-          <HStack justify="space-between" mb={2}>
-            <HStack spacing={2}>
-              <UserAvatar size="sm" user={feedback.user} />
-              <Text fontWeight="600">{feedback.user.first_name}</Text>
-            </HStack>
-            {feedback.rating && (
-              <HStack spacing={0.5}>
-                {[...Array(feedback.rating)].map((_, index) => (
-                  <Icon key={index} as={MdStar} color="#ECC94B" boxSize={3} />
-                ))}
-              </HStack>
-            )}
-          </HStack>
-          <Text fontSize="sm" color="gray.700">
-            {feedback.content}
-          </Text>
-          <Text fontSize="xs" color="gray.500" mt={2}>
-            {new Date(feedback.created_at).toLocaleDateString('tr-TR')}
-          </Text>
-        </Box>
-      ))}
-      <Button variant="outline" size="sm">
-        See All Feedback
-      </Button>
-    </VStack>
-  </Stack>
-)
 
 export default TransactionsPage

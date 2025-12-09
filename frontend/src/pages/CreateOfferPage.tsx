@@ -2,12 +2,10 @@ import {
   Badge,
   Box,
   Button,
-  Container,
-  Divider,
+  Flex,
   FormControl,
   FormErrorMessage,
   Grid,
-  Heading,
   HStack,
   Icon,
   Input,
@@ -31,8 +29,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import ImageUpload, { UploadedImage } from '@/components/ImageUpload'
-import { MdCalendarToday, MdLocationOn, MdTag } from 'react-icons/md'
-import { mockOffers } from '@/services/mock/mockData'
+import { MdArrowBack, MdLocationOn, MdTag } from 'react-icons/md'
 import { activity_type, location_type } from '@/types'
 import { useGeoStore } from '@/store/useGeoStore'
 import { mapboxService } from '@/services/mapbox.service'
@@ -49,7 +46,7 @@ const CreateOfferPage = () => {
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState('')
   const [enteredTags, setEnteredTags] = useState<string[]>([])
-  const [duration, setDuration] = useState('1 hr.')
+  const [duration, setDuration] = useState('1')
   const [activityType, setActivityType] = useState(activity_type[0])
   const [personCount, setPersonCount] = useState('1')
   const [locationType, setLocationType] = useState(location_type[0])
@@ -67,40 +64,17 @@ const CreateOfferPage = () => {
   const [locationSearchResults, setLocationSearchResults] = useState<Array<{ longitude: number; latitude: number; address: string }>>([])
   const [showLocationDropdown, setShowLocationDropdown] = useState(false)
 
-  const relatedOffers = useMemo(() => mockOffers.slice(0, 2), [])
-
-  // Validation logic
   const errors = useMemo(() => {
     const errs: Record<string, string> = {}
-    
-    if (!title.trim()) {
-      errs.title = 'Title is required'
-    }
-    
-    if (!description.trim()) {
-      errs.description = 'Description is required'
-    }
-    
-    if (locationType === 'otherLocation' && !otherLocationCoords) {
-      errs.location = 'Please select a location from the dropdown'
-    }
-    
+    if (!title.trim()) errs.title = 'Title is required'
+    if (!description.trim()) errs.description = 'Description is required'
+    if (locationType === 'otherLocation' && !otherLocationCoords) errs.location = 'Select a location'
     return errs
   }, [title, description, locationType, otherLocationCoords])
 
   const isFormValid = Object.keys(errors).length === 0
-
-  const handleBlur = (field: string) => {
-    setTouched(prev => ({ ...prev, [field]: true }))
-  }
-
-  const validateAllFields = () => {
-    setTouched({
-      title: true,
-      description: true,
-      location: true,
-    })
-  }
+  const handleBlur = (field: string) => setTouched(prev => ({ ...prev, [field]: true }))
+  const validateAllFields = () => setTouched({ title: true, description: true, location: true })
 
   useEffect(() => {
     if (!geoLocation || (geoLocation.latitude === 0 && geoLocation.longitude === 0)) {
@@ -112,9 +86,7 @@ const CreateOfferPage = () => {
               longitude: position.coords.longitude,
             })
           },
-          (error) => {
-            console.error('Error getting geolocation:', error)
-          }
+          (error) => console.error('Error getting geolocation:', error)
         )
       }
     }
@@ -132,13 +104,7 @@ const CreateOfferPage = () => {
   }, [locationType, geoLocation])
 
   useEffect(() => {
-    if (locationType !== 'otherLocation' || !otherLocationInput.trim()) {
-      setLocationSearchResults([])
-      setShowLocationDropdown(false)
-      return
-    }
-
-    if (otherLocationInput.trim().length < 3) {
+    if (locationType !== 'otherLocation' || !otherLocationInput.trim() || otherLocationInput.trim().length < 3) {
       setLocationSearchResults([])
       setShowLocationDropdown(false)
       return
@@ -148,7 +114,6 @@ const CreateOfferPage = () => {
       setIsLoadingLocation(true)
       const results = await mapboxService.forwardGeocode(otherLocationInput)
       setIsLoadingLocation(false)
-      
       if (results.length > 0) {
         setLocationSearchResults(results)
         setShowLocationDropdown(true)
@@ -170,56 +135,31 @@ const CreateOfferPage = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    
-    // Validate all fields on submit
     validateAllFields()
     
     if (!isFormValid) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please fill in all required fields',
-        status: 'error',
-        duration: 3000,
-      })
+      toast({ title: 'Fill required fields', status: 'error', duration: 2000 })
       return
     }
     
     setIsSubmitting(true)
     
-    let locationData = {
-      latitude: 0,
-      longitude: 0,
-      address: ''
-    }
+    let locationData = { latitude: 0, longitude: 0, address: '' }
     
     if (locationType === 'myLocation' && geoLocation) {
-      locationData = {
-        latitude: geoLocation.latitude,
-        longitude: geoLocation.longitude,
-        address: myLocationAddress
-      }
+      locationData = { latitude: geoLocation.latitude, longitude: geoLocation.longitude, address: myLocationAddress }
     } else if (locationType === 'otherLocation' && otherLocationCoords) {
-      locationData = {
-        latitude: otherLocationCoords.latitude,
-        longitude: otherLocationCoords.longitude,
-        address: otherLocationInput
-      }
+      locationData = { latitude: otherLocationCoords.latitude, longitude: otherLocationCoords.longitude, address: otherLocationInput }
     } else if (locationType === 'remote') {
-      locationData = {
-        latitude: 0,
-        longitude: 0,
-        address: 'Remote / Online'
-      }
+      locationData = { latitude: 0, longitude: 0, address: 'Remote / Online' }
     }
-    
-    const durationHours = parseInt(duration.replace(/[^0-9]/g, '')) || 1
     
     const offerData = {
       type: pageType,
       title,
       description,
       tags: enteredTags,
-      time_required: durationHours,
+      time_required: parseInt(duration) || 1,
       location: locationData,
       activity_type: activityType,
       person_count: parseInt(personCount),
@@ -230,49 +170,23 @@ const CreateOfferPage = () => {
     }
     
     try {
-      // Create the offer first
       const response = await offerService.createOffer(offerData as any)
-      console.log('Offer created:', response)
       
-      // Upload images if any
       const newImages = images.filter(img => img.isNew && img.file)
       if (newImages.length > 0 && response.offer_id) {
         try {
           const files = newImages.map(img => img.file!).filter(Boolean)
           await offerService.uploadImages(response.offer_id, files)
-          toast({
-            title: 'Success!',
-            description: `${pageType === 'want' ? 'Want' : 'Offer'} created with ${files.length} image(s)`,
-            status: 'success',
-            duration: 3000,
-          })
         } catch (imageError) {
           console.error('Failed to upload images:', imageError)
-          toast({
-            title: 'Partial Success',
-            description: `${pageType === 'want' ? 'Want' : 'Offer'} created but images failed to upload`,
-            status: 'warning',
-            duration: 3000,
-          })
         }
-      } else {
-        toast({
-          title: 'Success!',
-          description: `${pageType === 'want' ? 'Want' : 'Offer'} created successfully`,
-          status: 'success',
-          duration: 3000,
-        })
       }
       
+      toast({ title: 'Published!', status: 'success', duration: 2000 })
       navigate('/dashboard')
     } catch (error) {
       console.error('Failed to create offer:', error)
-      toast({
-        title: 'Error',
-        description: `Failed to create ${pageType}. Please try again.`,
-        status: 'error',
-        duration: 3000,
-      })
+      toast({ title: 'Error', description: 'Failed to publish', status: 'error', duration: 2000 })
     } finally {
       setIsSubmitting(false)
     }
@@ -281,330 +195,285 @@ const CreateOfferPage = () => {
   return (
     <Box bg="white" minH="100vh">
       <Navbar showUserInfo={true} />
-      <Container maxW="960px" py={10} px={{ base: 4, md: 8 }}>
-        <Grid templateColumns={{ base: '1fr', lg: '2fr 1fr' }} gap={8}>
-          <Box as="form" onSubmit={handleSubmit}>
-            <Heading fontSize="2xl" mb={6}>
-              {pageType === 'want' ? 'Publish a New Want' : 'Publish a New Offer'}
-            </Heading>
-            <VStack spacing={6} align="stretch">
-              <FormControl isInvalid={touched.title && !!errors.title}>
-                <Text fontWeight="600" mb={1}>Title <Text as="span" color="red.500">*</Text></Text>
+      <Box maxW="700px" mx="auto" px={4} py={6}>
+        {/* Header */}
+        <Flex align="center" gap={3} mb={6}>
+          <Box
+            as="button"
+            onClick={() => navigate('/dashboard')}
+            p={2}
+            borderRadius="md"
+            _hover={{ bg: 'gray.50' }}
+          >
+            <Icon as={MdArrowBack} boxSize={5} color="gray.600" />
+          </Box>
+          <Box>
+            <Text fontWeight="600" fontSize="lg">
+              {pageType === 'want' ? 'New Want' : 'New Offer'}
+            </Text>
+            <Text fontSize="xs" color="gray.500">
+              {pageType === 'want' ? 'Request help from the community' : 'Share your skills with the community'}
+            </Text>
+          </Box>
+        </Flex>
+
+        <Box as="form" onSubmit={handleSubmit}>
+          <VStack spacing={5} align="stretch">
+            {/* Title */}
+            <FormControl isInvalid={touched.title && !!errors.title}>
+              <Text fontSize="sm" fontWeight="500" mb={1}>
+                Title <Text as="span" color="red.400">*</Text>
+              </Text>
+              <Input
+                placeholder={pageType === 'want' ? "What do you need?" : "What are you offering?"}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => handleBlur('title')}
+                size="sm"
+                borderRadius="md"
+              />
+              <FormErrorMessage fontSize="xs">{errors.title}</FormErrorMessage>
+            </FormControl>
+
+            {/* Description */}
+            <FormControl isInvalid={touched.description && !!errors.description}>
+              <Text fontSize="sm" fontWeight="500" mb={1}>
+                Description <Text as="span" color="red.400">*</Text>
+              </Text>
+              <Textarea
+                placeholder="Provide more details..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={() => handleBlur('description')}
+                size="sm"
+                borderRadius="md"
+                rows={4}
+              />
+              <FormErrorMessage fontSize="xs">{errors.description}</FormErrorMessage>
+            </FormControl>
+
+            {/* Images */}
+            <Box>
+              <Text fontSize="sm" fontWeight="500" mb={1}>Images</Text>
+              <Text fontSize="xs" color="gray.500" mb={2}>Up to 5 images</Text>
+              <ImageUpload images={images} onChange={setImages} maxImages={5} disabled={isSubmitting} />
+            </Box>
+
+            {/* Tags */}
+            <Box>
+              <Text fontSize="sm" fontWeight="500" mb={1}>Tags</Text>
+              <InputGroup size="sm">
+                <InputLeftElement><Icon as={MdTag} color="gray.400" boxSize={4} /></InputLeftElement>
                 <Input
-                  placeholder={pageType === 'want' ? "What do you need help with?" : "Give your offer a short name"}
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  onBlur={() => handleBlur('title')}
-                  h="48px"
-                  borderRadius="lg"
-                />
-                <FormErrorMessage>{errors.title}</FormErrorMessage>
-              </FormControl>
-
-              <FormControl isInvalid={touched.description && !!errors.description}>
-                <Text fontWeight="600" mb={1}>Description <Text as="span" color="red.500">*</Text></Text>
-                <Textarea
-                  placeholder={pageType === 'want' ? "Describe what kind of help you're looking for" : "Describe the skills or support you want to share"}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  onBlur={() => handleBlur('description')}
-                  borderRadius="lg"
-                  minH="120px"
-                />
-                <FormErrorMessage>{errors.description}</FormErrorMessage>
-              </FormControl>
-
-              <Stack spacing={2}>
-                <Text fontWeight="600">Images</Text>
-                <Text fontSize="sm" color="gray.500">
-                  Add up to 5 images to showcase your {pageType}
-                </Text>
-                <ImageUpload
-                  images={images}
-                  onChange={setImages}
-                  maxImages={5}
-                  disabled={isSubmitting}
-                />
-              </Stack>
-
-              <Stack spacing={2}>
-                <Text fontWeight="600">Tags</Text>
-                <InputGroup>
-                  <InputLeftElement pointerEvents="none">
-                    <Icon as={MdTag} color="gray.400" />
-                  </InputLeftElement>
-                  <Input
-                    placeholder="Press Enter to add tags (e.g. #music, #piano)"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        if (tags.trim()) {
-                          setEnteredTags((prev) => [...prev, tags.trim()])
-                          setTags('')
-                        }
+                  placeholder="Press Enter to add"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (tags.trim()) {
+                        setEnteredTags((prev) => [...prev, tags.trim()])
+                        setTags('')
                       }
-                    }}
-                    h="48px"
-                    borderRadius="lg"
-                    pl="50px"
-                  />
-                </InputGroup>
-                <HStack spacing={2} flexWrap="wrap">
+                    }
+                  }}
+                  borderRadius="md"
+                  pl={8}
+                />
+              </InputGroup>
+              {enteredTags.length > 0 && (
+                <HStack spacing={1} mt={2} flexWrap="wrap">
                   {enteredTags.map((tag, index) => (
-                    <Tag 
-                      key={tag} 
-                      borderRadius="full" 
-                      bg="#EDF2F7" 
-                      color="gray.700"
+                    <Tag
+                      key={tag}
+                      size="sm"
+                      borderRadius="full"
+                      bg="gray.100"
                       cursor="pointer"
                       onClick={() => setEnteredTags(prev => prev.filter((_, i) => i !== index))}
-                      _hover={{ bg: '#E2E8F0' }}
+                      _hover={{ bg: 'gray.200' }}
                     >
                       #{tag} ✕
                     </Tag>
                   ))}
                 </HStack>
-              </Stack>
+              )}
+            </Box>
 
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
-                <Stack spacing={1}>
-                  <Text fontWeight="600">Date</Text>
-                  <Input
-                    type="date"
-                    value={date}
-                    onChange={(event) => setDate(event.target.value)}
-                    h="48px"
-                    borderRadius="lg"
-                  />
-                </Stack>
-                <Stack spacing={1}>
-                  <Text fontWeight="600">Time</Text>
-                  <Input
-                    type="time"
-                    value={time}
-                    onChange={(event) => setTime(event.target.value)}
-                    h="48px"
-                    borderRadius="lg"
-                  />
-                </Stack>
-              </Grid>
+            {/* Date & Time */}
+            <Grid templateColumns="1fr 1fr" gap={3}>
+              <Box>
+                <Text fontSize="sm" fontWeight="500" mb={1}>Date</Text>
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  size="sm"
+                  borderRadius="md"
+                />
+              </Box>
+              <Box>
+                <Text fontSize="sm" fontWeight="500" mb={1}>Time</Text>
+                <Input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  size="sm"
+                  borderRadius="md"
+                />
+              </Box>
+            </Grid>
 
-              <Stack spacing={1}>
-                <Text fontWeight="600">Duration</Text>
-                <Select value={duration} onChange={(event) => setDuration(event.target.value)} h="48px" borderRadius="lg">
-                  <option value="30 min.">30 min.</option>
-                  <option value="1 hr.">1 hr.</option>
-                  <option value="2 hr.">2 hr.</option>
-                  <option value="Half-day">Half-day</option>
+            {/* Duration & Activity Type */}
+            <Grid templateColumns="1fr 1fr" gap={3}>
+              <Box>
+                <Text fontSize="sm" fontWeight="500" mb={1}>Duration (hours)</Text>
+                <Select value={duration} onChange={(e) => setDuration(e.target.value)} size="sm" borderRadius="md">
+                  <option value="1">1 hour</option>
+                  <option value="2">2 hours</option>
+                  <option value="3">3 hours</option>
+                  <option value="4">4+ hours</option>
                 </Select>
-              </Stack>
-
-              <Stack spacing={1}>
-                <Text fontWeight="600">Activity Type</Text>
+              </Box>
+              <Box>
+                <Text fontSize="sm" fontWeight="500" mb={1}>Type</Text>
                 <RadioGroup value={activityType} onChange={(val) => setActivityType(val as '1to1' | 'group')}>
-                  <Stack direction="row" spacing={6}>
-                    <Radio value="1to1">1 to 1</Radio>
-                    <Radio value="group">Group Activity</Radio>
-                  </Stack>
+                  <HStack spacing={4}>
+                    <Radio value="1to1" size="sm">1-to-1</Radio>
+                    <Radio value="group" size="sm">Group</Radio>
+                  </HStack>
                 </RadioGroup>
-              </Stack>
+              </Box>
+            </Grid>
 
-              <Stack spacing={1}>
-                <Text fontWeight="600">Group Size</Text>
-                <Select
-                  value={personCount}
-                  onChange={(event) => setPersonCount(event.target.value)}
-                  h="48px"
-                  borderRadius="lg"
-                  isDisabled={activityType === '1to1'}
-                >
-                  <option value="1">1 person</option>
-                  <option value="2">2 people</option>
-                  <option value="3">3 people</option>
-                  <option value="4">4 people</option>
-                  <option value="5">5 people</option>
+            {/* Group Size */}
+            {activityType === 'group' && (
+              <Box>
+                <Text fontSize="sm" fontWeight="500" mb={1}>Group Size</Text>
+                <Select value={personCount} onChange={(e) => setPersonCount(e.target.value)} size="sm" borderRadius="md">
+                  {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                    <option key={n} value={n}>{n} people</option>
+                  ))}
                 </Select>
-              </Stack>
+              </Box>
+            )}
 
-              <Stack spacing={1}>
-                <Text fontWeight="600">Location</Text>
-                <RadioGroup value={locationType} onChange={(val) => setLocationType(val as typeof location_type[number])}>
-                  <Stack direction={{ base: 'column', md: 'row' }}>
-                    <Radio value="myLocation">Use my location</Radio>
-                    <Radio value="remote">Remote / Online</Radio>
-                    <Radio value="otherLocation">Other Location</Radio>
-                  </Stack>
-                </RadioGroup>
+            {/* Location */}
+            <Box>
+              <Text fontSize="sm" fontWeight="500" mb={1}>Location</Text>
+              <RadioGroup value={locationType} onChange={(val) => setLocationType(val as typeof location_type[number])}>
+                <HStack spacing={4} flexWrap="wrap">
+                  <Radio value="myLocation" size="sm">My Location</Radio>
+                  <Radio value="remote" size="sm">Remote</Radio>
+                  <Radio value="otherLocation" size="sm">Other</Radio>
+                </HStack>
+              </RadioGroup>
 
-                {locationType === 'myLocation' && geoLocation && (
-                  <Box mt={2} p={3} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
-                    <HStack>
-                      <Icon as={MdLocationOn} color="brand.yellow.500" />
-                      <Text fontSize="sm" color="gray.700">
-                        {myLocationAddress}
-                      </Text>
-                    </HStack>
-                    <Text fontSize="xs" color="gray.500" mt={1}>
-                      Lat: {geoLocation.latitude.toFixed(6)}, Long: {geoLocation.longitude.toFixed(6)}
-                    </Text>
-                  </Box>
-                )}
-                
-                {locationType === 'remote' && (
-                  <Box mt={2} p={3} bg="blue.50" borderRadius="lg" border="1px solid" borderColor="blue.200">
-                    <Text fontSize="sm" color="blue.700">
-                      🌐 This offer will be marked as remote/online (no physical location)
-                    </Text>
-                  </Box>
-                )}
-              </Stack>
+              {locationType === 'myLocation' && geoLocation && (
+                <Box mt={2} p={2} bg="gray.50" borderRadius="md" fontSize="xs">
+                  <HStack><Icon as={MdLocationOn} color="yellow.500" boxSize={3} /><Text>{myLocationAddress}</Text></HStack>
+                </Box>
+              )}
+              
+              {locationType === 'remote' && (
+                <Box mt={2} p={2} bg="blue.50" borderRadius="md" fontSize="xs" color="blue.600">
+                  🌐 Remote / Online
+                </Box>
+              )}
+            </Box>
 
-              {locationType === 'otherLocation' && (
-                <FormControl isInvalid={touched.location && !!errors.location}>
-                  <Text fontWeight="600" mb={1}>Other Location <Text as="span" color="red.500">*</Text></Text>
-                  <Box position="relative">
-                    <InputGroup>
-                      <InputLeftElement h="48px" pointerEvents="none">
-                        <Icon as={MdLocationOn} color="gray.400" />
-                      </InputLeftElement>
-                      <Input 
-                        placeholder="Type to search location (min. 3 characters)" 
-                        value={otherLocationInput}
-                        onChange={(e) => {
-                          setOtherLocationInput(e.target.value)
-                          if (!e.target.value.trim()) {
-                            setShowLocationDropdown(false)
-                            setOtherLocationCoords(null)
-                          }
-                        }}
-                        onBlur={() => handleBlur('location')}
-                        h="48px" 
-                        borderRadius="lg"
-                        pr={isLoadingLocation ? '40px' : '12px'}
-                      />
-                      {isLoadingLocation && (
-                        <InputRightElement h="48px">
-                          <Spinner size="sm" color="brand.yellow.500" />
-                        </InputRightElement>
-                      )}
-                    </InputGroup>
-                    
-                    {showLocationDropdown && locationSearchResults.length > 0 && (
-                      <Box
-                        position="absolute"
-                        top="calc(100% + 4px)"
-                        left={0}
-                        right={0}
-                        zIndex={10}
-                        bg="white"
-                        border="1px solid"
-                        borderColor="gray.200"
-                        borderRadius="lg"
-                        boxShadow="lg"
-                        maxH="300px"
-                        overflowY="auto"
-                      >
-                        <List spacing={0}>
-                          {locationSearchResults.map((location, index) => (
-                            <ListItem
-                              key={index}
-                              px={4}
-                              py={3}
-                              cursor="pointer"
-                              _hover={{ bg: 'gray.50' }}
-                              borderBottom={index < locationSearchResults.length - 1 ? '1px solid' : 'none'}
-                              borderBottomColor="gray.100"
-                              onClick={() => handleSelectLocation(location)}
-                            >
-                              <HStack spacing={3}>
-                                <Icon as={MdLocationOn} color="gray.400" boxSize={5} />
-                                <Box flex={1}>
-                                  <Text fontSize="sm" fontWeight="500" color="gray.800">
-                                    {location.address}
-                                  </Text>
-                                  <Text fontSize="xs" color="gray.500" mt={0.5}>
-                                    {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-                                  </Text>
-                                </Box>
-                              </HStack>
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Box>
+            {/* Other Location Search */}
+            {locationType === 'otherLocation' && (
+              <FormControl isInvalid={touched.location && !!errors.location}>
+                <Text fontSize="sm" fontWeight="500" mb={1}>Search Location <Text as="span" color="red.400">*</Text></Text>
+                <Box position="relative">
+                  <InputGroup size="sm">
+                    <InputLeftElement><Icon as={MdLocationOn} color="gray.400" boxSize={4} /></InputLeftElement>
+                    <Input
+                      placeholder="Type to search..."
+                      value={otherLocationInput}
+                      onChange={(e) => {
+                        setOtherLocationInput(e.target.value)
+                        if (!e.target.value.trim()) {
+                          setShowLocationDropdown(false)
+                          setOtherLocationCoords(null)
+                        }
+                      }}
+                      onBlur={() => handleBlur('location')}
+                      borderRadius="md"
+                      pl={8}
+                    />
+                    {isLoadingLocation && (
+                      <InputRightElement><Spinner size="xs" color="yellow.500" /></InputRightElement>
                     )}
-                  </Box>
+                  </InputGroup>
                   
-                  {otherLocationCoords && !showLocationDropdown && (
-                    <Box p={3} bg="green.50" borderRadius="lg" border="1px solid" borderColor="green.200">
-                      <HStack>
-                        <Icon as={MdLocationOn} color="green.500" />
-                        <Text fontSize="sm" color="green.700">
-                          Location selected!
-                        </Text>
-                      </HStack>
-                      <Text fontSize="xs" color="gray.500" mt={1}>
-                        Lat: {otherLocationCoords.latitude.toFixed(6)}, Long: {otherLocationCoords.longitude.toFixed(6)}
-                      </Text>
+                  {showLocationDropdown && locationSearchResults.length > 0 && (
+                    <Box
+                      position="absolute"
+                      top="100%"
+                      left={0}
+                      right={0}
+                      zIndex={10}
+                      bg="white"
+                      border="1px solid"
+                      borderColor="gray.200"
+                      borderRadius="md"
+                      boxShadow="lg"
+                      maxH="200px"
+                      overflowY="auto"
+                      mt={1}
+                    >
+                      <List spacing={0}>
+                        {locationSearchResults.map((location, index) => (
+                          <ListItem
+                            key={index}
+                            px={3}
+                            py={2}
+                            cursor="pointer"
+                            _hover={{ bg: 'gray.50' }}
+                            borderBottom={index < locationSearchResults.length - 1 ? '1px solid' : 'none'}
+                            borderBottomColor="gray.100"
+                            onClick={() => handleSelectLocation(location)}
+                          >
+                            <HStack spacing={2}>
+                              <Icon as={MdLocationOn} color="gray.400" boxSize={4} />
+                              <Text fontSize="xs" noOfLines={1}>{location.address}</Text>
+                            </HStack>
+                          </ListItem>
+                        ))}
+                      </List>
                     </Box>
                   )}
-                  <FormErrorMessage>{errors.location}</FormErrorMessage>
-                </FormControl>
-              )}
-
-              <Button 
-                type="submit" 
-                bg="#ECC94B" 
-                color="black" 
-                h="52px" 
-                borderRadius="xl" 
-                fontWeight="600"
-                isLoading={isSubmitting}
-                loadingText="Publishing..."
-                isDisabled={isSubmitting}
-                _disabled={{ bg: 'gray.300', cursor: 'not-allowed' }}
-              >
-                {pageType === 'want' ? 'Publish My Want' : 'Publish My Offer'}
-              </Button>
-            </VStack>
-          </Box>
-
-          <Box bg="#F7FAFC" borderRadius="2xl" p={6} border="1px solid #E2E8F0">
-            <Heading size="md" mb={4}>
-              {pageType === 'want' ? 'Want Tips' : 'Offer Tips'}
-            </Heading>
-            <Text fontSize="sm" color="gray.600" mb={4}>
-              {pageType === 'want' 
-                ? 'A clear title and detailed description help neighbors understand what you need. Add tags so your want is easy to discover.'
-                : 'A clear title and detailed description help neighbors understand what you provide. Add tags so your offer is easy to discover.'
-              }
-            </Text>
-            <Divider my={4} />
-            <Heading size="sm" mb={3}>
-              Similar Offers
-            </Heading>
-            <VStack spacing={4} align="stretch">
-              {relatedOffers.map((offer) => (
-                <Box key={offer.id} bg="white" borderRadius="md" p={3} border="1px solid #E2E8F0">
-                  <Text fontWeight="600">{offer.title}</Text>
-                  <HStack spacing={2} color="gray.600" fontSize="sm" mt={1}>
-                    <Icon as={MdCalendarToday} />
-                    <Text>{new Date(offer.created_at).toLocaleDateString()}</Text>
-                  </HStack>
-                  <HStack spacing={2} mt={2}>
-                    {offer.tags.slice(0, 2).map((tag) => (
-                      <Badge key={tag} colorScheme="gray" variant="subtle">
-                        #{tag}
-                      </Badge>
-                    ))}
-                  </HStack>
                 </Box>
-              ))}
-            </VStack>
-          </Box>
-        </Grid>
-      </Container>
+                
+                {otherLocationCoords && !showLocationDropdown && (
+                  <Box mt={2} p={2} bg="green.50" borderRadius="md" fontSize="xs" color="green.600">
+                    ✓ {otherLocationCoords.address}
+                  </Box>
+                )}
+                <FormErrorMessage fontSize="xs">{errors.location}</FormErrorMessage>
+              </FormControl>
+            )}
+
+            {/* Submit */}
+            <Button
+              type="submit"
+              bg="yellow.400"
+              color="black"
+              size="md"
+              borderRadius="md"
+              fontWeight="500"
+              isLoading={isSubmitting}
+              loadingText="Publishing..."
+              _hover={{ bg: 'yellow.500' }}
+              _disabled={{ bg: 'gray.300' }}
+            >
+              Publish {pageType === 'want' ? 'Want' : 'Offer'}
+            </Button>
+          </VStack>
+        </Box>
+      </Box>
     </Box>
   )
 }

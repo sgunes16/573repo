@@ -2,16 +2,13 @@ import {
   Avatar,
   Box,
   Button,
-  Container,
+  Flex,
   FormControl,
   FormLabel,
-  Grid,
-  Heading,
   HStack,
   IconButton,
   Input,
   Progress,
-  Stack,
   Tag,
   TagCloseButton,
   TagLabel,
@@ -28,10 +25,10 @@ import { profileService, UpdateProfileData } from "@/services/profile.service";
 import { User } from "@/types";
 
 const STEPS = [
-  { id: 1, title: "Welcome", description: "Let's set up your profile" },
-  { id: 2, title: "Photo & Location", description: "Help others find you" },
-  { id: 3, title: "About You", description: "Tell us about yourself" },
-  { id: 4, title: "Skills", description: "What can you offer?" },
+  { id: 1, title: "Welcome" },
+  { id: 2, title: "Photo & Location" },
+  { id: 3, title: "About You" },
+  { id: 4, title: "Skills" },
 ];
 
 const OnboardingPage = () => {
@@ -44,7 +41,6 @@ const OnboardingPage = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Form state
   const [location, setLocation] = useState("");
   const [bio, setBio] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
@@ -54,20 +50,13 @@ const OnboardingPage = () => {
 
   const progress = (currentStep / STEPS.length) * 100;
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleAvatarClick = () => fileInputRef.current?.click();
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "Error",
-          description: "File size must be less than 5MB",
-          status: "error",
-          duration: 3000,
-        });
+        toast({ title: "Max 5MB", status: "error", duration: 2000 });
         return;
       }
       setAvatarFile(file);
@@ -82,75 +71,25 @@ const OnboardingPage = () => {
     }
   };
 
-  const handleRemoveSkill = (skillToRemove: string) => {
-    setSkills(skills.filter((skill) => skill !== skillToRemove));
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleAddSkill();
-    }
-  };
-
-  const handleNext = () => {
-    if (currentStep < STEPS.length) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleSkip = () => {
-    navigate("/dashboard");
-  };
-
   const handleComplete = async () => {
     setIsSaving(true);
     try {
-      const updateData: UpdateProfileData = {
-        bio,
-        location,
-        skills,
-      };
-
-      if (avatarFile) {
-        updateData.avatar = avatarFile;
-      }
+      const updateData: UpdateProfileData = { bio, location, skills };
+      if (avatarFile) updateData.avatar = avatarFile;
 
       const response = await profileService.updateProfile(updateData);
 
-      // Update auth store with new user data
       if (setUser && response.user) {
         setUser({
           ...currentUser,
-          profile: {
-            ...currentUser.profile,
-            ...response.user_profile,
-          },
+          profile: { ...currentUser.profile, ...response.user_profile },
         } as any);
       }
 
-      toast({
-        title: "Welcome to The Hive!",
-        description: "Your profile is all set up",
-        status: "success",
-        duration: 3000,
-      });
-
+      toast({ title: "Welcome to The Hive!", status: "success", duration: 2000 });
       navigate("/dashboard");
     } catch (error) {
       console.error("Error saving profile:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save profile. You can update it later.",
-        status: "error",
-        duration: 3000,
-      });
       navigate("/dashboard");
     } finally {
       setIsSaving(false);
@@ -161,58 +100,47 @@ const OnboardingPage = () => {
     switch (currentStep) {
       case 1:
         return (
-          <VStack spacing={8} textAlign="center" py={8}>
+          <VStack spacing={6} textAlign="center" py={8}>
             <Box
-              w="120px"
-              h="120px"
+              w="80px"
+              h="80px"
               borderRadius="full"
               bg="yellow.100"
               display="flex"
               alignItems="center"
               justifyContent="center"
-              fontSize="60px"
+              fontSize="40px"
             >
               🐝
             </Box>
-            <VStack spacing={3}>
-              <Heading size="xl">
+            <VStack spacing={2}>
+              <Text fontWeight="600" fontSize="xl">
                 Welcome, {currentUser?.first_name || "Friend"}!
-              </Heading>
-              <Text color="gray.600" fontSize="lg" maxW="400px">
-                Let's set up your profile so you can start exchanging skills and time with your community.
+              </Text>
+              <Text color="gray.500" fontSize="sm" maxW="300px">
+                Let's set up your profile to start exchanging skills.
               </Text>
             </VStack>
-            <VStack spacing={2} color="gray.500" fontSize="sm">
-              <HStack>
-                <MdCheck color="green" />
-                <Text>Share your skills and interests</Text>
-              </HStack>
-              <HStack>
-                <MdCheck color="green" />
-                <Text>Connect with neighbors</Text>
-              </HStack>
-              <HStack>
-                <MdCheck color="green" />
-                <Text>Exchange time, not money</Text>
-              </HStack>
+            <VStack spacing={1} color="gray.500" fontSize="xs">
+              <HStack><MdCheck color="green" /><Text>Share your skills</Text></HStack>
+              <HStack><MdCheck color="green" /><Text>Connect with neighbors</Text></HStack>
+              <HStack><MdCheck color="green" /><Text>Exchange time, not money</Text></HStack>
             </VStack>
           </VStack>
         );
 
       case 2:
         return (
-          <VStack spacing={8} py={4}>
-            <VStack spacing={2} textAlign="center">
-              <Heading size="lg">Add Your Photo & Location</Heading>
-              <Text color="gray.600">
-                Help others recognize you and find services nearby
-              </Text>
+          <VStack spacing={6} py={4}>
+            <VStack spacing={1} textAlign="center">
+              <Text fontWeight="600" fontSize="lg">Photo & Location</Text>
+              <Text color="gray.500" fontSize="xs">Help others find you</Text>
             </VStack>
 
-            <VStack spacing={4}>
+            <VStack spacing={2}>
               <Box position="relative">
                 <Avatar
-                  size="2xl"
+                  size="xl"
                   name={`${currentUser?.first_name} ${currentUser?.last_name}`}
                   src={avatarPreview || undefined}
                   bg="yellow.200"
@@ -220,7 +148,7 @@ const OnboardingPage = () => {
                 <IconButton
                   aria-label="Change photo"
                   icon={<MdCameraAlt />}
-                  size="sm"
+                  size="xs"
                   colorScheme="yellow"
                   borderRadius="full"
                   position="absolute"
@@ -228,149 +156,98 @@ const OnboardingPage = () => {
                   right={0}
                   onClick={handleAvatarClick}
                 />
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  hidden
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                />
+                <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleAvatarChange} />
               </Box>
-              <Text fontSize="sm" color="gray.500">
-                Click to upload a profile photo
-              </Text>
+              <Text fontSize="xs" color="gray.400">Click to upload</Text>
             </VStack>
 
-            <FormControl maxW="400px" w="full">
-              <FormLabel>Where are you located?</FormLabel>
+            <FormControl maxW="300px" w="full">
+              <FormLabel fontSize="sm" fontWeight="500">Location</FormLabel>
               <Input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g. Brooklyn, NY"
-                size="lg"
+                size="sm"
+                borderRadius="md"
               />
-              <Text fontSize="xs" color="gray.500" mt={1}>
-                This helps match you with nearby community members
-              </Text>
             </FormControl>
           </VStack>
         );
 
       case 3:
         return (
-          <VStack spacing={8} py={4}>
-            <VStack spacing={2} textAlign="center">
-              <Heading size="lg">Tell Us About Yourself</Heading>
-              <Text color="gray.600">
-                Share a bit about who you are and what you're passionate about
-              </Text>
+          <VStack spacing={6} py={4}>
+            <VStack spacing={1} textAlign="center">
+              <Text fontWeight="600" fontSize="lg">About You</Text>
+              <Text color="gray.500" fontSize="xs">Tell us about yourself</Text>
             </VStack>
 
-            <FormControl maxW="500px" w="full">
-              <FormLabel>Your Bio</FormLabel>
+            <FormControl maxW="400px" w="full">
+              <FormLabel fontSize="sm" fontWeight="500">Bio</FormLabel>
               <Textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Hi! I'm passionate about... I love to... In my free time..."
-                size="lg"
-                rows={6}
-                resize="vertical"
+                placeholder="Hi! I'm passionate about..."
+                size="sm"
+                borderRadius="md"
+                rows={4}
               />
-              <Text fontSize="xs" color="gray.500" mt={1}>
-                {bio.length}/500 characters
-              </Text>
+              <Text fontSize="xs" color="gray.400" mt={1}>{bio.length}/500</Text>
             </FormControl>
-
-            <Box
-              bg="yellow.50"
-              p={4}
-              borderRadius="lg"
-              maxW="500px"
-              w="full"
-            >
-              <Text fontSize="sm" color="gray.700">
-                💡 <strong>Tip:</strong> Mention what you enjoy doing, your hobbies, and what kind of exchanges you're interested in!
-              </Text>
-            </Box>
           </VStack>
         );
 
       case 4:
         return (
-          <VStack spacing={8} py={4}>
-            <VStack spacing={2} textAlign="center">
-              <Heading size="lg">What Can You Offer?</Heading>
-              <Text color="gray.600">
-                Add skills and interests that you'd like to share with others
-              </Text>
+          <VStack spacing={6} py={4}>
+            <VStack spacing={1} textAlign="center">
+              <Text fontWeight="600" fontSize="lg">Your Skills</Text>
+              <Text color="gray.500" fontSize="xs">What can you offer?</Text>
             </VStack>
 
-            <FormControl maxW="500px" w="full">
-              <FormLabel>Add Your Skills</FormLabel>
+            <FormControl maxW="400px" w="full">
               <HStack>
                 <Input
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="e.g. Cooking, Gardening, Web Design..."
-                  size="lg"
+                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddSkill())}
+                  placeholder="e.g. Cooking, Tutoring..."
+                  size="sm"
+                  borderRadius="md"
                 />
                 <IconButton
                   aria-label="Add"
                   icon={<MdAdd />}
                   colorScheme="yellow"
-                  size="lg"
+                  size="sm"
                   onClick={handleAddSkill}
                 />
               </HStack>
             </FormControl>
 
-            <Box maxW="500px" w="full">
-              <HStack spacing={2} flexWrap="wrap" gap={2} minH="60px">
+            <Box maxW="400px" w="full">
+              <HStack spacing={1} flexWrap="wrap" gap={1} minH="40px">
                 {skills.map((skill) => (
-                  <Tag
-                    key={skill}
-                    size="lg"
-                    borderRadius="full"
-                    variant="solid"
-                    colorScheme="yellow"
-                  >
+                  <Tag key={skill} size="sm" borderRadius="full" colorScheme="yellow">
                     <TagLabel>{skill}</TagLabel>
-                    <TagCloseButton onClick={() => handleRemoveSkill(skill)} />
+                    <TagCloseButton onClick={() => setSkills(skills.filter((s) => s !== skill))} />
                   </Tag>
                 ))}
-                {skills.length === 0 && (
-                  <Text color="gray.400" fontSize="sm">
-                    Add some skills to get started
-                  </Text>
-                )}
+                {skills.length === 0 && <Text color="gray.400" fontSize="xs">Add some skills</Text>}
               </HStack>
             </Box>
 
-            <Box
-              bg="gray.50"
-              p={4}
-              borderRadius="lg"
-              maxW="500px"
-              w="full"
-            >
-              <Text fontSize="sm" fontWeight="600" mb={2}>
-                Popular skills in the community:
-              </Text>
-              <HStack flexWrap="wrap" gap={2}>
-                {["Cooking", "Tutoring", "Pet Sitting", "Gardening", "Photography", "Music Lessons", "Home Repair", "Language Exchange"].map((skill) => (
+            <Box bg="gray.50" p={3} borderRadius="md" maxW="400px" w="full">
+              <Text fontSize="xs" fontWeight="500" mb={2}>Popular:</Text>
+              <HStack flexWrap="wrap" gap={1}>
+                {["Cooking", "Tutoring", "Pet Sitting", "Gardening", "Photography"].map((skill) => (
                   <Tag
                     key={skill}
-                    size="md"
+                    size="sm"
                     borderRadius="full"
                     variant="outline"
-                    colorScheme="gray"
                     cursor="pointer"
-                    onClick={() => {
-                      if (!skills.includes(skill)) {
-                        setSkills([...skills, skill]);
-                      }
-                    }}
+                    onClick={() => !skills.includes(skill) && setSkills([...skills, skill])}
                     _hover={{ bg: "yellow.50" }}
                   >
                     + {skill}
@@ -388,94 +265,59 @@ const OnboardingPage = () => {
 
   return (
     <Box bg="white" minH="100vh">
-      {/* Progress Bar */}
-      <Box
-        position="fixed"
-        top={0}
-        left={0}
-        right={0}
-        zIndex={10}
-        bg="white"
-        borderBottom="1px solid"
-        borderColor="gray.100"
-      >
-        <Progress
-          value={progress}
-          size="xs"
-          colorScheme="yellow"
-          bg="gray.100"
-        />
-        <Container maxW="600px" py={4}>
-          <HStack justify="space-between">
-            <Text fontSize="sm" color="gray.500">
-              Step {currentStep} of {STEPS.length}
-            </Text>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSkip}
-              color="gray.500"
-            >
-              Skip for now
-            </Button>
-          </HStack>
-        </Container>
+      {/* Progress */}
+      <Box position="fixed" top={0} left={0} right={0} zIndex={10} bg="white" boxShadow="0 1px 3px rgba(0,0,0,0.05)">
+        <Progress value={progress} size="xs" colorScheme="yellow" bg="gray.100" />
+        <Flex maxW="500px" mx="auto" px={4} py={3} justify="space-between" align="center">
+          <Text fontSize="xs" color="gray.500">Step {currentStep}/{STEPS.length}</Text>
+          <Button variant="ghost" size="xs" onClick={() => navigate("/dashboard")} color="gray.500">Skip</Button>
+        </Flex>
       </Box>
 
-      {/* Main Content */}
-      <Container maxW="600px" pt="100px" pb={32}>
+      {/* Content */}
+      <Box maxW="500px" mx="auto" px={4} pt="80px" pb="100px">
         {renderStep()}
-      </Container>
+      </Box>
 
-      {/* Bottom Navigation */}
-      <Box
-        position="fixed"
-        bottom={0}
-        left={0}
-        right={0}
-        bg="white"
-        borderTop="1px solid"
-        borderColor="gray.100"
-        py={4}
-      >
-        <Container maxW="600px">
-          <Grid templateColumns="1fr 1fr" gap={4}>
+      {/* Navigation */}
+      <Box position="fixed" bottom={0} left={0} right={0} bg="white" boxShadow="0 -1px 3px rgba(0,0,0,0.05)" py={3}>
+        <Flex maxW="500px" mx="auto" px={4} gap={3}>
+          <Button
+            variant="outline"
+            size="sm"
+            flex={1}
+            leftIcon={<MdArrowBack />}
+            onClick={() => currentStep > 1 && setCurrentStep(currentStep - 1)}
+            isDisabled={currentStep === 1}
+          >
+            Back
+          </Button>
+          {currentStep < STEPS.length ? (
             <Button
-              variant="outline"
-              size="lg"
-              leftIcon={<MdArrowBack />}
-              onClick={handleBack}
-              isDisabled={currentStep === 1}
+              colorScheme="yellow"
+              size="sm"
+              flex={1}
+              rightIcon={<MdArrowForward />}
+              onClick={() => setCurrentStep(currentStep + 1)}
             >
-              Back
+              Continue
             </Button>
-            {currentStep < STEPS.length ? (
-              <Button
-                colorScheme="yellow"
-                size="lg"
-                rightIcon={<MdArrowForward />}
-                onClick={handleNext}
-              >
-                Continue
-              </Button>
-            ) : (
-              <Button
-                colorScheme="yellow"
-                size="lg"
-                rightIcon={<MdCheck />}
-                onClick={handleComplete}
-                isLoading={isSaving}
-                loadingText="Saving..."
-              >
-                Complete Setup
-              </Button>
-            )}
-          </Grid>
-        </Container>
+          ) : (
+            <Button
+              colorScheme="yellow"
+              size="sm"
+              flex={1}
+              rightIcon={<MdCheck />}
+              onClick={handleComplete}
+              isLoading={isSaving}
+            >
+              Complete
+            </Button>
+          )}
+        </Flex>
       </Box>
     </Box>
   );
 };
 
 export default OnboardingPage;
-

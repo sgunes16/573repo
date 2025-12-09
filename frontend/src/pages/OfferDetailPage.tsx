@@ -2,8 +2,8 @@ import {
   Badge,
   Box,
   Button,
-  Container,
   Divider,
+  Flex,
   Grid,
   Heading,
   HStack,
@@ -46,7 +46,6 @@ const OfferDetailPage = () => {
   const [exchanges, setExchanges] = useState<Exchange[]>([])
   const [myExchange, setMyExchange] = useState<Exchange | null>(null)
 
-  // Check if current user is the owner of this offer
   const isOwner = user?.id === offer?.user_id || user?.id === offer?.user?.id
 
   useEffect(() => {
@@ -58,7 +57,6 @@ const OfferDetailPage = () => {
         const data = await offerService.getOfferById(id)
         setOffer(data)
         
-        // Set primary image as selected
         const primaryImage = data.images?.find((img: OfferImage) => img.is_primary)
         if (primaryImage) {
           setSelectedImage(primaryImage.url)
@@ -66,19 +64,16 @@ const OfferDetailPage = () => {
           setSelectedImage(data.images[0].url)
         }
         
-        // Fetch location address if geo_location exists
-        // geo_location is [latitude, longitude], reverseGeocode expects (longitude, latitude)
         if (data.geo_location && data.geo_location.length === 2) {
           const address = await mapboxService.reverseGeocode(
-            data.geo_location[1],  // longitude
-            data.geo_location[0]   // latitude
+            data.geo_location[1],
+            data.geo_location[0]
           )
           setLocationAddress(address)
         } else if (data.location) {
           setLocationAddress(data.location)
         }
 
-        // Fetch exchanges if user is owner
         if (user?.id === data.user_id || user?.id === data.user?.id) {
           try {
             const exchangesData = await exchangeService.getExchangesForOffer(id)
@@ -87,14 +82,12 @@ const OfferDetailPage = () => {
             console.error('Failed to fetch exchanges:', error)
           }
         } else {
-          // Check if current user already requested this offer
           try {
             const existingExchange = await exchangeService.getExchangeByOfferId(id)
             if (existingExchange) {
               setMyExchange(existingExchange)
             }
           } catch (error) {
-            // No existing exchange, that's fine
             console.log('No existing exchange for this offer')
           }
         }
@@ -111,230 +104,172 @@ const OfferDetailPage = () => {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Not specified'
     return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
+      weekday: 'short',
+      month: 'short',
       day: 'numeric',
     })
   }
 
-  const formatTime = (timeStr?: string) => {
-    if (!timeStr) return ''
-    return timeStr
-  }
-
   if (isLoading) {
     return (
-      <Box bg="gray.50" minH="100vh">
+      <Box bg="white" minH="100vh">
         <Navbar showUserInfo={true} />
-        <Container maxW="1000px" py={8}>
-          <Skeleton height="40px" width="100px" mb={6} />
-          <Grid templateColumns={{ base: '1fr', lg: '1fr 350px' }} gap={8}>
+        <Box maxW="900px" mx="auto" px={4} py={6}>
+          <Skeleton height="32px" width="100px" mb={4} />
+          <Grid templateColumns={{ base: '1fr', lg: '1fr 300px' }} gap={6}>
             <Box>
-              <Skeleton height="400px" borderRadius="xl" mb={6} />
-              <Skeleton height="200px" borderRadius="xl" />
+              <Skeleton height="300px" borderRadius="lg" mb={4} />
+              <Skeleton height="150px" borderRadius="lg" />
             </Box>
             <Box>
-              <Skeleton height="250px" borderRadius="xl" mb={4} />
-              <Skeleton height="150px" borderRadius="xl" />
+              <Skeleton height="200px" borderRadius="lg" />
             </Box>
           </Grid>
-        </Container>
+        </Box>
       </Box>
     )
   }
 
   if (!offer) {
     return (
-      <Box bg="gray.50" minH="100vh">
+      <Box bg="white" minH="100vh">
         <Navbar showUserInfo={true} />
-        <Container maxW="1000px" py={8}>
-          <VStack spacing={4} py={20}>
-            <Heading size="lg" color="gray.600">Offer not found</Heading>
-            <Button leftIcon={<Icon as={MdArrowBack} />} onClick={() => navigate('/dashboard')}>
-              Back to Dashboard
-            </Button>
-          </VStack>
-        </Container>
+        <Box maxW="900px" mx="auto" px={4} py={20} textAlign="center">
+          <Heading size="md" color="gray.600" mb={4}>Offer not found</Heading>
+          <Button size="sm" leftIcon={<Icon as={MdArrowBack} />} onClick={() => navigate('/dashboard')}>
+            Back to Dashboard
+          </Button>
+        </Box>
       </Box>
     )
   }
 
   return (
-    <Box bg="gray.50" minH="100vh">
+    <Box bg="white" minH="100vh">
       <Navbar showUserInfo={true} />
-      <Container maxW="1000px" py={8}>
+      <Box maxW="900px" mx="auto" px={4} py={6}>
         {/* Back Button */}
         <Button
-          leftIcon={<Icon as={MdArrowBack} />}
+          leftIcon={<Icon as={MdArrowBack} boxSize={4} />}
           variant="ghost"
-          mb={6}
+          size="sm"
+          mb={4}
           onClick={() => navigate('/dashboard')}
-          _hover={{ bg: 'gray.100' }}
         >
-          Back to Dashboard
+          Back
         </Button>
 
-        <Grid templateColumns={{ base: '1fr', lg: '1fr 350px' }} gap={8}>
+        <Grid templateColumns={{ base: '1fr', lg: '1fr 280px' }} gap={6}>
           {/* Main Content */}
           <Box>
-            {/* Type Badge & Title */}
-            <HStack mb={4} spacing={3}>
+            {/* Type & Title */}
+            <HStack mb={3} spacing={2}>
               <Badge
                 colorScheme={offer.type === 'offer' ? 'green' : 'blue'}
-                fontSize="sm"
-                px={3}
-                py={1}
+                fontSize="xs"
+                px={2}
                 borderRadius="full"
               >
                 {offer.type === 'offer' ? '🤝 Offer' : '🙋 Want'}
               </Badge>
-              <Badge colorScheme="gray" fontSize="sm" px={3} py={1} borderRadius="full">
-                {offer.status}
-              </Badge>
               {isOwner && (
-                <Badge colorScheme="purple" fontSize="sm" px={3} py={1} borderRadius="full">
-                  Your {offer.type}
+                <Badge colorScheme="purple" fontSize="xs" px={2} borderRadius="full">
+                  Yours
                 </Badge>
               )}
             </HStack>
 
-            <Heading size="xl" mb={4} color="gray.800">
-              {offer.title}
-            </Heading>
+            <Heading size="lg" mb={4}>{offer.title}</Heading>
 
             {/* Images */}
             {offer.images && offer.images.length > 0 ? (
-              <Box mb={6}>
+              <Box mb={4}>
                 <Image
                   src={selectedImage || offer.images[0].url}
                   alt={offer.title}
-                  borderRadius="xl"
+                  borderRadius="lg"
                   w="100%"
-                  h="350px"
+                  h="280px"
                   objectFit="cover"
-                  mb={3}
-                  fallback={<Skeleton height="350px" borderRadius="xl" />}
+                  mb={2}
+                  fallback={<Skeleton height="280px" borderRadius="lg" />}
                 />
-                {offer.images && offer.images.length > 1 && (
-                  <HStack spacing={2} overflowX="auto" pb={2}>
+                {offer.images.length > 1 && (
+                  <HStack spacing={2} overflowX="auto">
                     {offer.images.map((img: OfferImage) => (
                       <Image
                         key={img.id}
                         src={img.url}
-                        alt=""
-                        w="80px"
-                        h="60px"
+                        w="60px"
+                        h="45px"
                         objectFit="cover"
                         borderRadius="md"
                         cursor="pointer"
-                        border={selectedImage === img.url ? '3px solid' : '2px solid transparent'}
-                        borderColor={selectedImage === img.url ? 'yellow.500' : 'transparent'}
+                        border={selectedImage === img.url ? '2px solid' : '1px solid'}
+                        borderColor={selectedImage === img.url ? 'yellow.400' : 'gray.200'}
                         onClick={() => setSelectedImage(img.url)}
-                        _hover={{ opacity: 0.8 }}
                       />
                     ))}
                   </HStack>
                 )}
               </Box>
             ) : (
-              <Box 
-                mb={6} 
-                h="200px" 
-                bg="gray.200" 
-                borderRadius="xl" 
-                display="flex" 
-                alignItems="center" 
-                justifyContent="center"
-              >
-                <Text color="gray.500">No images available</Text>
+              <Box mb={4} h="150px" bg="gray.100" borderRadius="lg" display="flex" alignItems="center" justifyContent="center">
+                <Text color="gray.400" fontSize="sm">No images</Text>
               </Box>
             )}
 
             {/* Description */}
-            <Box bg="white" p={6} borderRadius="xl" boxShadow="sm" mb={6}>
-              <Heading size="md" mb={4}>Description</Heading>
-              <Text color="gray.700" whiteSpace="pre-wrap" lineHeight="tall">
+            <Box mb={4}>
+              <Text fontWeight="600" fontSize="sm" mb={2}>Description</Text>
+              <Text color="gray.600" fontSize="sm" whiteSpace="pre-wrap">
                 {offer.description || 'No description provided.'}
               </Text>
             </Box>
 
             {/* Tags */}
             {offer.tags && offer.tags.length > 0 && (
-              <Box bg="white" p={6} borderRadius="xl" boxShadow="sm" mb={6}>
-                <Heading size="md" mb={4}>Tags</Heading>
+              <Box mb={4}>
+                <Text fontWeight="600" fontSize="sm" mb={2}>Tags</Text>
                 <HStack spacing={2} flexWrap="wrap">
                   {offer.tags.map((tag) => (
-                    <Tag
-                      key={tag}
-                      size="lg"
-                      borderRadius="full"
-                      bg="gray.100"
-                      color="gray.700"
-                    >
-                      #{tag}
-                    </Tag>
+                    <Tag key={tag} size="sm" borderRadius="full" bg="gray.100">#{tag}</Tag>
                   ))}
                 </HStack>
               </Box>
             )}
 
-            {/* Details Grid */}
-            <Box bg="white" p={6} borderRadius="xl" boxShadow="sm">
-              <Heading size="md" mb={4}>Details</Heading>
-              <Grid templateColumns="repeat(2, 1fr)" gap={4}>
+            {/* Details */}
+            <Box p={4} bg="gray.50" borderRadius="lg">
+              <Text fontWeight="600" fontSize="sm" mb={3}>Details</Text>
+              <Grid templateColumns="repeat(2, 1fr)" gap={3} fontSize="sm">
                 <HStack>
-                  <Icon as={MdCalendarToday} color="gray.500" boxSize={5} />
+                  <Icon as={MdCalendarToday} color="gray.400" boxSize={4} />
                   <Box>
-                    <Text fontSize="sm" color="gray.500">Date</Text>
+                    <Text color="gray.500" fontSize="xs">Date</Text>
                     <Text fontWeight="500">{formatDate(offer.date)}</Text>
                   </Box>
                 </HStack>
-
                 <HStack>
-                  <Icon as={MdAccessTime} color="gray.500" boxSize={5} />
+                  <Icon as={MdAccessTime} color="gray.400" boxSize={4} />
                   <Box>
-                    <Text fontSize="sm" color="gray.500">Time</Text>
-                    <Text fontWeight="500">{formatTime(offer.time) || 'Not specified'}</Text>
+                    <Text color="gray.500" fontSize="xs">Duration</Text>
+                    <Text fontWeight="500">{offer.time_required}H</Text>
                   </Box>
                 </HStack>
-
                 <HStack>
-                  <Icon as={MdAccessTime} color="gray.500" boxSize={5} />
+                  <Icon as={offer.activity_type === 'group' ? MdGroup : MdPerson} color="gray.400" boxSize={4} />
                   <Box>
-                    <Text fontSize="sm" color="gray.500">Duration</Text>
-                    <Text fontWeight="500">{offer.time_required} hour(s)</Text>
+                    <Text color="gray.500" fontSize="xs">Type</Text>
+                    <Text fontWeight="500">{offer.activity_type === 'group' ? 'Group' : '1-to-1'}</Text>
                   </Box>
                 </HStack>
-
                 <HStack>
-                  <Icon as={offer.activity_type === 'group' ? MdGroup : MdPerson} color="gray.500" boxSize={5} />
+                  <Icon as={MdLocationOn} color="gray.400" boxSize={4} />
                   <Box>
-                    <Text fontSize="sm" color="gray.500">Activity Type</Text>
-                    <Text fontWeight="500">
-                      {offer.activity_type === 'group' ? 'Group Activity' : '1 to 1'}
-                    </Text>
-                  </Box>
-                </HStack>
-
-                {offer.activity_type === 'group' && (
-                  <HStack>
-                    <Icon as={MdGroup} color="gray.500" boxSize={5} />
-                    <Box>
-                      <Text fontSize="sm" color="gray.500">Group Size</Text>
-                      <Text fontWeight="500">{offer.person_count} people</Text>
-                    </Box>
-                  </HStack>
-                )}
-
-                <HStack gridColumn="span 2">
-                  <Icon as={MdLocationOn} color="gray.500" boxSize={5} />
-                  <Box>
-                    <Text fontSize="sm" color="gray.500">Location</Text>
-                    <Text fontWeight="500">
-                      {offer.location_type === 'remote' 
-                        ? '🌐 Remote / Online' 
-                        : locationAddress || offer.location || 'Not specified'}
+                    <Text color="gray.500" fontSize="xs">Location</Text>
+                    <Text fontWeight="500" noOfLines={1}>
+                      {offer.location_type === 'remote' ? 'Remote' : locationAddress || 'TBD'}
                     </Text>
                   </Box>
                 </HStack>
@@ -343,119 +278,89 @@ const OfferDetailPage = () => {
           </Box>
 
           {/* Sidebar */}
-          <VStack spacing={6} align="stretch">
+          <VStack spacing={4} align="stretch">
             {/* Owner Card */}
-            <Box bg="white" p={6} borderRadius="xl" boxShadow="sm">
-              <Text fontSize="sm" color="gray.500" mb={4}>
+            <Box p={4} borderRadius="lg" border="1px solid" borderColor="gray.100">
+              <Text fontSize="xs" color="gray.500" mb={3}>
                 {offer.type === 'offer' ? 'Offered by' : 'Requested by'}
               </Text>
-              <HStack spacing={4} mb={4}>
+              <Flex align="center" gap={3} mb={3}>
                 <UserAvatar
-                  size="lg"
+                  size="md"
                   user={offer.user}
                   cursor="pointer"
-                  onClick={() => {
-                    if (offer.user?.id) {
-                      navigate(`/profile/${offer.user.id}`)
-                    }
-                  }}
-                  _hover={{ opacity: 0.8 }}
+                  onClick={() => offer.user?.id && navigate(`/profile/${offer.user.id}`)}
                 />
-                <Box>
+                <Box flex={1}>
                   <Text 
-                    fontWeight="600" 
-                    fontSize="lg"
+                    fontWeight="600"
+                    fontSize="sm"
                     cursor="pointer"
-                    onClick={() => {
-                      if (offer.user?.id) {
-                        navigate(`/profile/${offer.user.id}`)
-                      }
-                    }}
+                    onClick={() => offer.user?.id && navigate(`/profile/${offer.user.id}`)}
                     _hover={{ textDecoration: 'underline' }}
                   >
                     {offer.user?.first_name} {offer.user?.last_name}
                   </Text>
                   <HStack spacing={1}>
-                    <Icon as={MdStar} color="yellow.400" />
-                    <Text fontSize="sm" color="gray.600">
+                    <Icon as={MdStar} color="yellow.400" boxSize={3} />
+                    <Text fontSize="xs" color="gray.500">
                       {offer.user?.profile?.rating?.toFixed(1) || '0.0'}
                     </Text>
                   </HStack>
                 </Box>
-              </HStack>
+              </Flex>
               
-              <Divider my={4} />
+              <Divider my={3} />
 
               {isOwner ? (
                 <>
                   <Button
                     w="100%"
+                    size="sm"
                     colorScheme="purple"
-                    size="lg"
-                    leftIcon={<Icon as={MdEdit} />}
+                    variant="outline"
+                    leftIcon={<Icon as={MdEdit} boxSize={4} />}
                     onClick={() => navigate(`/create-offer?edit=${offer.id}`)}
-                    mb={4}
+                    mb={3}
                   >
-                    Edit {offer.type === 'offer' ? 'Offer' : 'Want'}
+                    Edit
                   </Button>
                   
                   {exchanges.length > 0 && (
                     <Box>
-                      <Text fontSize="sm" color="gray.500" mb={3} fontWeight="600">
-                        Handshake Requests ({exchanges.length})
+                      <Text fontSize="xs" color="gray.500" mb={2} fontWeight="500">
+                        Requests ({exchanges.length})
                       </Text>
-                      <VStack spacing={2} align="stretch" maxH="300px" overflowY="auto">
+                      <VStack spacing={2} align="stretch" maxH="250px" overflowY="auto">
                         {exchanges.map((exchange) => (
                           <Box
                             key={exchange.id}
-                            p={3}
+                            p={2}
                             bg="gray.50"
-                            borderRadius="lg"
-                            border="1px solid"
-                            borderColor="gray.200"
+                            borderRadius="md"
                             cursor="pointer"
-                            _hover={{ bg: 'gray.100', borderColor: 'yellow.400' }}
+                            _hover={{ bg: 'gray.100' }}
                             onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
                           >
-                            <HStack spacing={3} justify="space-between">
-                              <HStack spacing={3}>
-                                <UserAvatar
-                                  size="sm"
-                                  user={exchange.requester}
-                                />
-                                <Box>
-                                  <Text fontSize="sm" fontWeight="600">
-                                    {exchange.requester.first_name} {exchange.requester.last_name}
-                                  </Text>
-                                  <Text fontSize="xs" color="gray.500">
-                                    {new Date(exchange.created_at).toLocaleDateString()}
-                                  </Text>
-                                </Box>
+                            <Flex justify="space-between" align="center">
+                              <HStack spacing={2}>
+                                <UserAvatar size="xs" user={exchange.requester} />
+                                <Text fontSize="xs" fontWeight="500">
+                                  {exchange.requester.first_name}
+                                </Text>
                               </HStack>
                               <Badge
+                                size="sm"
                                 colorScheme={
                                   exchange.status === 'ACCEPTED' ? 'green' :
                                   exchange.status === 'PENDING' ? 'yellow' :
-                                  exchange.status === 'COMPLETED' ? 'blue' :
-                                  'gray'
+                                  exchange.status === 'COMPLETED' ? 'blue' : 'gray'
                                 }
-                                variant="subtle"
+                                fontSize="10px"
                               >
                                 {exchange.status}
                               </Badge>
-                            </HStack>
-                            {exchange.proposed_date && (
-                              <HStack spacing={1} mt={2} fontSize="xs" color="gray.600">
-                                <Icon as={MdCalendarToday} />
-                                <Text>{new Date(exchange.proposed_date).toLocaleDateString()}</Text>
-                                {exchange.proposed_time && (
-                                  <>
-                                    <Text>•</Text>
-                                    <Text>{exchange.proposed_time}</Text>
-                                  </>
-                                )}
-                              </HStack>
-                            )}
+                            </Flex>
                           </Box>
                         ))}
                       </VStack>
@@ -463,58 +368,42 @@ const OfferDetailPage = () => {
                   )}
                 </>
               ) : myExchange ? (
-                // User already has a handshake for this offer
                 <Box>
                   <Box
-                    p={4}
+                    p={3}
                     bg={
                       myExchange.status === 'COMPLETED' ? 'green.50' :
                       myExchange.status === 'ACCEPTED' ? 'blue.50' :
-                      myExchange.status === 'PENDING' ? 'yellow.50' :
-                      'gray.50'
+                      'yellow.50'
                     }
-                    borderRadius="lg"
-                    border="1px solid"
-                    borderColor={
-                      myExchange.status === 'COMPLETED' ? 'green.200' :
-                      myExchange.status === 'ACCEPTED' ? 'blue.200' :
-                      myExchange.status === 'PENDING' ? 'yellow.200' :
-                      'gray.200'
-                    }
-                    mb={3}
+                    borderRadius="md"
+                    mb={2}
                   >
-                    <HStack justify="space-between" mb={2}>
-                      <Text fontWeight="600">Your Handshake</Text>
+                    <Flex justify="space-between" align="center" mb={1}>
+                      <Text fontSize="xs" fontWeight="600">Your Request</Text>
                       <Badge
+                        size="sm"
                         colorScheme={
                           myExchange.status === 'COMPLETED' ? 'green' :
-                          myExchange.status === 'ACCEPTED' ? 'blue' :
-                          myExchange.status === 'PENDING' ? 'yellow' :
-                          'gray'
+                          myExchange.status === 'ACCEPTED' ? 'blue' : 'yellow'
                         }
+                        fontSize="10px"
                       >
                         {myExchange.status}
                       </Badge>
-                    </HStack>
+                    </Flex>
                     {myExchange.proposed_date && (
-                      <HStack fontSize="sm" color="gray.600">
-                        <Icon as={MdCalendarToday} />
-                        <Text>{new Date(myExchange.proposed_date).toLocaleDateString()}</Text>
-                        {myExchange.proposed_time && (
-                          <>
-                            <Text>•</Text>
-                            <Text>{myExchange.proposed_time}</Text>
-                          </>
-                        )}
-                      </HStack>
+                      <Text fontSize="xs" color="gray.600">
+                        {new Date(myExchange.proposed_date).toLocaleDateString()}
+                      </Text>
                     )}
                   </Box>
                   <Button
                     w="100%"
+                    size="sm"
                     bg="yellow.400"
                     color="black"
-                    size="lg"
-                    leftIcon={<Icon as={MdHandshake} />}
+                    leftIcon={<Icon as={MdHandshake} boxSize={4} />}
                     _hover={{ bg: 'yellow.500' }}
                     onClick={() => navigate(`/handshake/exchange/${myExchange.id}`)}
                   >
@@ -524,46 +413,37 @@ const OfferDetailPage = () => {
               ) : (
                 <Button
                   w="100%"
+                  size="sm"
                   bg="yellow.400"
                   color="black"
-                  size="lg"
-                  leftIcon={<Icon as={MdHandshake} />}
+                  leftIcon={<Icon as={MdHandshake} boxSize={4} />}
                   _hover={{ bg: 'yellow.500' }}
                   onClick={() => navigate(`/handshake/offer/${offer.id}`)}
                 >
-                  {offer.type === 'offer' ? 'Request This Offer' : 'Offer Help'}
+                  {offer.type === 'offer' ? 'Request' : 'Offer Help'}
                 </Button>
               )}
             </Box>
 
             {/* Quick Info */}
-            <Box bg="white" p={6} borderRadius="xl" boxShadow="sm">
-              <Heading size="sm" mb={4}>Quick Info</Heading>
-              <VStack spacing={3} align="stretch">
-                <HStack justify="space-between">
-                  <Text color="gray.600" fontSize="sm">Posted</Text>
-                  <Text fontSize="sm" fontWeight="500">
-                    {new Date(offer.created_at).toLocaleDateString()}
-                  </Text>
-                </HStack>
-                <HStack justify="space-between">
-                  <Text color="gray.600" fontSize="sm">Last Updated</Text>
-                  <Text fontSize="sm" fontWeight="500">
-                    {new Date(offer.updated_at).toLocaleDateString()}
-                  </Text>
-                </HStack>
-                <HStack justify="space-between">
-                  <Text color="gray.600" fontSize="sm">Duration</Text>
-                  <Text fontSize="sm" fontWeight="500">{offer.time_required} hr</Text>
-                </HStack>
+            <Box p={4} borderRadius="lg" border="1px solid" borderColor="gray.100">
+              <Text fontWeight="600" fontSize="xs" mb={3}>Quick Info</Text>
+              <VStack spacing={2} align="stretch" fontSize="xs">
+                <Flex justify="space-between">
+                  <Text color="gray.500">Posted</Text>
+                  <Text fontWeight="500">{new Date(offer.created_at).toLocaleDateString()}</Text>
+                </Flex>
+                <Flex justify="space-between">
+                  <Text color="gray.500">Duration</Text>
+                  <Text fontWeight="500">{offer.time_required}H</Text>
+                </Flex>
               </VStack>
             </Box>
           </VStack>
         </Grid>
-      </Container>
+      </Box>
     </Box>
   )
 }
 
 export default OfferDetailPage
-

@@ -1,7 +1,5 @@
 import {
   Box,
-  Button,
-  Container,
   Flex,
   HStack,
   Icon,
@@ -17,13 +15,11 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { profileService } from "@/services/profile.service";
 import UserAvatar from "@/components/UserAvatar";
 import {
-
   MdChevronRight,
   MdDashboard,
   MdExitToApp,
   MdOutlineTimer,
   MdPersonOutline,
-  MdStarOutline,
   MdTimeline,
 } from "react-icons/md";
 import { TimeBank, UserProfile } from "@/types";
@@ -72,12 +68,11 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
     <Box
       as="nav"
       bg="white"
-      borderBottom="1px solid"
-      borderColor="gray.100"
       position="sticky"
       top={0}
       zIndex={100}
       h="56px"
+      boxShadow="0 1px 3px rgba(0,0,0,0.05)"
     >
       <Flex
         h="100%"
@@ -135,14 +130,14 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
             {/* User Menu */}
             <Menu>
               <MenuButton
-                as={Button}
-                variant="ghost"
-                size="sm"
                 px={2}
-                rightIcon={<Icon as={MdChevronRight} boxSize={4} />}
+                py={1}
+                borderRadius="md"
+                transition="background 0.15s"
+                _hover={{ bg: 'gray.50' }}
               >
                 <HStack spacing={2}>
-                  <Text fontSize="sm" fontWeight="500">
+                  <Text fontSize="sm" fontWeight="500" color="gray.700">
                     {user.first_name}
                   </Text>
                   <Box position="relative">
@@ -161,28 +156,29 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
                       border="1.5px solid white"
                     />
                   </Box>
+                  <Icon as={MdChevronRight} boxSize={4} color="gray.400" />
                 </HStack>
               </MenuButton>
-              <MenuList fontSize="sm">
-                <MenuItem onClick={() => navigate("/dashboard")}>
+              <MenuList fontSize="sm" py={1} boxShadow="lg" borderColor="gray.100">
+                <MenuItem onClick={() => navigate("/dashboard")} _hover={{ bg: 'gray.50' }}>
                   <HStack spacing={2}>
-                    <Icon as={MdDashboard} boxSize={4} />
+                    <Icon as={MdDashboard} boxSize={4} color="gray.500" />
                     <Text>Dashboard</Text>
                   </HStack>
                 </MenuItem>
-                <MenuItem onClick={() => navigate("/profile")}>
+                <MenuItem onClick={() => navigate("/profile")} _hover={{ bg: 'gray.50' }}>
                   <HStack spacing={2}>
-                    <Icon as={MdPersonOutline} boxSize={4} />
+                    <Icon as={MdPersonOutline} boxSize={4} color="gray.500" />
                     <Text>My Profile</Text>
                   </HStack>
                 </MenuItem>
-                <MenuItem onClick={() => navigate("/transactions")}>
+                <MenuItem onClick={() => navigate("/transactions")} _hover={{ bg: 'gray.50' }}>
                   <HStack spacing={2}>
-                    <Icon as={MdTimeline} boxSize={4} />
+                    <Icon as={MdTimeline} boxSize={4} color="gray.500" />
                     <Text>Transactions</Text>
                   </HStack>
                 </MenuItem>
-                <MenuItem onClick={handleLogout} color="red.500">
+                <MenuItem onClick={handleLogout} color="red.500" _hover={{ bg: 'red.50' }}>
                   <HStack spacing={2}>
                     <Icon as={MdExitToApp} boxSize={4} />
                     <Text>Logout</Text>

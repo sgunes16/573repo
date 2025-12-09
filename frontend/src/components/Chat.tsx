@@ -148,7 +148,14 @@ const Chat: React.FC<ChatProps> = ({ exchangeId }) => {
                   >
                     <UserAvatar
                       size="sm"
-                      user={message.user}
+                      user={{
+                        first_name: message.user.first_name,
+                        last_name: message.user.last_name,
+                        email: message.user.email,
+                        profile: {
+                          avatar: message.user.profile?.avatar ?? undefined,
+                        }
+                      }}
                       bg={own ? 'yellow.500' : 'teal.500'}
                     />
                     <Box

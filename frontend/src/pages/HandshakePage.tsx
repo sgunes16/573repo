@@ -2,13 +2,10 @@ import {
   Badge,
   Box,
   Button,
-  Container,
-  Divider,
   Flex,
   FormControl,
   FormLabel,
   Grid,
-  GridItem,
   HStack,
   Icon,
   Input,
@@ -21,9 +18,7 @@ import {
   ModalOverlay,
   Radio,
   RadioGroup,
-  Skeleton,
-  SkeletonCircle,
-  SkeletonText,
+  Spinner,
   Stack,
   Text,
   Textarea,
@@ -31,7 +26,7 @@ import {
   useToast,
   VStack,
 } from '@chakra-ui/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import Chat from '@/components/Chat'
@@ -42,18 +37,12 @@ import { getUserBadge } from '@/services/mock/mockData'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { getAccessToken } from '@/utils/cookies'
-import type { Exchange, ExchangeStatus, User, ExchangeRating } from '@/types'
+import type { Exchange, User } from '@/types'
 import { 
   MdAccessTime, 
   MdCalendarToday, 
-  MdChat, 
-  MdHandshake, 
   MdLocationPin, 
-  MdPeople, 
-  MdSchedule,
-  MdCheckCircle,
-  MdCancel,
-  MdStar,
+  MdPeople,
 } from 'react-icons/md'
 
 const HandshakePage = () => {
@@ -65,14 +54,14 @@ const HandshakePage = () => {
 
   const [exchange, setExchange] = useState<Exchange | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isCreating, setIsCreating] = useState(false)
+  const isCreatingRef = useRef(false)
   const [locationAddress, setLocationAddress] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Modals
   const { isOpen: isProposeOpen, onOpen: onProposeOpen, onClose: onProposeClose } = useDisclosure()
   const { isOpen: isRatingOpen, onOpen: onRatingOpen, onClose: onRatingClose } = useDisclosure()
 
-  // Form states
   const [proposedDate, setProposedDate] = useState('')
   const [proposedTime, setProposedTime] = useState('')
   const [rating, setRating] = useState({
@@ -82,13 +71,14 @@ const HandshakePage = () => {
     comment: '',
   })
 
-  // WebSocket for exchange state updates
-  const { isConnected: isExchangeConnected } = useWebSocket({
+  useWebSocket({
     url: exchange ? `/ws/exchange/${exchange.id}/` : '',
     token: getAccessToken() || undefined,
     onMessage: (message) => {
       if (message.type === 'exchange_update' && message.data) {
-        // Update exchange state from websocket
+        const prevStatus = exchange?.status
+        const newStatus = message.data.status
+        
         setExchange((prev) => {
           if (!prev) return prev
           return {
@@ -102,14 +92,16 @@ const HandshakePage = () => {
           }
         })
         
-        toast({
-          title: 'Exchange updated',
-          description: 'The exchange status has been updated.',
-          status: 'info',
-          duration: 3000,
-        })
+        // Sadece önemli değişikliklerde toast göster (status değiştiyse)
+        if (prevStatus !== newStatus) {
+          if (newStatus === 'COMPLETED') {
+            toast({ title: 'Exchange completed!', status: 'success', duration: 2000 })
+            onRatingOpen()
+          } else if (newStatus === 'ACCEPTED' && prevStatus === 'PENDING') {
+            toast({ title: 'Exchange accepted!', status: 'success', duration: 2000 })
+          }
+        }
       } else if (message.type === 'exchange_state' && message.data) {
-        // Initial state
         setExchange((prev) => {
           if (!prev) return prev
           return {
@@ -124,40 +116,75 @@ const HandshakePage = () => {
         })
       }
     },
-    onOpen: () => {
-      console.log('Exchange WebSocket connected')
-    },
-    onClose: () => {
-      console.log('Exchange WebSocket disconnected')
-    },
     reconnect: !!exchange,
   })
 
+  // Automatically create exchange when offerId is provided and no exchange exists
   useEffect(() => {
-    const fetchExchange = async () => {
+    const fetchOrCreateExchange = async () => {
+      // Prevent duplicate requests (React StrictMode or re-renders)
+      if (isCreatingRef.current) return
+      
       setIsLoading(true)
       try {
         let exchangeData: Exchange | null = null
 
-        // If exchangeId is provided, fetch by exchange ID
         if (exchangeId) {
           exchangeData = await exchangeService.getExchange(exchangeId)
-        } 
-        // Otherwise, try to get exchange by offerId (for requester)
-        else if (offerId) {
-          exchangeData = await exchangeService.getExchangeByOfferId(offerId)
+        } else if (offerId) {
+          // First try to get existing exchange
+          try {
+            exchangeData = await exchangeService.getExchangeByOfferId(offerId)
+          } catch {
+            // No existing exchange, create one automatically
+            if (isCreatingRef.current) return // Double check
+            isCreatingRef.current = true
+            setIsCreating(true)
+            try {
+              const response = await exchangeService.createExchange({ offer_id: offerId })
+              toast({ title: 'Handshake started!', status: 'success', duration: 2000 })
+              // Fetch the created exchange
+              exchangeData = await exchangeService.getExchange(response.exchange_id.toString())
+            } catch (createError: any) {
+              // If exchange already exists, try to fetch it
+              if (createError.response?.status === 400 && createError.response?.data?.error?.includes('already')) {
+                try {
+                  exchangeData = await exchangeService.getExchangeByOfferId(offerId)
+                } catch {
+                  // Really failed
+                  toast({ 
+                    title: 'Error', 
+                    description: createError.response?.data?.error || 'Failed to start handshake', 
+                    status: 'error', 
+                    duration: 3000 
+                  })
+                  navigate('/dashboard')
+                  return
+                }
+              } else {
+                toast({ 
+                  title: 'Error', 
+                  description: createError.response?.data?.error || 'Failed to start handshake', 
+                  status: 'error', 
+                  duration: 3000 
+                })
+                navigate('/dashboard')
+                return
+              }
+            } finally {
+              setIsCreating(false)
+            }
+          }
         }
 
         if (exchangeData) {
           setExchange(exchangeData)
           
-          // Fetch location address
-          // geo_location is [latitude, longitude], reverseGeocode expects (longitude, latitude)
           if (exchangeData.offer.geo_location && exchangeData.offer.geo_location.length === 2) {
             try {
               const address = await mapboxService.reverseGeocode(
-                exchangeData.offer.geo_location[1],  // longitude
-                exchangeData.offer.geo_location[0]   // latitude
+                exchangeData.offer.geo_location[1],
+                exchangeData.offer.geo_location[0]
               )
               setLocationAddress(address)
             } catch (error) {
@@ -167,7 +194,6 @@ const HandshakePage = () => {
             setLocationAddress(exchangeData.offer.location)
           }
         }
-        // If no exchange found, it will show the "Request Exchange" button
       } catch (error) {
         console.error('Failed to fetch exchange:', error)
       } finally {
@@ -175,79 +201,40 @@ const HandshakePage = () => {
       }
     }
 
-    fetchExchange()
-  }, [exchangeId, offerId])
+    fetchOrCreateExchange()
+  }, [exchangeId, offerId, navigate, toast])
 
   const isRequester = exchange?.requester.id === currentUser?.id
   const isProvider = exchange?.provider.id === currentUser?.id
   const otherUser = isRequester ? exchange?.provider : exchange?.requester
 
-  const getStatusSteps = () => {
+  const getProgressSteps = () => {
     if (!exchange) return []
     
-    const steps = [
-      { label: 'Request Sent', state: 'done' },
-      { label: 'Chat', state: exchange.status !== 'PENDING' ? 'done' : 'active' },
-      { label: 'Date Proposed', state: exchange.proposed_date ? 'done' : 'upcoming' },
-      { label: 'Accepted', state: exchange.status === 'ACCEPTED' || exchange.status === 'COMPLETED' ? 'done' : 'upcoming' },
-      { label: 'Completed', state: exchange.status === 'COMPLETED' ? 'done' : 'upcoming' },
-    ]
-    return steps
-  }
-
-  const handleCreateExchange = async () => {
-    if (!offerId) return
+    // Check if waiting for confirmation
+    const myConfirmed = isRequester ? exchange.requester_confirmed : exchange.provider_confirmed
+    const otherConfirmed = isRequester ? exchange.provider_confirmed : exchange.requester_confirmed
+    const isWaitingForOther = myConfirmed && !otherConfirmed && exchange.status === 'ACCEPTED'
     
-    setIsSubmitting(true)
-    try {
-      const response = await exchangeService.createExchange({ offer_id: offerId })
-      toast({
-        title: 'Request sent!',
-        description: '1H has been frozen. You can now chat and propose a date.',
-        status: 'success',
-        duration: 3000,
-      })
-      
-      // Navigate to exchange page
-      navigate(`/handshake/exchange/${response.exchange_id}`)
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to create exchange',
-        status: 'error',
-        duration: 3000,
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
+    return [
+      { done: true, waiting: false }, // Request Sent
+      { done: !!exchange.proposed_date, waiting: false }, // Date Proposed
+      { done: exchange.status === 'ACCEPTED' || exchange.status === 'COMPLETED', waiting: false }, // Accepted
+      { done: exchange.status === 'COMPLETED', waiting: isWaitingForOther }, // Completed - waiting for other's confirmation
+    ]
   }
 
   const handleProposeDateTime = async () => {
     if (!exchange || !proposedDate) return
-
     setIsSubmitting(true)
     try {
-      await exchangeService.proposeDateTime(exchange.id.toString(), {
-        date: proposedDate,
-        time: proposedTime || undefined,
-      })
-      
+      await exchangeService.proposeDateTime(exchange.id.toString(), { date: proposedDate, time: proposedTime || undefined })
       const updatedExchange = await exchangeService.getExchange(exchange.id.toString())
       setExchange(updatedExchange)
       onProposeClose()
-      toast({
-        title: 'Date proposed!',
-        description: 'Waiting for provider to accept.',
-        status: 'success',
-        duration: 3000,
-      })
+      toast({ title: 'Date proposed!', status: 'success', duration: 2000 })
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to propose date',
-        status: 'error',
-        duration: 3000,
-      })
+      toast({ title: 'Error', description: error.response?.data?.error, status: 'error', duration: 3000 })
     } finally {
       setIsSubmitting(false)
     }
@@ -255,25 +242,25 @@ const HandshakePage = () => {
 
   const handleAccept = async () => {
     if (!exchange) return
-
+    // Zaten accepted ise işlem yapma
+    if (exchange.status === 'ACCEPTED') {
+      toast({ title: 'Already accepted', status: 'info', duration: 2000 })
+      return
+    }
     setIsSubmitting(true)
     try {
       await exchangeService.acceptExchange(exchange.id.toString())
       const updatedExchange = await exchangeService.getExchange(exchange.id.toString())
       setExchange(updatedExchange)
-      toast({
-        title: 'Exchange accepted!',
-        description: 'You can now coordinate the details.',
-        status: 'success',
-        duration: 3000,
-      })
+      toast({ title: 'Accepted!', status: 'success', duration: 2000 })
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to accept exchange',
-        status: 'error',
-        duration: 3000,
-      })
+      // Zaten accepted hatası ise sadece exchange'i yenile
+      if (error.response?.data?.error?.includes('already') || error.response?.data?.error?.includes('Already')) {
+        const updatedExchange = await exchangeService.getExchange(exchange.id.toString())
+        setExchange(updatedExchange)
+      } else {
+        toast({ title: 'Error', description: error.response?.data?.error, status: 'error', duration: 3000 })
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -281,24 +268,13 @@ const HandshakePage = () => {
 
   const handleReject = async () => {
     if (!exchange) return
-
     setIsSubmitting(true)
     try {
       await exchangeService.rejectExchange(exchange.id.toString())
-      toast({
-        title: 'Exchange rejected',
-        description: 'Time has been unfrozen.',
-        status: 'info',
-        duration: 3000,
-      })
+      toast({ title: 'Rejected', status: 'info', duration: 2000 })
       navigate('/dashboard')
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to reject exchange',
-        status: 'error',
-        duration: 3000,
-      })
+      toast({ title: 'Error', description: error.response?.data?.error, status: 'error', duration: 3000 })
     } finally {
       setIsSubmitting(false)
     }
@@ -306,7 +282,6 @@ const HandshakePage = () => {
 
   const handleConfirmCompletion = async () => {
     if (!exchange) return
-
     setIsSubmitting(true)
     try {
       await exchangeService.confirmCompletion(exchange.id.toString())
@@ -314,28 +289,13 @@ const HandshakePage = () => {
       setExchange(updatedExchange)
       
       if (updatedExchange.status === 'COMPLETED') {
-        toast({
-          title: 'Exchange completed!',
-          description: 'Please rate your experience.',
-          status: 'success',
-          duration: 3000,
-        })
+        toast({ title: 'Completed!', status: 'success', duration: 2000 })
         onRatingOpen()
       } else {
-        toast({
-          title: 'Confirmation sent!',
-          description: 'Waiting for the other party to confirm.',
-          status: 'success',
-          duration: 3000,
-        })
+        toast({ title: 'Waiting for other party', status: 'info', duration: 2000 })
       }
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to confirm completion',
-        status: 'error',
-        duration: 3000,
-      })
+      toast({ title: 'Error', description: error.response?.data?.error, status: 'error', duration: 3000 })
     } finally {
       setIsSubmitting(false)
     }
@@ -343,54 +303,23 @@ const HandshakePage = () => {
 
   const handleSubmitRating = async () => {
     if (!exchange) return
-
     setIsSubmitting(true)
     try {
       await exchangeService.submitRating(exchange.id.toString(), rating)
       const updatedExchange = await exchangeService.getExchange(exchange.id.toString())
       setExchange(updatedExchange)
       onRatingClose()
-      toast({
-        title: 'Rating submitted!',
-        description: 'Thank you for your feedback.',
-        status: 'success',
-        duration: 3000,
-      })
+      toast({ title: 'Rating submitted!', status: 'success', duration: 2000 })
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to submit rating',
-        status: 'error',
-        duration: 3000,
-      })
+      toast({ title: 'Error', description: error.response?.data?.error, status: 'error', duration: 3000 })
     } finally {
       setIsSubmitting(false)
     }
   }
 
-
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'TBD'
-    return new Date(dateStr).toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    })
-  }
-
-  const formatTime = (timeStr?: string) => {
-    if (!timeStr) return 'TBD'
-    return timeStr
-  }
-
-  const getActivityTypeLabel = (type?: string) => {
-    return type === 'group' ? 'Group' : '1 to 1'
-  }
-
-  const getLocationTypeLabel = () => {
-    if (offer?.location_type === 'remote' || offer?.location_type === 'otherLocation') return 'Remote / Online'
-    return locationAddress || offer?.location || 'TBD'
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
   const hasRated = () => {
@@ -398,47 +327,30 @@ const HandshakePage = () => {
     return exchange.ratings.some(r => r.rater_id === currentUser?.id)
   }
 
-  if (isLoading) {
+  if (isLoading || isCreating) {
     return (
-      <Box bg="gray.50" minH="100vh">
+      <Box bg="white" minH="100vh">
         <Navbar showUserInfo={true} />
-        <Container maxW="1440px" px={{ base: 4, lg: 8 }} py={10}>
-          <Grid templateColumns={{ base: '1fr', xl: '480px 1fr' }} gap={6}>
-            <GridItem>
-              <Stack spacing={6}>
-                <Box bg="#E2E8F0" p={6} borderRadius="xl">
-                  <Skeleton height="24px" width="150px" mb={4} />
-                  <SkeletonText noOfLines={4} spacing={4} />
-                </Box>
-              </Stack>
-            </GridItem>
-            <GridItem>
-              <Box bg="#E2E8F0" p={6} borderRadius="xl">
-                <Skeleton height="400px" />
-              </Box>
-            </GridItem>
-          </Grid>
-        </Container>
+        <Flex direction="column" align="center" justify="center" h="calc(100vh - 56px)" gap={4}>
+          <Spinner size="lg" color="yellow.400" />
+          <Text fontSize="sm" color="gray.500">
+            {isCreating ? 'Starting handshake...' : 'Loading...'}
+          </Text>
+        </Flex>
       </Box>
     )
   }
 
   if (!exchange) {
     return (
-      <Box bg="gray.50" minH="100vh">
+      <Box bg="white" minH="100vh">
         <Navbar showUserInfo={true} />
-        <Container maxW="container.md" py={20} textAlign="center">
-          <Text fontSize="xl" fontWeight="semibold" mb={4}>No exchange found</Text>
-          <Text color="gray.600" mb={6}>Create an exchange request to start the handshake process.</Text>
-          <Button
-            colorScheme="yellow"
-            size="lg"
-            onClick={handleCreateExchange}
-            isLoading={isSubmitting}
-          >
-            Request Exchange
+        <Box maxW="500px" mx="auto" px={4} py={20} textAlign="center">
+          <Text fontWeight="600" mb={4}>Something went wrong</Text>
+          <Button colorScheme="yellow" size="sm" onClick={() => navigate('/dashboard')}>
+            Back to Dashboard
           </Button>
-        </Container>
+        </Box>
       </Box>
     )
   }
@@ -447,344 +359,265 @@ const HandshakePage = () => {
   const provider = exchange.provider
   const requester = exchange.requester
   const providerBadge = getUserBadge((provider.profile as any)?.time_credits || 0)
-  const providerRating = (provider.profile as any)?.rating || 0
+  const steps = getProgressSteps()
+  const stepLabels = ['Requested', 'Date Set', 'Accepted', 'Done']
 
   return (
-    <Box bg="gray.50" minH="100vh">
+    <Box bg="white" minH="100vh">
       <Navbar showUserInfo={true} />
-      <Container maxW="1440px" px={{ base: 4, lg: 8 }} py={10}>
-        <Grid templateColumns={{ base: '1fr', xl: '480px 1fr' }} gap={6} alignItems="flex-start">
-          <GridItem>
-            <Stack spacing={6}>
-              {/* Offer Overview */}
-              <Box bg="#E2E8F0" p={6} borderRadius="xl" boxShadow="sm">
-                <Text fontSize="lg" fontWeight="700" mb={4}>
-                  {offer.type === 'offer' ? 'Offer' : 'Want'} Overview
-                </Text>
-                <Stack spacing={4}>
-                  <Flex align="center" justify="space-between" gap={4} flexWrap="wrap">
-                    <Box>
-                      <Text fontSize="xl" fontWeight="700">{offer.title}</Text>
-                      <Badge 
-                        colorScheme={offer.type === 'offer' ? 'green' : 'blue'} 
-                        mt={1}
-                      >
-                        {offer.type === 'offer' ? '🤝 Offer' : '🙋 Want'}
-                      </Badge>
-                    </Box>
-                    <HStack spacing={2} flexWrap="wrap">
-                      <Badge bg="yellow.50" color="yellow.700" px={2} py={1} borderRadius="md">
-                        ⭐ {providerRating.toFixed(1)}
-                      </Badge>
-                      <Badge colorScheme={providerBadge.color as any} variant="subtle" textTransform="uppercase">
-                        {providerBadge.label}
-                      </Badge>
-                      <UserAvatar size="sm" user={provider} />
-                    </HStack>
-                  </Flex>
-
-                  {/* Description */}
-                  {offer.description && (
-                    <Box bg="white" p={3} borderRadius="lg">
-                      <Text fontSize="sm" color="gray.700" noOfLines={3}>
-                        {offer.description}
-                      </Text>
-                    </Box>
-                  )}
-
-                  {/* Tags */}
-                  {offer.tags && offer.tags.length > 0 && (
-                    <HStack spacing={2} flexWrap="wrap">
-                      {offer.tags.map((tag) => (
-                        <Badge key={tag} colorScheme="gray" variant="subtle">
-                          #{tag}
-                        </Badge>
-                      ))}
-                    </HStack>
-                  )}
-
-                  <Divider />
-
-                  <VStack align="stretch" spacing={3} fontSize="sm">
-                    {offer.date && (
-                      <HStack justify="space-between">
-                        <Text fontWeight="600">Date</Text>
-                        <HStack>
-                          <Icon as={MdCalendarToday} />
-                          <Text>{formatDate(offer.date)}</Text>
-                        </HStack>
-                      </HStack>
-                    )}
-                    {offer.time && (
-                      <HStack justify="space-between">
-                        <Text fontWeight="600">Time</Text>
-                        <HStack>
-                          <Icon as={MdSchedule} />
-                          <Text>{formatTime(offer.time)}</Text>
-                        </HStack>
-                      </HStack>
-                    )}
-                    {exchange.proposed_date && (
-                      <>
-                        <HStack justify="space-between">
-                          <Text fontWeight="600">Proposed Date</Text>
-                          <HStack>
-                            <Icon as={MdCalendarToday} />
-                            <Text>{formatDate(exchange.proposed_date)}</Text>
-                          </HStack>
-                        </HStack>
-                        {exchange.proposed_time && (
-                          <HStack justify="space-between">
-                            <Text fontWeight="600">Proposed Time</Text>
-                            <HStack>
-                              <Icon as={MdSchedule} />
-                              <Text>{formatTime(exchange.proposed_time)}</Text>
-                            </HStack>
-                          </HStack>
-                        )}
-                      </>
-                    )}
-                    <HStack justify="space-between">
-                      <Text fontWeight="600">Location</Text>
-                      <HStack>
-                        <Icon as={MdLocationPin} />
-                        <Text noOfLines={1} maxW="200px">{getLocationTypeLabel()}</Text>
-                      </HStack>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text fontWeight="600">Details</Text>
-                      <HStack spacing={3} color="gray.700">
-                        <HStack spacing={1}>
-                          <Icon as={MdAccessTime} />
-                          <Text>{offer.time_required} hr</Text>
-                        </HStack>
-                        {offer.activity_type && (
-                          <HStack spacing={1}>
-                            <Icon as={MdPeople} />
-                            <Text>{getActivityTypeLabel(offer.activity_type)}</Text>
-                          </HStack>
-                        )}
-                        {offer.activity_type === 'group' && offer.person_count && (
-                          <Text>({offer.person_count} ppl)</Text>
-                        )}
-                      </HStack>
-                    </HStack>
-                  </VStack>
-                </Stack>
-              </Box>
-
-              {/* Participants */}
-              <Box bg="#E2E8F0" p={6} borderRadius="xl" boxShadow="sm">
-                <Text fontSize="lg" fontWeight="700" mb={4}>Participants</Text>
-                <VStack align="stretch" spacing={4}>
-                  <Flex align="center" justify="space-between">
-                    <HStack spacing={4}>
-                      <UserAvatar user={provider} />
-                      <Box>
-                        <Text fontWeight="600">{provider.first_name} {provider.last_name}</Text>
-                        <Text fontSize="sm" color="gray.600">Provider</Text>
-                      </Box>
-                    </HStack>
-                    <Badge colorScheme="green">Provider</Badge>
-                  </Flex>
-                  <Flex align="center" justify="space-between">
-                    <HStack spacing={4}>
-                      <UserAvatar user={requester} />
-                      <Box>
-                        <Text fontWeight="600">{requester.first_name} {requester.last_name}</Text>
-                        <Text fontSize="sm" color="gray.600">Requester</Text>
-                      </Box>
-                    </HStack>
-                    <Badge colorScheme="blue">Requester</Badge>
-                  </Flex>
-                </VStack>
-              </Box>
-
-              {/* Status Steps */}
-              <Box bg="#E2E8F0" p={6} borderRadius="xl" boxShadow="sm">
-                <Text fontSize="lg" fontWeight="700" mb={4}>Handshake Progress</Text>
-                <VStack align="stretch" spacing={3}>
-                  {getStatusSteps().map((step, idx) => (
-                    <Flex
-                      key={idx}
-                      bg={step.state === 'done' ? '#FAF089' : step.state === 'active' ? '#FEEBC8' : '#FFFFF0'}
-                      p={3}
-                      borderRadius="lg"
-                      align="center"
-                      justify="space-between"
-                    >
-                      <Text fontWeight="600" fontSize="sm">{step.label}</Text>
-                      {step.state === 'done' && <Icon as={MdCheckCircle} color="green.600" />}
-                      {step.state === 'active' && <Icon as={MdChat} color="orange.500" />}
-                      {step.state === 'upcoming' && <Icon as={MdAccessTime} color="gray.500" />}
-                    </Flex>
-                  ))}
-                </VStack>
-              </Box>
-
-              {/* Action Buttons */}
-              {exchange.status === 'PENDING' && isRequester && !exchange.proposed_date && (
-                <Button colorScheme="yellow" onClick={onProposeOpen}>
-                  Propose Date & Time
-                </Button>
-              )}
-              
-              {exchange.status === 'PENDING' && isProvider && exchange.proposed_date && (
-                <HStack spacing={3}>
-                  <Button colorScheme="green" flex={1} onClick={handleAccept} isLoading={isSubmitting}>
-                    Accept
-                  </Button>
-                  <Button colorScheme="red" flex={1} onClick={handleReject} isLoading={isSubmitting}>
-                    Reject
-                  </Button>
-                </HStack>
-              )}
-
-              {exchange.status === 'ACCEPTED' && (
-                <Button 
-                  colorScheme="yellow" 
-                  onClick={handleConfirmCompletion}
-                  isLoading={isSubmitting}
-                  isDisabled={isRequester ? exchange.requester_confirmed : exchange.provider_confirmed}
+      
+      {/* Progress Dots - Fixed at top */}
+      <Box 
+        bg="white" 
+        borderBottom="1px solid" 
+        borderColor="gray.100" 
+        py={3}
+        position="sticky"
+        top="56px"
+        zIndex={10}
+      >
+        <HStack justify="center" spacing={0} maxW="400px" mx="auto" px={4}>
+          {steps.map((step, idx) => (
+            <Flex key={idx} align="center" flex={idx < steps.length - 1 ? 1 : 'none'}>
+              <VStack spacing={1}>
+                <Box
+                  w="24px"
+                  h="24px"
+                  borderRadius="full"
+                  bg={step.done ? 'yellow.400' : step.waiting ? 'orange.300' : 'gray.200'}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  transition="all 0.2s"
                 >
-                  {isRequester ? exchange.requester_confirmed : exchange.provider_confirmed 
-                    ? 'Waiting for confirmation...' 
-                    : 'Mark as Completed'}
-                </Button>
+                  {step.done && (
+                    <Text fontSize="xs" fontWeight="bold" color="black">✓</Text>
+                  )}
+                  {step.waiting && !step.done && (
+                    <Icon as={MdAccessTime} color="white" boxSize={3} />
+                  )}
+                </Box>
+                <Text fontSize="9px" color={step.done ? 'gray.700' : step.waiting ? 'orange.500' : 'gray.400'} fontWeight={step.done || step.waiting ? '500' : '400'}>
+                  {stepLabels[idx]}
+                </Text>
+              </VStack>
+              {idx < steps.length - 1 && (
+                <Box 
+                  flex={1} 
+                  h="2px" 
+                  bg={steps[idx + 1].done ? 'yellow.400' : steps[idx + 1].waiting ? 'orange.200' : 'gray.200'} 
+                  mx={1}
+                  mb={4}
+                  transition="all 0.2s"
+                />
+              )}
+            </Flex>
+          ))}
+        </HStack>
+      </Box>
+
+      <Box maxW="1100px" mx="auto" px={4} py={4}>
+        <Grid templateColumns={{ base: '1fr', lg: '340px 1fr' }} gap={4} alignItems="flex-start">
+          {/* Left Panel */}
+          <VStack spacing={3} align="stretch">
+            {/* Offer Info */}
+            <Box p={3} borderRadius="lg" border="1px solid" borderColor="gray.100" bg="gray.50">
+              <Flex justify="space-between" align="flex-start" mb={2}>
+                <Box flex={1}>
+                  <Text fontWeight="600" fontSize="sm" mb={1}>{offer.title}</Text>
+                  <Badge colorScheme={offer.type === 'offer' ? 'green' : 'blue'} fontSize="10px">
+                    {offer.type === 'offer' ? 'Offer' : 'Want'}
+                  </Badge>
+                </Box>
+                <HStack spacing={1}>
+                  <Badge bg="yellow.100" color="yellow.700" fontSize="10px">
+                    ⭐ {((provider.profile as any)?.rating || 0).toFixed(1)}
+                  </Badge>
+                  <Badge colorScheme={providerBadge.color as any} fontSize="10px" textTransform="uppercase">
+                    {providerBadge.label}
+                  </Badge>
+                </HStack>
+              </Flex>
+
+              {offer.description && (
+                <Text fontSize="xs" color="gray.600" mb={2} noOfLines={2}>
+                  {offer.description}
+                </Text>
               )}
 
-              {exchange.status === 'COMPLETED' && !hasRated() && (
-                <Button colorScheme="yellow" onClick={onRatingOpen}>
-                  Rate Exchange
-                </Button>
-              )}
-            </Stack>
-          </GridItem>
+              <VStack align="stretch" spacing={1} fontSize="xs">
+                {/* Orijinal Offer Tarihi */}
+                {offer.date && (
+                  <Flex justify="space-between">
+                    <HStack><Icon as={MdCalendarToday} boxSize={3} /><Text>Offer Date</Text></HStack>
+                    <Text fontWeight="500" color="gray.600">{formatDate(offer.date)} {offer.time || ''}</Text>
+                  </Flex>
+                )}
+                {/* Proposed Date */}
+                <Flex justify="space-between">
+                  <HStack><Icon as={MdCalendarToday} boxSize={3} color={exchange.proposed_date ? 'green.500' : 'gray.400'} /><Text>Proposed Date</Text></HStack>
+                  {exchange.proposed_date ? (
+                    <Text fontWeight="600" color="green.600">{formatDate(exchange.proposed_date)} {exchange.proposed_time || ''}</Text>
+                  ) : (
+                    <Text fontWeight="500" color="orange.500">Not set yet</Text>
+                  )}
+                </Flex>
+                <Flex justify="space-between">
+                  <HStack><Icon as={MdLocationPin} boxSize={3} /><Text>Location</Text></HStack>
+                  <Text fontWeight="500" noOfLines={1} maxW="140px">
+                    {offer.location_type === 'remote' ? 'Remote' : locationAddress || 'TBD'}
+                  </Text>
+                </Flex>
+                <Flex justify="space-between">
+                  <HStack><Icon as={MdAccessTime} boxSize={3} /><Text>Duration</Text></HStack>
+                  <Text fontWeight="500">{offer.time_required}H</Text>
+                </Flex>
+                <Flex justify="space-between">
+                  <HStack><Icon as={MdPeople} boxSize={3} /><Text>Type</Text></HStack>
+                  <Text fontWeight="500">{offer.activity_type === 'group' ? 'Group' : '1-to-1'}</Text>
+                </Flex>
+              </VStack>
+            </Box>
 
-          <GridItem>
-            <Stack spacing={6}>
-              {/* Chat */}
-              <Box bg="#E2E8F0" p={0} borderRadius="xl" boxShadow="sm" h="600px" overflow="hidden">
-                {exchange && <Chat exchangeId={exchange.id} />}
-              </Box>
-            </Stack>
-          </GridItem>
+            {/* Participants */}
+            <Box p={3} borderRadius="lg" border="1px solid" borderColor="gray.100">
+              <Text fontWeight="500" fontSize="xs" mb={2} color="gray.500">Participants</Text>
+              <VStack spacing={2} align="stretch">
+                <Flex align="center" justify="space-between">
+                  <HStack spacing={2}>
+                    <UserAvatar size="xs" user={provider} />
+                    <Text fontSize="xs" fontWeight="500">{provider.first_name} {provider.last_name}</Text>
+                  </HStack>
+                  <Badge colorScheme="green" fontSize="9px">Provider</Badge>
+                </Flex>
+                <Flex align="center" justify="space-between">
+                  <HStack spacing={2}>
+                    <UserAvatar size="xs" user={requester} />
+                    <Text fontSize="xs" fontWeight="500">{requester.first_name} {requester.last_name}</Text>
+                  </HStack>
+                  <Badge colorScheme="blue" fontSize="9px">Requester</Badge>
+                </Flex>
+              </VStack>
+            </Box>
+
+            {/* Actions */}
+            {exchange.status === 'PENDING' && isRequester && !exchange.proposed_date && (
+              <Button colorScheme="yellow" size="sm" onClick={onProposeOpen}>Propose Date</Button>
+            )}
+            
+            {exchange.status === 'PENDING' && isProvider && exchange.proposed_date && (
+              <HStack spacing={2}>
+                <Button colorScheme="green" size="sm" flex={1} onClick={handleAccept} isLoading={isSubmitting}>Accept</Button>
+                <Button colorScheme="red" variant="outline" size="sm" flex={1} onClick={handleReject} isLoading={isSubmitting}>Reject</Button>
+              </HStack>
+            )}
+
+            {exchange.status === 'ACCEPTED' && (
+              <>
+                {/* Eğer ben onayladıysam ama karşı taraf henüz onaylamadıysa */}
+                {(isRequester ? exchange.requester_confirmed : exchange.provider_confirmed) && 
+                 !(isRequester ? exchange.provider_confirmed : exchange.requester_confirmed) && (
+                  <Box 
+                    p={3} 
+                    bg="orange.50" 
+                    borderRadius="md" 
+                    border="1px solid" 
+                    borderColor="orange.200"
+                  >
+                    <HStack spacing={2}>
+                      <Icon as={MdAccessTime} color="orange.500" boxSize={4} />
+                      <Text fontSize="xs" color="orange.700">
+                        Waiting for {otherUser?.first_name}'s confirmation
+                      </Text>
+                    </HStack>
+                  </Box>
+                )}
+                {/* Eğer ben henüz onaylamadıysam */}
+                {!(isRequester ? exchange.requester_confirmed : exchange.provider_confirmed) && (
+                  <Button 
+                    colorScheme="yellow" 
+                    size="sm"
+                    onClick={handleConfirmCompletion}
+                    isLoading={isSubmitting}
+                  >
+                    Mark Complete
+                  </Button>
+                )}
+              </>
+            )}
+
+            {exchange.status === 'COMPLETED' && !hasRated() && (
+              <Button colorScheme="yellow" size="sm" onClick={onRatingOpen}>Rate</Button>
+            )}
+          </VStack>
+
+          {/* Chat */}
+          <Box borderRadius="lg" border="1px solid" borderColor="gray.100" h={{ base: '350px', lg: '550px' }} overflow="hidden">
+            {exchange && <Chat exchangeId={exchange.id} />}
+          </Box>
         </Grid>
-      </Container>
+      </Box>
 
-      {/* Propose Date/Time Modal */}
-      <Modal isOpen={isProposeOpen} onClose={onProposeClose}>
+      {/* Propose Modal */}
+      <Modal isOpen={isProposeOpen} onClose={onProposeClose} size="sm">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Propose Date & Time</ModalHeader>
+          <ModalHeader fontSize="md">Propose Date</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Stack spacing={4}>
+            <Stack spacing={3}>
               <FormControl isRequired>
-                <FormLabel>Date</FormLabel>
-                <Input
-                  type="date"
-                  value={proposedDate}
-                  onChange={(e) => setProposedDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                />
+                <FormLabel fontSize="sm">Date</FormLabel>
+                <Input type="date" size="sm" value={proposedDate} onChange={(e) => setProposedDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
               </FormControl>
               <FormControl>
-                <FormLabel>Time (Optional)</FormLabel>
-                <Input
-                  type="time"
-                  value={proposedTime}
-                  onChange={(e) => setProposedTime(e.target.value)}
-                />
+                <FormLabel fontSize="sm">Time</FormLabel>
+                <Input type="time" size="sm" value={proposedTime} onChange={(e) => setProposedTime(e.target.value)} />
               </FormControl>
             </Stack>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onProposeClose}>
-              Cancel
-            </Button>
-            <Button colorScheme="yellow" onClick={handleProposeDateTime} isLoading={isSubmitting}>
-              Propose
-            </Button>
+            <Button variant="ghost" size="sm" mr={2} onClick={onProposeClose}>Cancel</Button>
+            <Button colorScheme="yellow" size="sm" onClick={handleProposeDateTime} isLoading={isSubmitting}>Propose</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       {/* Rating Modal */}
-      <Modal isOpen={isRatingOpen} onClose={onRatingClose} size="lg">
+      <Modal isOpen={isRatingOpen} onClose={onRatingClose} size="md">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Rate Your Experience</ModalHeader>
+          <ModalHeader fontSize="md">Rate {otherUser?.first_name}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Stack spacing={6}>
-              <Text fontSize="sm" color="gray.600">
-                Rate {otherUser?.first_name} {otherUser?.last_name}
-              </Text>
-
+            <Stack spacing={4}>
               <FormControl>
-                <FormLabel>Communication (1-5)</FormLabel>
-                <RadioGroup
-                  value={rating.communication.toString()}
-                  onChange={(val) => setRating({ ...rating, communication: parseInt(val) })}
-                >
-                  <HStack spacing={4}>
-                    {[1, 2, 3, 4, 5].map((val) => (
-                      <Radio key={val} value={val.toString()}>
-                        {val}
-                      </Radio>
-                    ))}
-                  </HStack>
+                <FormLabel fontSize="sm">Communication</FormLabel>
+                <RadioGroup value={rating.communication.toString()} onChange={(val) => setRating({ ...rating, communication: parseInt(val) })}>
+                  <HStack spacing={3}>{[1, 2, 3, 4, 5].map((val) => <Radio key={val} value={val.toString()} size="sm">{val}</Radio>)}</HStack>
                 </RadioGroup>
               </FormControl>
-
               <FormControl>
-                <FormLabel>Punctuality (1-5)</FormLabel>
-                <RadioGroup
-                  value={rating.punctuality.toString()}
-                  onChange={(val) => setRating({ ...rating, punctuality: parseInt(val) })}
-                >
-                  <HStack spacing={4}>
-                    {[1, 2, 3, 4, 5].map((val) => (
-                      <Radio key={val} value={val.toString()}>
-                        {val}
-                      </Radio>
-                    ))}
-                  </HStack>
+                <FormLabel fontSize="sm">Punctuality</FormLabel>
+                <RadioGroup value={rating.punctuality.toString()} onChange={(val) => setRating({ ...rating, punctuality: parseInt(val) })}>
+                  <HStack spacing={3}>{[1, 2, 3, 4, 5].map((val) => <Radio key={val} value={val.toString()} size="sm">{val}</Radio>)}</HStack>
                 </RadioGroup>
               </FormControl>
-
               <FormControl>
-                <FormLabel>Would Recommend?</FormLabel>
-                <RadioGroup
-                  value={rating.would_recommend ? 'yes' : 'no'}
-                  onChange={(val) => setRating({ ...rating, would_recommend: val === 'yes' })}
-                >
-                  <HStack spacing={4}>
-                    <Radio value="yes">Yes</Radio>
-                    <Radio value="no">No</Radio>
-                  </HStack>
+                <FormLabel fontSize="sm">Would Recommend?</FormLabel>
+                <RadioGroup value={rating.would_recommend ? 'yes' : 'no'} onChange={(val) => setRating({ ...rating, would_recommend: val === 'yes' })}>
+                  <HStack spacing={3}><Radio value="yes" size="sm">Yes</Radio><Radio value="no" size="sm">No</Radio></HStack>
                 </RadioGroup>
               </FormControl>
-
               <FormControl>
-                <FormLabel>Comment (Optional)</FormLabel>
-                <Textarea
-                  value={rating.comment}
-                  onChange={(e) => setRating({ ...rating, comment: e.target.value })}
-                  placeholder="Share your experience..."
-                  rows={3}
-                />
+                <FormLabel fontSize="sm">Comment</FormLabel>
+                <Textarea size="sm" value={rating.comment} onChange={(e) => setRating({ ...rating, comment: e.target.value })} rows={2} />
               </FormControl>
             </Stack>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onRatingClose}>
-              Cancel
-            </Button>
-            <Button colorScheme="yellow" onClick={handleSubmitRating} isLoading={isSubmitting}>
-              Submit Rating
-            </Button>
+            <Button variant="ghost" size="sm" mr={2} onClick={onRatingClose}>Cancel</Button>
+            <Button colorScheme="yellow" size="sm" onClick={handleSubmitRating} isLoading={isSubmitting}>Submit</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

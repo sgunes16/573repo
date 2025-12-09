@@ -2,17 +2,13 @@ import {
   Badge,
   Box,
   Button,
-  Container,
-  Divider,
+  Flex,
   Grid,
-  Heading,
   HStack,
   Icon,
   SimpleGrid,
   Skeleton,
   SkeletonCircle,
-  SkeletonText,
-  Stack,
   Tab,
   TabList,
   TabPanel,
@@ -28,28 +24,14 @@ import {
   MdAccessTime,
   MdAdd,
   MdEdit,
-  MdLocationOn,
   MdStar,
 } from "react-icons/md";
 import Navbar from "@/components/Navbar";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuthStore } from "@/store/useAuthStore";
-
 import { User, UserProfile, TimeBank, TimeBankTransaction, Comment, Exchange } from "@/types";
 import { profileService } from "@/services/profile.service";
 import { exchangeService } from "@/services/exchange.service";
-
-
-const StatPill = ({ label, value }: { label: string; value: string }) => (
-  <VStack spacing={0} align="flex-start">
-    <Text fontSize="xs" color="gray.500">
-      {label}
-    </Text>
-    <Text fontSize="lg" fontWeight="600">
-      {value}
-    </Text>
-  </VStack>
-);
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -64,6 +46,8 @@ const ProfilePage = () => {
   const [recentTransactions, setRecentTransactions] = useState<TimeBankTransaction[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [myHandshakes, setMyHandshakes] = useState<Exchange[]>([]);
+  const [incomingHandshakes, setIncomingHandshakes] = useState<Exchange[]>([]);
+  const [pendingCountByOffer, setPendingCountByOffer] = useState<Record<string, number>>({});
   const [ratingsSummary, setRatingsSummary] = useState<{
     avg_communication: number
     avg_punctuality: number
@@ -73,12 +57,10 @@ const ProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const isOwnProfile = !userId || userId === currentUser?.id;
   
-  // Categorize offers by status
   const activeOffers = offers.filter((o: any) => o.status === 'active')
   const inProgressOffers = offers.filter((o: any) => o.status === 'in_progress')
   const completedOffers = offers.filter((o: any) => o.status === 'completed')
   
-  // Categorize wants by status
   const activeWants = wants.filter((w: any) => w.status === 'active')
   const inProgressWants = wants.filter((w: any) => w.status === 'in_progress')
   const completedWants = wants.filter((w: any) => w.status === 'completed')
@@ -88,13 +70,11 @@ const ProfilePage = () => {
       setIsLoading(true);
       try {
         if (isOwnProfile) {
-          // Fetch own profile using detail endpoint to get status information
           const [profileData, timebankData] = await profileService.getUserProfile();
           setProfile(profileData);
           setTimebank(timebankData);
           setViewingUser(currentUser);
           
-          // Fetch own profile detail to get offers with status
           const profileDetail = await profileService.getUserProfileDetail(currentUser.id);
           setOffers(profileDetail.recent_offers);
           setWants(profileDetail.recent_wants);
@@ -102,19 +82,32 @@ const ProfilePage = () => {
           setComments(profileDetail.comments || []);
           setRatingsSummary(profileDetail.ratings_summary || null);
           
-          // Fetch my handshakes (exchanges where I'm the requester)
           try {
             const exchanges = await exchangeService.getMyExchanges();
-            // Filter to only show exchanges where current user is the requester
+            // Kullanıcının gönderdiği requestler (requester olduğu)
             const requestedExchanges = exchanges.filter(
               (ex: Exchange) => String(ex.requester?.id) === String(currentUser.id)
             );
+            // Kullanıcıya gelen requestler (provider olduğu)
+            const incomingExchanges = exchanges.filter(
+              (ex: Exchange) => String(ex.provider?.id) === String(currentUser.id)
+            );
             setMyHandshakes(requestedExchanges);
+            setIncomingHandshakes(incomingExchanges);
+            
+            // Her offer/want için pending exchange sayısını hesapla
+            const pendingCounts: Record<string, number> = {};
+            for (const ex of incomingExchanges) {
+              if (ex.status === 'PENDING' && ex.offer?.id) {
+                const offerId = String(ex.offer.id);
+                pendingCounts[offerId] = (pendingCounts[offerId] || 0) + 1;
+              }
+            }
+            setPendingCountByOffer(pendingCounts);
           } catch (error) {
             console.error('Error fetching handshakes:', error);
           }
         } else {
-          // Fetch other user's profile
           const profileDetail = await profileService.getUserProfileDetail(userId);
           setProfile(profileDetail.profile);
           setViewingUser({
@@ -138,47 +131,22 @@ const ProfilePage = () => {
     fetchData();
   }, [userId, currentUser?.id, isOwnProfile]);
 
-  const completedCount = offers.filter(o => 
-    String(o.status).toUpperCase() === 'COMPLETED'
-  ).length;
-
-  const stats = isOwnProfile ? [
-    {
-      label: "Time Credits",
-      value: `${timebank?.amount ?? profile?.time_credits ?? 0}H`,
-    },
-    { label: "Rating", value: `${profile?.rating ?? 0} ★` },
-    { label: "Completed Exchanges", value: String(completedCount) },
-  ] : [
-    { label: "Rating", value: `${profile?.rating ?? 0} ★` },
-    { label: "Completed Exchanges", value: String(completedCount) },
-  ];
+  const completedCount = offers.filter(o => String(o.status).toUpperCase() === 'COMPLETED').length;
 
   if (isLoading) {
     return (
       <Box bg="white" minH="100vh">
         <Navbar showUserInfo={true} />
-        <Container maxW="1440px" px={{ base: 4, md: 8 }} py={10}>
-          <Grid templateColumns={{ base: "1fr", lg: "360px 1fr" }} gap={6}>
-            <VStack spacing={6} align="stretch">
-              <Box bg="#F7FAFC" borderRadius="2xl" p={6} border="1px solid #E2E8F0">
-                <Stack spacing={4} align="center">
-                  <SkeletonCircle size="96px" />
-                  <Skeleton height="24px" width="150px" />
-                  <Skeleton height="16px" width="100px" />
-                  <Skeleton height="32px" width="full" />
-                </Stack>
-              </Box>
-              <Box bg="#F7FAFC" borderRadius="2xl" p={6} border="1px solid #E2E8F0">
-                <SkeletonText noOfLines={4} spacing="4" />
+        <Box maxW="1100px" mx="auto" px={4} py={6}>
+          <Grid templateColumns={{ base: "1fr", lg: "280px 1fr" }} gap={6}>
+            <VStack spacing={4} align="stretch">
+              <Box bg="gray.50" borderRadius="lg" p={4}>
+                <VStack><SkeletonCircle size="80px" /><Skeleton height="20px" width="120px" /></VStack>
               </Box>
             </VStack>
-            <Stack spacing={6}>
-              <Skeleton height="200px" borderRadius="xl" />
-              <Skeleton height="200px" borderRadius="xl" />
-            </Stack>
+            <Skeleton height="300px" borderRadius="lg" />
           </Grid>
-        </Container>
+        </Box>
       </Box>
     );
   }
@@ -187,753 +155,445 @@ const ProfilePage = () => {
     <Box bg="white" minH="100vh">
       <Navbar showUserInfo={true} />
 
-      <Container maxW="1440px" px={{ base: 4, md: 8 }} py={10}>
-        <Stack spacing={8}>
-          <Grid
-            templateColumns={{ base: "1fr", lg: "360px 1fr" }}
-            gap={6}
-            alignItems="start"
-          >
-            <VStack spacing={6} align="stretch">
-              <Box
-                bg="#F7FAFC"
-                borderRadius="2xl"
-                p={6}
-                border="1px solid #E2E8F0"
-              >
-                <Stack spacing={4} align="center">
-                  <UserAvatar
-                    size="xl"
-                    user={{ ...viewingUser, profile: profile as any }}
-                  />
-                  <VStack spacing={1}>
-                    <Heading size="md">{`${viewingUser?.first_name || ''} ${viewingUser?.last_name || ''}`}</Heading>
-                    <Text color="gray.600">
-                      {profile?.location || "Location not specified"}
-                    </Text>
-                  </VStack>
-                  <HStack spacing={2}>
-                    {(profile as any)?.badges?.length > 0 ? (
-                      (profile as any).badges.map((badge: string, index: number) => (
-                        <Badge key={index} colorScheme="purple" variant="subtle">
-                          {badge}
-                        </Badge>
-                      ))
-                    ) : (
-                      <Badge colorScheme="purple" variant="subtle">
-                        Member
-                      </Badge>
-                    )}
-                  </HStack>
-                  <SimpleGrid columns={isOwnProfile ? 3 : 2} w="full">
-                    {stats.map((stat) => (
-                      <StatPill key={stat.label} {...stat} />
-                    ))}
-                  </SimpleGrid>
-                  {ratingsSummary && ratingsSummary.total_count > 0 && (
-                    <Box w="full" mt={4} pt={4} borderTop="1px solid #E2E8F0">
-                      <Heading size="sm" mb={3}>
-                        Rating Details ({ratingsSummary.total_count} {ratingsSummary.total_count === 1 ? 'rating' : 'ratings'})
-                      </Heading>
-                      <VStack align="flex-start" spacing={3}>
-                        <Box w="full">
-                          <HStack justify="space-between" mb={1}>
-                            <Text fontSize="sm" color="gray.600">
-                              Communication
-                            </Text>
-                            <Text fontSize="sm" fontWeight="600">
-                              {ratingsSummary.avg_communication}/5
-                            </Text>
-                          </HStack>
-                          <HStack spacing={1}>
-                            {[...Array(5)].map((_, idx) => (
-                              <Icon
-                                key={idx}
-                                as={MdStar}
-                                color={idx < Math.round(ratingsSummary.avg_communication) ? 'yellow.400' : 'gray.300'}
-                                boxSize={4}
-                              />
-                            ))}
-                          </HStack>
-                        </Box>
-                        <Box w="full">
-                          <HStack justify="space-between" mb={1}>
-                            <Text fontSize="sm" color="gray.600">
-                              Punctuality
-                            </Text>
-                            <Text fontSize="sm" fontWeight="600">
-                              {ratingsSummary.avg_punctuality}/5
-                            </Text>
-                          </HStack>
-                          <HStack spacing={1}>
-                            {[...Array(5)].map((_, idx) => (
-                              <Icon
-                                key={idx}
-                                as={MdStar}
-                                color={idx < Math.round(ratingsSummary.avg_punctuality) ? 'yellow.400' : 'gray.300'}
-                                boxSize={4}
-                              />
-                            ))}
-                          </HStack>
-                        </Box>
-                        <Box w="full">
-                          <HStack justify="space-between">
-                            <Text fontSize="sm" color="gray.600">
-                              Would Recommend
-                            </Text>
-                            <Text fontSize="sm" fontWeight="600" color="green.500">
-                              {ratingsSummary.would_recommend_percentage}%
-                            </Text>
-                          </HStack>
-                        </Box>
-                      </VStack>
+      <Box maxW="1100px" mx="auto" px={4} py={6}>
+        <Grid templateColumns={{ base: "1fr", lg: "280px 1fr" }} gap={6} alignItems="start">
+          {/* Sidebar */}
+          <VStack spacing={4} align="stretch">
+            {/* Profile Card */}
+            <Box bg="gray.50" borderRadius="lg" p={4}>
+              <VStack spacing={3}>
+                <UserAvatar size="xl" user={{ ...viewingUser, profile: profile as any }} />
+                <VStack spacing={0}>
+                  <Text fontWeight="600">{`${viewingUser?.first_name || ''} ${viewingUser?.last_name || ''}`}</Text>
+                  <Text fontSize="xs" color="gray.500">{profile?.location || "No location"}</Text>
+                </VStack>
+                <Badge colorScheme="purple" fontSize="xs">Member</Badge>
+                
+                {/* Stats */}
+                <SimpleGrid columns={isOwnProfile ? 3 : 2} w="full" gap={2} pt={2}>
+                  {isOwnProfile && (
+                    <Box textAlign="center">
+                      <Text fontSize="lg" fontWeight="700">{timebank?.amount ?? 0}H</Text>
+                      <Text fontSize="xs" color="gray.500">Credits</Text>
                     </Box>
                   )}
-                  {isOwnProfile && (
-                    <Button
-                      leftIcon={<MdEdit />}
-                      variant="outline"
-                      colorScheme="yellow"
-                      onClick={() => navigate("/profile/edit")}
-                      alignSelf="stretch"
-                    >
-                      Edit Profile
-                    </Button>
-                  )}
-                </Stack>
-              </Box>
+                  <Box textAlign="center">
+                    <Text fontSize="lg" fontWeight="700">{profile?.rating ?? 0}★</Text>
+                    <Text fontSize="xs" color="gray.500">Rating</Text>
+                  </Box>
+                  <Box textAlign="center">
+                    <Text fontSize="lg" fontWeight="700">{completedCount}</Text>
+                    <Text fontSize="xs" color="gray.500">Done</Text>
+                  </Box>
+                </SimpleGrid>
 
-              <Box
-                bg="#F7FAFC"
-                borderRadius="2xl"
-                p={6}
-                border="1px solid #E2E8F0"
-              >
-                <Heading size="sm" mb={2}>
-                  About
-                </Heading>
-                <Text color="gray.600" fontSize="sm">
-                  {profile?.bio || "No bio added yet. Edit your profile to introduce yourself!"}
-                </Text>
-                <Divider my={4} />
-                <Heading size="sm" mb={2}>
-                  Skills & Interests
-                </Heading>
-                <HStack spacing={2} flexWrap="wrap" gap={2}>
-                  {(profile?.skills || []).length > 0 ? (
-                    (profile?.skills || []).map((tag, idx) => (
-                      <Tag key={idx} size="md" borderRadius="full" bg="#E2E8F0">
-                        {tag}
-                      </Tag>
-                    ))
-                  ) : (
-                    <Text color="gray.400" fontSize="sm">
-                      No skills added yet
-                    </Text>
-                  )}
-                </HStack>
-              </Box>
-            </VStack>
-
-            <Box>
-              <Tabs colorScheme="yellow" variant="enclosed">
-                <TabList>
-                  <Tab>Offers</Tab>
-                  <Tab>Wants</Tab>
-                  {isOwnProfile && <Tab>My Handshakes</Tab>}
-                  <Tab>Transactions</Tab>
-                  <Tab>Comments</Tab>
-                </TabList>
-
-                <TabPanels>
-                  {/* Offers Tab */}
-                  <TabPanel px={0}>
-                    <HStack justify="space-between" mb={4}>
-                      <Heading size="md">{isOwnProfile ? 'My Offers' : 'Offers'}</Heading>
-                      {isOwnProfile && (
-                        <Button
-                          leftIcon={<MdAdd />}
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigate("/create-offer")}
-                        >
-                          New Offer
-                        </Button>
-                      )}
-                    </HStack>
-                    {isOwnProfile && (inProgressOffers.length > 0 || completedOffers.length > 0) ? (
-                      <Stack spacing={6}>
-                        {inProgressOffers.length > 0 && (
-                          <Box>
-                            <Heading size="sm" mb={3} color="blue.600">
-                              In Progress ({inProgressOffers.length})
-                            </Heading>
-                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                              {inProgressOffers.map((offer: any) => (
-                                <Box
-                                  key={offer.id}
-                                  bg="#EBF8FF"
-                                  borderRadius="xl"
-                                  p={5}
-                                  border="2px solid #90CDF4"
-                                  cursor="pointer"
-                                  onClick={() => navigate(`/offer/${offer.id}`)}
-                                  _hover={{ bg: '#BEE3F8' }}
-                                >
-                                  <Stack spacing={2}>
-                                    <HStack justify="space-between">
-                                      <Text fontWeight="600">{offer.title}</Text>
-                                      <Badge colorScheme="blue" variant="solid">
-                                        In Progress
-                                      </Badge>
-                                    </HStack>
-                                    <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                                      {offer.description}
-                                    </Text>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdLocationOn} />
-                                      <Text>{offer.location || 'Location not specified'}</Text>
-                                    </HStack>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdAccessTime} />
-                                      <Text>{offer.time_required} hour{offer.time_required > 1 ? 's' : ''}</Text>
-                                    </HStack>
-                                  </Stack>
-                                </Box>
-                              ))}
-                            </SimpleGrid>
-                          </Box>
-                        )}
-                        {completedOffers.length > 0 && (
-                          <Box>
-                            <Heading size="sm" mb={3} color="green.600">
-                              Completed ({completedOffers.length})
-                            </Heading>
-                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                              {completedOffers.map((offer: any) => (
-                                <Box
-                                  key={offer.id}
-                                  bg="#F0FFF4"
-                                  borderRadius="xl"
-                                  p={5}
-                                  border="2px solid #9AE6B4"
-                                  cursor="pointer"
-                                  onClick={() => navigate(`/offer/${offer.id}`)}
-                                  _hover={{ bg: '#C6F6D5' }}
-                                >
-                                  <Stack spacing={2}>
-                                    <HStack justify="space-between">
-                                      <Text fontWeight="600">{offer.title}</Text>
-                                      <Badge colorScheme="green" variant="solid">
-                                        Completed
-                                      </Badge>
-                                    </HStack>
-                                    <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                                      {offer.description}
-                                    </Text>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdLocationOn} />
-                                      <Text>{offer.location || 'Location not specified'}</Text>
-                                    </HStack>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdAccessTime} />
-                                      <Text>{offer.time_required} hour{offer.time_required > 1 ? 's' : ''}</Text>
-                                    </HStack>
-                                  </Stack>
-                                </Box>
-                              ))}
-                            </SimpleGrid>
-                          </Box>
-                        )}
-                        {activeOffers.length > 0 && (
-                          <Box>
-                            <Heading size="sm" mb={3}>
-                              Active ({activeOffers.length})
-                            </Heading>
-                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                              {activeOffers.map((offer: any) => (
-                                <Box
-                                  key={offer.id}
-                                  bg="#F7FAFC"
-                                  borderRadius="xl"
-                                  p={5}
-                                  border="1px solid #E2E8F0"
-                                  cursor="pointer"
-                                  onClick={() => navigate(`/offer/${offer.id}`)}
-                                  _hover={{ bg: '#EDF2F7' }}
-                                >
-                                  <Stack spacing={2}>
-                                    <HStack justify="space-between">
-                                      <Text fontWeight="600">{offer.title}</Text>
-                                      <Badge colorScheme="green" variant="subtle">
-                                        Active
-                                      </Badge>
-                                    </HStack>
-                                    <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                                      {offer.description}
-                                    </Text>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdLocationOn} />
-                                      <Text>{offer.location || 'Location not specified'}</Text>
-                                    </HStack>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdAccessTime} />
-                                      <Text>{offer.time_required} hour{offer.time_required > 1 ? 's' : ''}</Text>
-                                    </HStack>
-                                  </Stack>
-                                </Box>
-                              ))}
-                            </SimpleGrid>
-                          </Box>
-                        )}
-                      </Stack>
-                    ) : offers.length > 0 ? (
-                      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                        {offers.map((offer: any) => (
-                          <Box
-                            key={offer.id}
-                            bg="#F7FAFC"
-                            borderRadius="xl"
-                            p={5}
-                            border="1px solid #E2E8F0"
-                            cursor="pointer"
-                            onClick={() => navigate(`/offer/${offer.id}`)}
-                            _hover={{ bg: '#EDF2F7' }}
-                          >
-                            <Stack spacing={2}>
-                              <HStack justify="space-between">
-                                <Text fontWeight="600">{offer.title}</Text>
-                                <Badge colorScheme="green" variant="subtle">
-                                  {offer.type === 'offer' ? 'Offer' : 'Want'}
-                                </Badge>
-                              </HStack>
-                              <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                                {offer.description}
-                              </Text>
-                              <HStack color="gray.600" fontSize="sm">
-                                <Icon as={MdLocationOn} />
-                                <Text>{offer.location || 'Location not specified'}</Text>
-                              </HStack>
-                              <HStack color="gray.600" fontSize="sm">
-                                <Icon as={MdAccessTime} />
-                                <Text>{offer.time_required} hour{offer.time_required > 1 ? 's' : ''}</Text>
-                              </HStack>
-                            </Stack>
-                          </Box>
-                        ))}
-                      </SimpleGrid>
-                    ) : (
-                      <Box bg="#F7FAFC" borderRadius="xl" p={6} textAlign="center">
-                        <Text color="gray.600">
-                          {isOwnProfile ? 'No offers yet. Start by creating your first offer.' : 'No offers yet.'}
-                        </Text>
-                      </Box>
-                    )}
-                  </TabPanel>
-
-                  {/* Wants Tab */}
-                  <TabPanel px={0}>
-                    <HStack justify="space-between" mb={4}>
-                      <Heading size="md">{isOwnProfile ? 'My Wants' : 'Wants'}</Heading>
-                      {isOwnProfile && (
-                        <Button
-                          leftIcon={<MdAdd />}
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigate("/wants")}
-                        >
-                          New Want
-                        </Button>
-                      )}
-                    </HStack>
-                    {isOwnProfile && (inProgressWants.length > 0 || completedWants.length > 0) ? (
-                      <Stack spacing={6}>
-                        {inProgressWants.length > 0 && (
-                          <Box>
-                            <Heading size="sm" mb={3} color="blue.600">
-                              In Progress ({inProgressWants.length})
-                            </Heading>
-                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                              {inProgressWants.map((want: any) => (
-                                <Box
-                                  key={want.id}
-                                  bg="#EBF8FF"
-                                  borderRadius="xl"
-                                  p={5}
-                                  border="2px solid #90CDF4"
-                                  cursor="pointer"
-                                  onClick={() => navigate(`/offer/${want.id}`)}
-                                  _hover={{ bg: '#BEE3F8' }}
-                                >
-                                  <Stack spacing={2}>
-                                    <HStack justify="space-between">
-                                      <Text fontWeight="600">{want.title}</Text>
-                                      <Badge colorScheme="blue" variant="solid">
-                                        In Progress
-                                      </Badge>
-                                    </HStack>
-                                    <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                                      {want.description}
-                                    </Text>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdLocationOn} />
-                                      <Text>{want.location || 'Location not specified'}</Text>
-                                    </HStack>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdAccessTime} />
-                                      <Text>{want.time_required} hour{want.time_required > 1 ? 's' : ''}</Text>
-                                    </HStack>
-                                  </Stack>
-                                </Box>
-                              ))}
-                            </SimpleGrid>
-                          </Box>
-                        )}
-                        {completedWants.length > 0 && (
-                          <Box>
-                            <Heading size="sm" mb={3} color="green.600">
-                              Completed ({completedWants.length})
-                            </Heading>
-                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                              {completedWants.map((want: any) => (
-                                <Box
-                                  key={want.id}
-                                  bg="#F0FFF4"
-                                  borderRadius="xl"
-                                  p={5}
-                                  border="2px solid #9AE6B4"
-                                  cursor="pointer"
-                                  onClick={() => navigate(`/offer/${want.id}`)}
-                                  _hover={{ bg: '#C6F6D5' }}
-                                >
-                                  <Stack spacing={2}>
-                                    <HStack justify="space-between">
-                                      <Text fontWeight="600">{want.title}</Text>
-                                      <Badge colorScheme="green" variant="solid">
-                                        Completed
-                                      </Badge>
-                                    </HStack>
-                                    <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                                      {want.description}
-                                    </Text>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdLocationOn} />
-                                      <Text>{want.location || 'Location not specified'}</Text>
-                                    </HStack>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdAccessTime} />
-                                      <Text>{want.time_required} hour{want.time_required > 1 ? 's' : ''}</Text>
-                                    </HStack>
-                                  </Stack>
-                                </Box>
-                              ))}
-                            </SimpleGrid>
-                          </Box>
-                        )}
-                        {activeWants.length > 0 && (
-                          <Box>
-                            <Heading size="sm" mb={3}>
-                              Active ({activeWants.length})
-                            </Heading>
-                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                              {activeWants.map((want: any) => (
-                                <Box
-                                  key={want.id}
-                                  bg="#F7FAFC"
-                                  borderRadius="xl"
-                                  p={5}
-                                  border="1px solid #E2E8F0"
-                                  cursor="pointer"
-                                  onClick={() => navigate(`/offer/${want.id}`)}
-                                  _hover={{ bg: '#EDF2F7' }}
-                                >
-                                  <Stack spacing={2}>
-                                    <HStack justify="space-between">
-                                      <Text fontWeight="600">{want.title}</Text>
-                                      <Badge colorScheme="blue" variant="subtle">
-                                        Want
-                                      </Badge>
-                                    </HStack>
-                                    <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                                      {want.description}
-                                    </Text>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdLocationOn} />
-                                      <Text>{want.location || 'Location not specified'}</Text>
-                                    </HStack>
-                                    <HStack color="gray.600" fontSize="sm">
-                                      <Icon as={MdAccessTime} />
-                                      <Text>{want.time_required} hour{want.time_required > 1 ? 's' : ''}</Text>
-                                    </HStack>
-                                  </Stack>
-                                </Box>
-                              ))}
-                            </SimpleGrid>
-                          </Box>
-                        )}
-                      </Stack>
-                    ) : wants.length > 0 ? (
-                      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                        {wants.map((want: any) => (
-                          <Box
-                            key={want.id}
-                            bg="#F7FAFC"
-                            borderRadius="xl"
-                            p={5}
-                            border="1px solid #E2E8F0"
-                            cursor="pointer"
-                            onClick={() => navigate(`/offer/${want.id}`)}
-                            _hover={{ bg: '#EDF2F7' }}
-                          >
-                            <Stack spacing={2}>
-                              <HStack justify="space-between">
-                                <Text fontWeight="600">{want.title}</Text>
-                                <Badge colorScheme="blue" variant="subtle">
-                                  Want
-                                </Badge>
-                              </HStack>
-                              <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                                {want.description}
-                              </Text>
-                              <HStack color="gray.600" fontSize="sm">
-                                <Icon as={MdLocationOn} />
-                                <Text>{want.location || 'Location not specified'}</Text>
-                              </HStack>
-                              <HStack color="gray.600" fontSize="sm">
-                                <Icon as={MdAccessTime} />
-                                <Text>{want.time_required} hour{want.time_required > 1 ? 's' : ''}</Text>
-                              </HStack>
-                            </Stack>
-                          </Box>
-                        ))}
-                      </SimpleGrid>
-                    ) : (
-                      <Box bg="#F7FAFC" borderRadius="xl" p={6} textAlign="center">
-                        <Text color="gray.600">
-                          {isOwnProfile ? 'No active wants. Post your next request.' : 'No wants yet.'}
-                        </Text>
-                      </Box>
-                    )}
-                  </TabPanel>
-
-                  {/* My Handshakes Tab - Only for own profile */}
-                  {isOwnProfile && (
-                    <TabPanel px={0}>
-                      <Heading size="md" mb={4}>My Handshake Requests</Heading>
-                      {myHandshakes.length > 0 ? (
-                        <VStack spacing={4} align="stretch">
-                          {myHandshakes.map((exchange) => (
-                            <Box
-                              key={exchange.id}
-                              bg="white"
-                              p={4}
-                              borderRadius="lg"
-                              border="1px solid"
-                              borderColor="gray.200"
-                              cursor="pointer"
-                              _hover={{ borderColor: 'yellow.400', bg: 'yellow.50' }}
-                              onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
-                            >
-                              <HStack justify="space-between" mb={2}>
-                                <HStack spacing={3}>
-                                  <UserAvatar size="sm" user={exchange.provider} />
-                                  <Box>
-                                    <Text fontWeight="600">{exchange.offer?.title || 'Untitled Offer'}</Text>
-                                    <Text fontSize="sm" color="gray.600">
-                                      with {exchange.provider?.first_name} {exchange.provider?.last_name}
-                                    </Text>
-                                  </Box>
-                                </HStack>
-                                <Badge
-                                  colorScheme={
-                                    exchange.status === 'COMPLETED' ? 'green' :
-                                    exchange.status === 'ACCEPTED' ? 'blue' :
-                                    exchange.status === 'PENDING' ? 'yellow' :
-                                    exchange.status === 'CANCELLED' ? 'red' :
-                                    'gray'
-                                  }
-                                >
-                                  {exchange.status === 'PENDING' ? 'REQUESTED' : exchange.status}
-                                </Badge>
-                              </HStack>
-                              {exchange.proposed_date && (
-                                <HStack fontSize="sm" color="gray.500" mt={2}>
-                                  <Icon as={MdAccessTime} />
-                                  <Text>
-                                    {new Date(exchange.proposed_date).toLocaleDateString()}
-                                    {exchange.proposed_time && ` at ${exchange.proposed_time}`}
-                                  </Text>
-                                </HStack>
-                              )}
-                            </Box>
+                {/* Rating Details */}
+                {ratingsSummary && ratingsSummary.total_count > 0 && (
+                  <Box w="full" pt={3} borderTop="1px solid" borderColor="gray.200">
+                    <Text fontSize="xs" fontWeight="600" mb={2}>Rating Details ({ratingsSummary.total_count})</Text>
+                    <VStack align="stretch" spacing={1} fontSize="xs">
+                      <Flex justify="space-between">
+                        <Text color="gray.600">Communication</Text>
+                        <HStack spacing={0.5}>
+                          {[...Array(5)].map((_, idx) => (
+                            <Icon key={idx} as={MdStar} color={idx < Math.round(ratingsSummary.avg_communication) ? 'yellow.400' : 'gray.300'} boxSize={3} />
                           ))}
-                        </VStack>
-                      ) : (
-                        <Box textAlign="center" py={8}>
-                          <Text color="gray.500" mb={4}>
-                            You haven't requested any handshakes yet.
+                        </HStack>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.600">Punctuality</Text>
+                        <HStack spacing={0.5}>
+                          {[...Array(5)].map((_, idx) => (
+                            <Icon key={idx} as={MdStar} color={idx < Math.round(ratingsSummary.avg_punctuality) ? 'yellow.400' : 'gray.300'} boxSize={3} />
+                          ))}
+                        </HStack>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.600">Recommend</Text>
+                        <Text fontWeight="600" color="green.500">{ratingsSummary.would_recommend_percentage}%</Text>
+                      </Flex>
+                    </VStack>
+                  </Box>
+                )}
+
+                {isOwnProfile && (
+                  <Button leftIcon={<MdEdit />} variant="outline" size="sm" w="full" onClick={() => navigate("/profile/edit")}>
+                    Edit Profile
+                  </Button>
+                )}
+              </VStack>
+            </Box>
+
+            {/* About */}
+            <Box bg="gray.50" borderRadius="lg" p={4}>
+              <Text fontWeight="600" fontSize="sm" mb={2}>About</Text>
+              <Text fontSize="xs" color="gray.600" mb={3}>
+                {profile?.bio || "No bio yet"}
+              </Text>
+              <Text fontWeight="600" fontSize="sm" mb={2}>Skills</Text>
+              <HStack spacing={1} flexWrap="wrap" gap={1}>
+                {(profile?.skills || []).length > 0 ? (
+                  (profile?.skills || []).map((tag, idx) => (
+                    <Tag key={idx} size="sm" borderRadius="full" bg="gray.200">{tag}</Tag>
+                  ))
+                ) : (
+                  <Text color="gray.400" fontSize="xs">No skills</Text>
+                )}
+              </HStack>
+            </Box>
+          </VStack>
+
+          {/* Main Content */}
+          <Box>
+            <Tabs colorScheme="yellow" size="sm">
+              <TabList borderBottom="1px solid" borderColor="gray.100">
+                <Tab fontSize="sm">Offers</Tab>
+                <Tab fontSize="sm">Wants</Tab>
+                {isOwnProfile && <Tab fontSize="sm">Handshakes</Tab>}
+                <Tab fontSize="sm">Transactions</Tab>
+                <Tab fontSize="sm">Comments</Tab>
+              </TabList>
+
+              <TabPanels>
+                {/* Offers Tab */}
+                <TabPanel px={0}>
+                  <Flex justify="space-between" align="center" mb={3}>
+                    <Text fontWeight="600" fontSize="sm">{isOwnProfile ? 'My Offers' : 'Offers'}</Text>
+                    {isOwnProfile && (
+                      <Button leftIcon={<MdAdd />} size="xs" variant="outline" onClick={() => navigate("/create-offer")}>New</Button>
+                    )}
+                  </Flex>
+                  {renderOffersList(isOwnProfile ? { inProgress: inProgressOffers, completed: completedOffers, active: activeOffers } : { all: offers }, navigate, isOwnProfile ? pendingCountByOffer : undefined)}
+                </TabPanel>
+
+                {/* Wants Tab */}
+                <TabPanel px={0}>
+                  <Flex justify="space-between" align="center" mb={3}>
+                    <Text fontWeight="600" fontSize="sm">{isOwnProfile ? 'My Wants' : 'Wants'}</Text>
+                    {isOwnProfile && (
+                      <Button leftIcon={<MdAdd />} size="xs" variant="outline" onClick={() => navigate("/wants")}>New</Button>
+                    )}
+                  </Flex>
+                  {renderOffersList(isOwnProfile ? { inProgress: inProgressWants, completed: completedWants, active: activeWants } : { all: wants }, navigate, isOwnProfile ? pendingCountByOffer : undefined)}
+                </TabPanel>
+
+                {/* Handshakes Tab */}
+                {isOwnProfile && (
+                  <TabPanel px={0}>
+                    <VStack spacing={6} align="stretch">
+                      {/* Incoming Requests - Gelen İstekler */}
+                      <Box>
+                        <Text fontWeight="600" fontSize="sm" mb={3} color="orange.600">
+                          Incoming Requests ({incomingHandshakes.filter(ex => ex.status === 'PENDING').length})
+                        </Text>
+                        {incomingHandshakes.filter(ex => ex.status === 'PENDING').length > 0 ? (
+                          <VStack spacing={2} align="stretch">
+                            {incomingHandshakes.filter(ex => ex.status === 'PENDING').map((exchange) => (
+                              <Box
+                                key={exchange.id}
+                                p={3}
+                                borderRadius="md"
+                                border="1px solid"
+                                borderColor="orange.200"
+                                bg="orange.50"
+                                cursor="pointer"
+                                _hover={{ bg: 'orange.100' }}
+                                onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
+                              >
+                                <Flex justify="space-between" align="center">
+                                  <HStack spacing={2}>
+                                    <UserAvatar size="sm" user={exchange.requester} />
+                                    <Box>
+                                      <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
+                                      <Text fontSize="xs" color="gray.500">from {exchange.requester?.first_name}</Text>
+                                    </Box>
+                                  </HStack>
+                                  <Badge colorScheme="orange" fontSize="10px">
+                                    PENDING
+                                  </Badge>
+                                </Flex>
+                              </Box>
+                            ))}
+                          </VStack>
+                        ) : (
+                          <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+                            <Text color="gray.500" fontSize="xs">No incoming requests</Text>
+                          </Box>
+                        )}
+                      </Box>
+
+                      {/* All Incoming Exchanges (Accepted, Completed etc.) */}
+                      {incomingHandshakes.filter(ex => ex.status !== 'PENDING').length > 0 && (
+                        <Box>
+                          <Text fontWeight="600" fontSize="sm" mb={3}>
+                            Incoming (Other) ({incomingHandshakes.filter(ex => ex.status !== 'PENDING').length})
                           </Text>
-                          <Button
-                            colorScheme="yellow"
-                            onClick={() => navigate('/dashboard')}
-                          >
-                            Browse Offers
-                          </Button>
+                          <VStack spacing={2} align="stretch">
+                            {incomingHandshakes.filter(ex => ex.status !== 'PENDING').map((exchange) => (
+                              <Box
+                                key={exchange.id}
+                                p={3}
+                                borderRadius="md"
+                                border="1px solid"
+                                borderColor="gray.100"
+                                cursor="pointer"
+                                _hover={{ bg: 'gray.50' }}
+                                onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
+                              >
+                                <Flex justify="space-between" align="center">
+                                  <HStack spacing={2}>
+                                    <UserAvatar size="sm" user={exchange.requester} />
+                                    <Box>
+                                      <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
+                                      <Text fontSize="xs" color="gray.500">from {exchange.requester?.first_name}</Text>
+                                    </Box>
+                                  </HStack>
+                                  <Badge
+                                    colorScheme={
+                                      exchange.status === 'COMPLETED' ? 'green' :
+                                      exchange.status === 'ACCEPTED' ? 'blue' : 'gray'
+                                    }
+                                    fontSize="10px"
+                                  >
+                                    {exchange.status}
+                                  </Badge>
+                                </Flex>
+                              </Box>
+                            ))}
+                          </VStack>
                         </Box>
                       )}
-                    </TabPanel>
-                  )}
 
-                  {/* Transactions Tab */}
-                  <TabPanel px={0}>
-                    {isOwnProfile && timebank && (
-                      <Box
-                        bg="#F7FAFC"
-                        borderRadius="2xl"
-                        p={6}
-                        border="1px solid #E2E8F0"
-                        mb={6}
-                      >
-                        <Heading size="md" mb={4}>
-                          Time Bank Snapshot
-                        </Heading>
-                        <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-                          <StatPill
-                            label="Available Credits"
-                            value={`${timebank?.available_amount ?? 0}H`}
-                          />
-                          <StatPill label="Blocked" value={`${timebank?.blocked_amount ?? 0}H`} />
-                          <StatPill label="Total" value={`${timebank?.total_amount ?? 0}H`} />
-                        </SimpleGrid>
-                        <Button
-                          variant="ghost"
-                          mt={4}
-                          onClick={() => navigate("/transactions")}
-                          alignSelf="flex-start"
-                        >
-                          View All Transactions
-                        </Button>
-                      </Box>
-                    )}
-                    <Heading size="md" mb={4}>
-                      Recent Transactions
-                    </Heading>
-                    {recentTransactions.length > 0 ? (
-                      <Stack spacing={3}>
-                        {recentTransactions.map((tx) => {
-                          const isEarn = tx.transaction_type === 'EARN'
-                          const otherUser = tx.from_user.id === viewingUser?.id ? tx.to_user : tx.from_user
-                          return (
-                            <Box
-                              key={tx.id}
-                              bg="white"
-                              borderRadius="lg"
-                              p={4}
-                              border="1px solid #E2E8F0"
-                            >
-                              <HStack justify="space-between">
-                                <HStack spacing={3}>
-                                  <UserAvatar size="sm" user={otherUser} />
-                                  <VStack align="flex-start" spacing={0}>
-                                    <Text fontSize="sm" fontWeight="600">
-                                      {tx.exchange?.offer.title || tx.description}
-                                    </Text>
-                                    <Text fontSize="xs" color="gray.600">
-                                      {otherUser.first_name} {otherUser.last_name}
-                                    </Text>
-                                    <Text fontSize="xs" color="gray.500">
-                                      {new Date(tx.created_at).toLocaleDateString()}
-                                    </Text>
-                                  </VStack>
-                                </HStack>
-                                <Badge
-                                  colorScheme={isEarn ? 'green' : 'red'}
-                                  px={3}
-                                  py={1}
-                                  borderRadius="md"
-                                  fontWeight="bold"
-                                >
-                                  {isEarn ? '+' : '-'}
-                                  {tx.time_amount}H
-                                </Badge>
-                              </HStack>
-                            </Box>
-                          )
-                        })}
-                      </Stack>
-                    ) : (
-                      <Box bg="#F7FAFC" borderRadius="xl" p={6} textAlign="center">
-                        <Text color="gray.600" fontSize="sm">
-                          No recent transactions.
-                        </Text>
-                      </Box>
-                    )}
-                  </TabPanel>
-
-                  {/* Comments Tab */}
-                  <TabPanel px={0}>
-                    <Heading size="md" mb={4}>
-                      Comments ({comments.length})
-                    </Heading>
-                    {comments.length > 0 ? (
-                      <Stack spacing={4}>
-                        {comments.map((comment) => (
-                          <Box
-                            key={comment.id}
-                            bg="white"
-                            borderRadius="lg"
-                            p={5}
-                            border="1px solid #E2E8F0"
-                          >
-                            <HStack spacing={3} mb={3}>
-                              <UserAvatar
-                                size="sm"
-                                user={comment.user}
+                      {/* My Requests - Gönderdiğim İstekler */}
+                      <Box>
+                        <Text fontWeight="600" fontSize="sm" mb={3}>My Requests ({myHandshakes.length})</Text>
+                        {myHandshakes.length > 0 ? (
+                          <VStack spacing={2} align="stretch">
+                            {myHandshakes.map((exchange) => (
+                              <Box
+                                key={exchange.id}
+                                p={3}
+                                borderRadius="md"
+                                border="1px solid"
+                                borderColor="gray.100"
                                 cursor="pointer"
-                                onClick={() => {
-                                  if (comment.user?.id) {
-                                    navigate(`/profile/${comment.user.id}`)
-                                  }
-                                }}
-                              />
-                              <VStack align="flex-start" spacing={0}>
-                                <Text fontSize="sm" fontWeight="600">
-                                  {comment.user?.first_name} {comment.user?.last_name}
-                                </Text>
-                                <Text fontSize="xs" color="gray.500">
-                                  {new Date(comment.created_at).toLocaleDateString()}
-                                </Text>
-                              </VStack>
-                              {comment.rating && (
-                                <HStack spacing={1} ml="auto">
-                                  {[...Array(comment.rating)].map((_, idx) => (
-                                    <Icon key={idx} as={MdStar} color="yellow.400" boxSize={4} />
-                                  ))}
-                                </HStack>
-                              )}
-                            </HStack>
-                            <Text fontSize="sm" color="gray.700" whiteSpace="pre-wrap">
-                              {comment.content}
-                            </Text>
+                                _hover={{ bg: 'gray.50' }}
+                                onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
+                              >
+                                <Flex justify="space-between" align="center">
+                                  <HStack spacing={2}>
+                                    <UserAvatar size="sm" user={exchange.provider} />
+                                    <Box>
+                                      <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
+                                      <Text fontSize="xs" color="gray.500">with {exchange.provider?.first_name}</Text>
+                                    </Box>
+                                  </HStack>
+                                  <Badge
+                                    colorScheme={
+                                      exchange.status === 'COMPLETED' ? 'green' :
+                                      exchange.status === 'ACCEPTED' ? 'blue' :
+                                      exchange.status === 'PENDING' ? 'yellow' : 'gray'
+                                    }
+                                    fontSize="10px"
+                                  >
+                                    {exchange.status === 'PENDING' ? 'REQUESTED' : exchange.status}
+                                  </Badge>
+                                </Flex>
+                              </Box>
+                            ))}
+                          </VStack>
+                        ) : (
+                          <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+                            <Text color="gray.500" fontSize="xs">No outgoing requests</Text>
                           </Box>
-                        ))}
-                      </Stack>
-                    ) : (
-                      <Box bg="#F7FAFC" borderRadius="xl" p={6} textAlign="center">
-                        <Text color="gray.600" fontSize="sm">
-                          No comments yet.
-                        </Text>
+                        )}
                       </Box>
-                    )}
+                    </VStack>
                   </TabPanel>
-                </TabPanels>
-              </Tabs>
-            </Box>
-          </Grid>
-        </Stack>
-      </Container>
+                )}
+
+                {/* Transactions Tab */}
+                <TabPanel px={0}>
+                  {isOwnProfile && timebank && (
+                    <SimpleGrid columns={3} gap={2} mb={4}>
+                      <Box bg="gray.50" p={3} borderRadius="md" textAlign="center">
+                        <Text fontSize="lg" fontWeight="700">{timebank?.available_amount ?? 0}H</Text>
+                        <Text fontSize="xs" color="gray.500">Available</Text>
+                      </Box>
+                      <Box bg="gray.50" p={3} borderRadius="md" textAlign="center">
+                        <Text fontSize="lg" fontWeight="700">{timebank?.blocked_amount ?? 0}H</Text>
+                        <Text fontSize="xs" color="gray.500">Blocked</Text>
+                      </Box>
+                      <Box bg="gray.50" p={3} borderRadius="md" textAlign="center">
+                        <Text fontSize="lg" fontWeight="700">{timebank?.total_amount ?? 0}H</Text>
+                        <Text fontSize="xs" color="gray.500">Total</Text>
+                      </Box>
+                    </SimpleGrid>
+                  )}
+                  <Text fontWeight="600" fontSize="sm" mb={3}>Recent</Text>
+                  {recentTransactions.length > 0 ? (
+                    <VStack spacing={2} align="stretch">
+                      {recentTransactions.map((tx) => {
+                        const isEarn = tx.transaction_type === 'EARN'
+                        const otherUser = tx.from_user.id === viewingUser?.id ? tx.to_user : tx.from_user
+                        return (
+                          <Flex key={tx.id} p={3} borderRadius="md" border="1px solid" borderColor="gray.100" justify="space-between" align="center">
+                            <HStack spacing={2}>
+                              <UserAvatar size="sm" user={otherUser} />
+                              <Box>
+                                <Text fontSize="sm" fontWeight="500">{tx.exchange?.offer.title || tx.description}</Text>
+                                <Text fontSize="xs" color="gray.500">{new Date(tx.created_at).toLocaleDateString()}</Text>
+                              </Box>
+                            </HStack>
+                            <Badge colorScheme={isEarn ? 'green' : 'red'} fontSize="xs">
+                              {isEarn ? '+' : '-'}{tx.time_amount}H
+                            </Badge>
+                          </Flex>
+                        )
+                      })}
+                    </VStack>
+                  ) : (
+                    <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+                      <Text color="gray.500" fontSize="xs">No transactions</Text>
+                    </Box>
+                  )}
+                </TabPanel>
+
+                {/* Comments Tab */}
+                <TabPanel px={0}>
+                  <Text fontWeight="600" fontSize="sm" mb={3}>Comments ({comments.length})</Text>
+                  {comments.length > 0 ? (
+                    <VStack spacing={2} align="stretch">
+                      {comments.map((comment) => (
+                        <Box key={comment.id} p={3} borderRadius="md" border="1px solid" borderColor="gray.100">
+                          <Flex align="center" gap={2} mb={2}>
+                            <UserAvatar size="xs" user={comment.user} onClick={() => comment.user?.id && navigate(`/profile/${comment.user.id}`)} cursor="pointer" />
+                            <Text fontSize="xs" fontWeight="500">{comment.user?.first_name} {comment.user?.last_name}</Text>
+                            {comment.rating && (
+                              <HStack spacing={0.5} ml="auto">
+                                {[...Array(comment.rating)].map((_, idx) => (
+                                  <Icon key={idx} as={MdStar} color="yellow.400" boxSize={3} />
+                                ))}
+                              </HStack>
+                            )}
+                          </Flex>
+                          <Text fontSize="xs" color="gray.600">{comment.content}</Text>
+                          <Text fontSize="xs" color="gray.400" mt={1}>{new Date(comment.created_at).toLocaleDateString()}</Text>
+                        </Box>
+                      ))}
+                    </VStack>
+                  ) : (
+                    <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+                      <Text color="gray.500" fontSize="xs">No comments</Text>
+                    </Box>
+                  )}
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
+          </Box>
+        </Grid>
+      </Box>
     </Box>
   );
 };
+
+const renderOffersList = (
+  data: { inProgress?: any[]; completed?: any[]; active?: any[]; all?: any[] },
+  navigate: any,
+  pendingCounts?: Record<string, number>
+) => {
+  if (data.all) {
+    if (data.all.length === 0) {
+      return (
+        <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+          <Text color="gray.500" fontSize="xs">None yet</Text>
+        </Box>
+      )
+    }
+    return (
+      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+        {data.all.map((item: any) => <OfferCard key={item.id} item={item} navigate={navigate} pendingCount={pendingCounts?.[String(item.id)]} />)}
+      </SimpleGrid>
+    )
+  }
+
+  const { inProgress = [], completed = [], active = [] } = data
+  const hasAny = inProgress.length > 0 || completed.length > 0 || active.length > 0
+
+  if (!hasAny) {
+    return (
+      <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+        <Text color="gray.500" fontSize="xs">None yet</Text>
+      </Box>
+    )
+  }
+
+  return (
+    <VStack spacing={4} align="stretch">
+      {inProgress.length > 0 && (
+        <Box>
+          <Text fontSize="xs" fontWeight="600" color="blue.600" mb={2}>In Progress ({inProgress.length})</Text>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+            {inProgress.map((item: any) => <OfferCard key={item.id} item={item} navigate={navigate} status="in_progress" pendingCount={pendingCounts?.[String(item.id)]} />)}
+          </SimpleGrid>
+        </Box>
+      )}
+      {completed.length > 0 && (
+        <Box>
+          <Text fontSize="xs" fontWeight="600" color="green.600" mb={2}>Completed ({completed.length})</Text>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+            {completed.map((item: any) => <OfferCard key={item.id} item={item} navigate={navigate} status="completed" pendingCount={pendingCounts?.[String(item.id)]} />)}
+          </SimpleGrid>
+        </Box>
+      )}
+      {active.length > 0 && (
+        <Box>
+          <Text fontSize="xs" fontWeight="600" mb={2}>Active ({active.length})</Text>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+            {active.map((item: any) => <OfferCard key={item.id} item={item} navigate={navigate} status="active" pendingCount={pendingCounts?.[String(item.id)]} />)}
+          </SimpleGrid>
+        </Box>
+      )}
+    </VStack>
+  )
+}
+
+const OfferCard = ({ item, navigate, status, pendingCount }: { item: any; navigate: any; status?: string; pendingCount?: number }) => (
+  <Box
+    p={3}
+    borderRadius="md"
+    border="1px solid"
+    borderColor={status === 'in_progress' ? 'blue.200' : status === 'completed' ? 'green.200' : 'gray.100'}
+    bg={status === 'in_progress' ? 'blue.50' : status === 'completed' ? 'green.50' : 'white'}
+    cursor="pointer"
+    _hover={{ bg: status === 'in_progress' ? 'blue.100' : status === 'completed' ? 'green.100' : 'gray.50' }}
+    onClick={() => navigate(`/offer/${item.id}`)}
+  >
+    <Flex justify="space-between" align="flex-start" mb={1}>
+      <HStack spacing={2} flex={1} minW={0}>
+        <Text fontSize="sm" fontWeight="600" noOfLines={1}>{item.title}</Text>
+        {pendingCount && pendingCount > 0 && (
+          <Badge 
+            colorScheme="orange" 
+            fontSize="10px" 
+            borderRadius="full"
+            px={2}
+            flexShrink={0}
+          >
+            {pendingCount} request{pendingCount > 1 ? 's' : ''}
+          </Badge>
+        )}
+      </HStack>
+      <Badge fontSize="10px" colorScheme={status === 'in_progress' ? 'blue' : status === 'completed' ? 'green' : 'gray'} flexShrink={0} ml={1}>
+        {status === 'in_progress' ? 'In Progress' : status === 'completed' ? 'Done' : item.type}
+      </Badge>
+    </Flex>
+    <Text fontSize="xs" color="gray.500" noOfLines={1}>{item.description}</Text>
+    <HStack fontSize="xs" color="gray.500" mt={2}>
+      <Icon as={MdAccessTime} boxSize={3} />
+      <Text>{item.time_required}H</Text>
+    </HStack>
+  </Box>
+)
 
 export default ProfilePage;
