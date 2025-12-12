@@ -7,7 +7,6 @@ import CreateOfferPage from './pages/CreateOfferPage'
 import OfferDetailPage from './pages/OfferDetailPage'
 import TransactionsPage from './pages/TransactionsPage'
 import HandshakePage from './pages/HandshakePage'
-import AchievementTreePage from './pages/AchievementTreePage'
 import WantsPage from './pages/WantsPage'
 import ProfilePage from './pages/ProfilePage'
 import EditProfilePage from './pages/EditProfilePage'
@@ -119,14 +118,6 @@ function App() {
         element={
           <ProtectedRoute>
             <HandshakePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/achievements"
-        element={
-          <ProtectedRoute>
-            <AchievementTreePage />
           </ProtectedRoute>
         }
       />

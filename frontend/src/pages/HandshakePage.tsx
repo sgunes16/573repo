@@ -34,7 +34,6 @@ import UserAvatar from '@/components/UserAvatar'
 import ReportModal from '@/components/ReportModal'
 import { exchangeService } from '@/services/exchange.service'
 import { mapboxService } from '@/services/mapbox.service'
-import { getUserBadge } from '@/services/mock/mockData'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { getAccessToken } from '@/utils/cookies'
@@ -412,7 +411,6 @@ const HandshakePage = () => {
   const offer = exchange.offer
   const provider = exchange.provider
   const requester = exchange.requester
-  const providerBadge = getUserBadge((provider.profile as any)?.time_credits || 0)
   const steps = getProgressSteps()
   const stepLabels = ['Requested', 'Date Set', 'Accepted', 'Done']
 
@@ -486,9 +484,6 @@ const HandshakePage = () => {
                 <HStack spacing={1}>
                   <Badge bg="yellow.100" color="yellow.700" fontSize="10px">
                     ⭐ {((provider.profile as any)?.rating || 0).toFixed(1)}
-                  </Badge>
-                  <Badge colorScheme={providerBadge.color as any} fontSize="10px" textTransform="uppercase">
-                    {providerBadge.label}
                   </Badge>
                 </HStack>
               </Flex>

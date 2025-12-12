@@ -39,9 +39,6 @@ import { useNavigate } from 'react-router-dom'
 import Map, { Marker, Layer, Source } from 'react-map-gl'
 import type { MapRef } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import {
-  getUserBadge,
-} from '@/services/mock/mockData'
 import { exchangeService } from '@/services/exchange.service'
 import type { Offer, Exchange } from '@/types'
 import {
@@ -161,7 +158,6 @@ const OfferCardSkeleton = () => (
 
 const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locationAddress?: string; myExchange?: Exchange }) => {
   const navigate = useNavigate()
-  const badge = getUserBadge(offer.user?.profile?.time_credits || 0)
   const rating = offer.user?.profile?.rating ?? 0
   const userName = offer.user?.first_name || 'User'
   const displayLocation = truncateLocation(locationAddress || offer.location || '', 30)
@@ -197,16 +193,6 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
                 <Text fontSize="xs" fontWeight="600" color="yellow.700">{rating.toFixed(1)}</Text>
               </HStack>
             )}
-            <Badge
-              colorScheme={badge.color as any}
-              variant="subtle"
-              fontSize="10px"
-              fontWeight="600"
-              borderRadius="full"
-              px={2}
-            >
-              {badge.label}
-            </Badge>
             {myExchange && (
               <Badge
                 colorScheme={
@@ -445,7 +431,6 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
           const borderColor = isOffer ? '#38A169' : '#2C5282' // Green for offers, Navy for wants
           const userName = offer.user?.first_name || 'U'
           const userLastName = offer.user?.last_name || ''
-          const badge = getUserBadge(offer.user?.profile?.time_credits || 0)
           
           return (
             <Marker
@@ -492,23 +477,14 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
                           <Text fontWeight="bold" fontSize="sm">
                             {userName} {userLastName}
                           </Text>
-                          <HStack spacing={2}>
-                            <Badge
-                              bg={isOffer ? '#38A169' : '#2C5282'}
-                              color="white"
-                              fontSize="xs"
-                              textTransform="uppercase"
-                            >
-                              {isOffer ? 'OFFER' : 'WANT'}
-                            </Badge>
-                            <Badge
-                              colorScheme={badge.color as any}
-                              variant="subtle"
-                              fontSize="xs"
-                            >
-                              {badge.label}
-                            </Badge>
-                          </HStack>
+                          <Badge
+                            bg={isOffer ? '#38A169' : '#2C5282'}
+                            color="white"
+                            fontSize="xs"
+                            textTransform="uppercase"
+                          >
+                            {isOffer ? 'OFFER' : 'WANT'}
+                          </Badge>
                         </VStack>
                       </HStack>
                       

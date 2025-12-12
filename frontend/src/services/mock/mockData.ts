@@ -414,19 +414,3 @@ export const mockCurrentUser: User = withUserDefaults({
 
 // Helper function to simulate API delay
 export const delay = (ms: number = 500) => new Promise(resolve => setTimeout(resolve, ms))
-
-// Badge types
-export const badgeTypes = {
-  COMMUNITY_LEAD: 'COMMUNITY LEAD',
-  NEWCOMER: 'NEWCOMER',
-  SR_MEMBER: 'SR. MEMBER',
-  JR_MEMBER: 'JR. MEMBER',
-}
-
-// Get badge for user based on time credits
-export const getUserBadge = (timeCredits: number) => {
-  if (timeCredits >= 1000) return { label: badgeTypes.COMMUNITY_LEAD, color: 'purple' }
-  if (timeCredits >= 50) return { label: badgeTypes.SR_MEMBER, color: 'blue' }
-  if (timeCredits >= 10) return { label: badgeTypes.NEWCOMER, color: 'green' }
-  return { label: badgeTypes.JR_MEMBER, color: 'teal' }
-}

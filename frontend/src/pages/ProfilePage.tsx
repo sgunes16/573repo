@@ -168,7 +168,6 @@ const ProfilePage = () => {
                   <Text fontWeight="600">{`${viewingUser?.first_name || ''} ${viewingUser?.last_name || ''}`}</Text>
                   <Text fontSize="xs" color="gray.500">{profile?.location || "No location"}</Text>
                 </VStack>
-                <Badge colorScheme="purple" fontSize="xs">Member</Badge>
                 
                 {/* Stats */}
                 <SimpleGrid columns={isOwnProfile ? 4 : 3} w="full" gap={2} pt={2}>

@@ -119,7 +119,6 @@ export interface UserProfile {
   rating?: number
   phone_number?: string
   badges?: string[]
-  achievements?: string[]
 }
 
 export interface UserProfileResponse {
