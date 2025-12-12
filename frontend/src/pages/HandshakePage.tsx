@@ -244,10 +244,14 @@ const HandshakePage = () => {
   }
 
   const handleAccept = async () => {
-    if (!exchange) return
-    // Zaten accepted ise işlem yapma
+    if (!exchange || isSubmitting) return
+    // Already accepted - no action needed
     if (exchange.status === 'ACCEPTED') {
       toast({ title: 'Already accepted', status: 'info', duration: 2000 })
+      return
+    }
+    if (exchange.status !== 'PENDING') {
+      toast({ title: 'Cannot accept', description: 'Exchange is not in pending status', status: 'warning', duration: 2000 })
       return
     }
     setIsSubmitting(true)
@@ -257,12 +261,14 @@ const HandshakePage = () => {
       setExchange(updatedExchange)
       toast({ title: 'Accepted!', status: 'success', duration: 2000 })
     } catch (error: any) {
-      // Zaten accepted hatası ise sadece exchange'i yenile
-      if (error.response?.data?.error?.includes('already') || error.response?.data?.error?.includes('Already')) {
+      const errorMsg = error.response?.data?.error || ''
+      // Already accepted or not pending - just refresh exchange state
+      if (errorMsg.includes('pending') || errorMsg.includes('already') || errorMsg.includes('Already')) {
         const updatedExchange = await exchangeService.getExchange(exchange.id.toString())
         setExchange(updatedExchange)
+        // Don't show error toast - state will update from refresh
       } else {
-        toast({ title: 'Error', description: error.response?.data?.error, status: 'error', duration: 3000 })
+        toast({ title: 'Error', description: errorMsg, status: 'error', duration: 3000 })
       }
     } finally {
       setIsSubmitting(false)
@@ -270,21 +276,56 @@ const HandshakePage = () => {
   }
 
   const handleReject = async () => {
-    if (!exchange) return
+    if (!exchange || isSubmitting) return
+    if (exchange.status !== 'PENDING') {
+      toast({ title: 'Cannot reject', description: 'Exchange is not in pending status', status: 'warning', duration: 2000 })
+      return
+    }
     setIsSubmitting(true)
     try {
       await exchangeService.rejectExchange(exchange.id.toString())
       toast({ title: 'Rejected', status: 'info', duration: 2000 })
       navigate('/dashboard')
     } catch (error: any) {
-      toast({ title: 'Error', description: error.response?.data?.error, status: 'error', duration: 3000 })
+      const errorMsg = error.response?.data?.error || ''
+      if (errorMsg.includes('pending')) {
+        // Status changed, refresh and redirect
+        navigate('/dashboard')
+      } else {
+        toast({ title: 'Error', description: errorMsg, status: 'error', duration: 3000 })
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!exchange || isSubmitting) return
+    if (!['PENDING', 'ACCEPTED'].includes(exchange.status)) {
+      toast({ title: 'Cannot cancel', description: 'Exchange cannot be cancelled in current status', status: 'warning', duration: 2000 })
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      await exchangeService.cancelExchange(exchange.id.toString())
+      toast({ title: 'Cancelled', description: 'Your request has been cancelled and time credits returned', status: 'info', duration: 3000 })
+      navigate('/dashboard')
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || ''
+      toast({ title: 'Error', description: errorMsg, status: 'error', duration: 3000 })
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleConfirmCompletion = async () => {
-    if (!exchange) return
+    if (!exchange || isSubmitting) return
+    // Check if already confirmed by this user
+    const myConfirmed = isRequester ? exchange.requester_confirmed : exchange.provider_confirmed
+    if (myConfirmed) {
+      toast({ title: 'Already confirmed', status: 'info', duration: 2000 })
+      return
+    }
     setIsSubmitting(true)
     try {
       await exchangeService.confirmCompletion(exchange.id.toString())
@@ -298,7 +339,17 @@ const HandshakePage = () => {
         toast({ title: 'Waiting for other party', status: 'info', duration: 2000 })
       }
     } catch (error: any) {
-      toast({ title: 'Error', description: error.response?.data?.error, status: 'error', duration: 3000 })
+      const errorMsg = error.response?.data?.error || ''
+      // If already confirmed or completed, just refresh state
+      if (errorMsg.includes('already') || errorMsg.includes('Already') || errorMsg.includes('completed')) {
+        const updatedExchange = await exchangeService.getExchange(exchange.id.toString())
+        setExchange(updatedExchange)
+        if (updatedExchange.status === 'COMPLETED' && !hasRated()) {
+          onRatingOpen()
+        }
+      } else {
+        toast({ title: 'Error', description: errorMsg, status: 'error', duration: 3000 })
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -518,7 +569,14 @@ const HandshakePage = () => {
 
             {/* Actions */}
             {exchange.status === 'PENDING' && isRequester && !exchange.proposed_date && (
-              <Button colorScheme="yellow" size="sm" onClick={onProposeOpen}>Propose Date</Button>
+              <VStack spacing={2} align="stretch">
+                <Button colorScheme="yellow" size="sm" onClick={onProposeOpen}>Propose Date</Button>
+                <Button colorScheme="red" variant="outline" size="sm" onClick={handleCancel} isLoading={isSubmitting}>Cancel Request</Button>
+              </VStack>
+            )}
+
+            {exchange.status === 'PENDING' && isRequester && exchange.proposed_date && (
+              <Button colorScheme="red" variant="outline" size="sm" onClick={handleCancel} isLoading={isSubmitting}>Cancel Request</Button>
             )}
             
             {exchange.status === 'PENDING' && isProvider && exchange.proposed_date && (
@@ -530,7 +588,7 @@ const HandshakePage = () => {
 
             {exchange.status === 'ACCEPTED' && (
               <>
-                {/* Eğer ben onayladıysam ama karşı taraf henüz onaylamadıysa */}
+                {/* If I confirmed but other party hasn't */}
                 {(isRequester ? exchange.requester_confirmed : exchange.provider_confirmed) && 
                  !(isRequester ? exchange.provider_confirmed : exchange.requester_confirmed) && (
                   <Box 
@@ -548,16 +606,29 @@ const HandshakePage = () => {
                     </HStack>
                   </Box>
                 )}
-                {/* Eğer ben henüz onaylamadıysam */}
+                {/* If I haven't confirmed yet */}
                 {!(isRequester ? exchange.requester_confirmed : exchange.provider_confirmed) && (
-                  <Button 
-                    colorScheme="yellow" 
-                    size="sm"
-                    onClick={handleConfirmCompletion}
-                    isLoading={isSubmitting}
-                  >
-                    Mark Complete
-                  </Button>
+                  <VStack spacing={2} align="stretch">
+                    <Button 
+                      colorScheme="yellow" 
+                      size="sm"
+                      onClick={handleConfirmCompletion}
+                      isLoading={isSubmitting}
+                    >
+                      Mark Complete
+                    </Button>
+                    {isRequester && (
+                      <Button 
+                        colorScheme="red" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleCancel}
+                        isLoading={isSubmitting}
+                      >
+                        Cancel Request
+                      </Button>
+                    )}
+                  </VStack>
                 )}
               </>
             )}

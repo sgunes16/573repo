@@ -262,6 +262,12 @@ class OffersView(APIView):
 class OfferDetailView(APIView):
     """Get details of a single offer/want"""
     
+    def get_permissions(self):
+        """GET is public, PUT requires authentication"""
+        if self.request.method == 'PUT':
+            return [IsAuthenticated()]
+        return []
+    
     def get(self, request, offer_id):
         try:
             offer = Offer.objects.select_related('user', 'user__profile').prefetch_related('offer_images').get(id=offer_id)
@@ -310,6 +316,74 @@ class OfferDetailView(APIView):
             "created_at": offer.created_at,
             "updated_at": offer.updated_at,
         })
+    
+    def put(self, request, offer_id):
+        """Update an existing offer"""
+        try:
+            offer = Offer.objects.get(id=offer_id)
+            
+            # Only owner can update
+            if offer.user != request.user:
+                return Response({"error": "Not authorized to update this offer"}, status=403)
+            
+            # Update fields
+            if 'title' in request.data:
+                offer.title = request.data['title']
+            if 'description' in request.data:
+                offer.description = request.data['description']
+            if 'tags' in request.data:
+                offer.tags = request.data['tags']
+            if 'time_required' in request.data:
+                offer.time_required = request.data['time_required']
+            if 'activity_type' in request.data:
+                offer.activity_type = request.data['activity_type']
+            if 'person_count' in request.data:
+                offer.person_count = request.data['person_count']
+            if 'location_type' in request.data:
+                offer.location_type = request.data['location_type']
+            if 'status' in request.data:
+                offer.status = request.data['status']
+            
+            # Handle location data
+            location_data = request.data.get('location', {})
+            if isinstance(location_data, dict):
+                if 'address' in location_data:
+                    offer.location = location_data.get('address', '')
+                if 'latitude' in location_data and 'longitude' in location_data:
+                    offer.geo_location = [location_data.get('latitude', 0), location_data.get('longitude', 0)]
+            
+            # Handle date/time
+            if 'date' in request.data:
+                date_str = request.data['date']
+                if date_str:
+                    try:
+                        offer.date = date.fromisoformat(date_str)
+                    except:
+                        pass
+                else:
+                    offer.date = None
+                    
+            if 'time' in request.data:
+                time_str = request.data['time']
+                if time_str:
+                    try:
+                        offer.time = time.fromisoformat(time_str)
+                    except:
+                        pass
+                else:
+                    offer.time = None
+            
+            offer.save()
+            
+            return Response({
+                "message": "Offer updated successfully",
+                "offer_id": offer.id
+            })
+            
+        except Offer.DoesNotExist:
+            return Response({"error": "Offer not found"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
 
 
 class CreateOfferView(APIView):

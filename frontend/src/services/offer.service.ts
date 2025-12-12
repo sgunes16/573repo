@@ -20,6 +20,11 @@ export const offerService = {
     return response
   },
 
+  async updateOffer(offerId: string | number, offer: Partial<Offer>): Promise<CreateOfferResponse> {
+    const response = await apiService.put<CreateOfferResponse>(`/offers/${offerId}/`, offer)
+    return response
+  },
+
   async uploadImages(offerId: string | number, files: File[]): Promise<UploadImageResponse> {
     const formData = new FormData()
     files.forEach((file) => {

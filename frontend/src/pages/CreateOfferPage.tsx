@@ -41,6 +41,8 @@ const CreateOfferPage = () => {
   const { geoLocation } = useGeoStore()
   const toast = useToast()
   
+  const editOfferId = searchParams.get('edit')
+  const isEditMode = !!editOfferId
   const pageType = searchParams.get('type') === 'want' ? 'want' : 'offer'
   
   const [title, setTitle] = useState('')
@@ -56,6 +58,8 @@ const CreateOfferPage = () => {
   const [images, setImages] = useState<UploadedImage[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [isLoadingOffer, setIsLoadingOffer] = useState(false)
+  const [offerType, setOfferType] = useState<'offer' | 'want'>(pageType as 'offer' | 'want')
   
   const [myLocationAddress, setMyLocationAddress] = useState<string>('Loading...')
   const [otherLocationInput, setOtherLocationInput] = useState('')
@@ -63,6 +67,68 @@ const CreateOfferPage = () => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false)
   const [locationSearchResults, setLocationSearchResults] = useState<Array<{ longitude: number; latitude: number; address: string }>>([])
   const [showLocationDropdown, setShowLocationDropdown] = useState(false)
+
+  // Load offer data in edit mode
+  useEffect(() => {
+    if (!isEditMode || !editOfferId) return
+    
+    const fetchOffer = async () => {
+      setIsLoadingOffer(true)
+      try {
+        const offer = await offerService.getOfferById(editOfferId)
+        
+        // Pre-fill form fields
+        setTitle(offer.title || '')
+        setDescription(offer.description || '')
+        setEnteredTags(offer.tags || [])
+        setDuration(String(offer.time_required || 1))
+        setActivityType((offer.activity_type as '1to1' | 'group') || '1to1')
+        setPersonCount(String(offer.person_count || 1))
+        setLocationType((offer.location_type as typeof location_type[number]) || 'myLocation')
+        setOfferType(offer.type as 'offer' | 'want')
+        
+        // Handle date/time
+        if (offer.date) {
+          const dateStr = typeof offer.date === 'string' ? offer.date.split('T')[0] : offer.date
+          setDate(dateStr)
+        }
+        if (offer.time) {
+          const timeStr = typeof offer.time === 'string' ? offer.time.substring(0, 5) : ''
+          setTime(timeStr)
+        }
+        
+        // Handle location
+        if (offer.location_type === 'otherLocation' && offer.geo_location && offer.geo_location.length === 2) {
+          const address = offer.location || await mapboxService.reverseGeocode(offer.geo_location[1], offer.geo_location[0])
+          setOtherLocationInput(address)
+          setOtherLocationCoords({
+            latitude: offer.geo_location[0],
+            longitude: offer.geo_location[1],
+            address
+          })
+        }
+        
+        // Load existing images
+        if (offer.images && offer.images.length > 0) {
+          const existingImages: UploadedImage[] = offer.images.map((img: any) => ({
+            id: String(img.id),
+            url: img.url,
+            isNew: false
+          }))
+          setImages(existingImages)
+        }
+        
+      } catch (error) {
+        console.error('Failed to fetch offer:', error)
+        toast({ title: 'Error', description: 'Failed to load offer', status: 'error', duration: 2000 })
+        navigate('/dashboard')
+      } finally {
+        setIsLoadingOffer(false)
+      }
+    }
+    
+    fetchOffer()
+  }, [editOfferId, isEditMode, navigate, toast])
 
   const errors = useMemo(() => {
     const errs: Record<string, string> = {}
@@ -155,7 +221,7 @@ const CreateOfferPage = () => {
     }
     
     const offerData = {
-      type: pageType,
+      type: isEditMode ? offerType : pageType,
       title,
       description,
       tags: enteredTags,
@@ -170,26 +236,52 @@ const CreateOfferPage = () => {
     }
     
     try {
-      const response = await offerService.createOffer(offerData as any)
+      let offerId: string
       
+      if (isEditMode && editOfferId) {
+        // Update existing offer
+        await offerService.updateOffer(editOfferId, offerData as any)
+        offerId = editOfferId
+        toast({ title: 'Updated!', status: 'success', duration: 2000 })
+      } else {
+        // Create new offer
+        const response = await offerService.createOffer(offerData as any)
+        offerId = response.offer_id
+        toast({ title: 'Published!', status: 'success', duration: 2000 })
+      }
+      
+      // Upload new images
       const newImages = images.filter(img => img.isNew && img.file)
-      if (newImages.length > 0 && response.offer_id) {
+      if (newImages.length > 0 && offerId) {
         try {
           const files = newImages.map(img => img.file!).filter(Boolean)
-          await offerService.uploadImages(response.offer_id, files)
+          await offerService.uploadImages(offerId, files)
         } catch (imageError) {
           console.error('Failed to upload images:', imageError)
         }
       }
       
-      toast({ title: 'Published!', status: 'success', duration: 2000 })
-      navigate('/dashboard')
+      navigate(isEditMode ? `/offer/${editOfferId}` : '/dashboard')
     } catch (error) {
-      console.error('Failed to create offer:', error)
-      toast({ title: 'Error', description: 'Failed to publish', status: 'error', duration: 2000 })
+      console.error('Failed to save offer:', error)
+      toast({ title: 'Error', description: isEditMode ? 'Failed to update' : 'Failed to publish', status: 'error', duration: 2000 })
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (isLoadingOffer) {
+    return (
+      <Box bg="white" minH="100vh">
+        <Navbar showUserInfo={true} />
+        <Flex justify="center" align="center" h="50vh">
+          <VStack spacing={3}>
+            <Spinner size="lg" color="yellow.400" />
+            <Text color="gray.500">Loading offer...</Text>
+          </VStack>
+        </Flex>
+      </Box>
+    )
   }
 
   return (
@@ -209,10 +301,14 @@ const CreateOfferPage = () => {
           </Box>
           <Box>
             <Text fontWeight="600" fontSize="lg">
-              {pageType === 'want' ? 'New Want' : 'New Offer'}
+              {isEditMode 
+                ? `Edit ${offerType === 'want' ? 'Want' : 'Offer'}`
+                : pageType === 'want' ? 'New Want' : 'New Offer'}
             </Text>
             <Text fontSize="xs" color="gray.500">
-              {pageType === 'want' ? 'Request help from the community' : 'Share your skills with the community'}
+              {isEditMode 
+                ? 'Update your listing'
+                : pageType === 'want' ? 'Request help from the community' : 'Share your skills with the community'}
             </Text>
           </Box>
         </Flex>
@@ -464,12 +560,15 @@ const CreateOfferPage = () => {
               size="md"
               borderRadius="md"
               fontWeight="500"
-              isLoading={isSubmitting}
-              loadingText="Publishing..."
+              isLoading={isSubmitting || isLoadingOffer}
+              loadingText={isEditMode ? "Saving..." : "Publishing..."}
               _hover={{ bg: 'yellow.500' }}
               _disabled={{ bg: 'gray.300' }}
+              isDisabled={isLoadingOffer}
             >
-              Publish {pageType === 'want' ? 'Want' : 'Offer'}
+              {isEditMode 
+                ? 'Save Changes' 
+                : `Publish ${pageType === 'want' ? 'Want' : 'Offer'}`}
             </Button>
           </VStack>
         </Box>
