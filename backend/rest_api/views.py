@@ -10,6 +10,35 @@ from django.db.models import Q, Avg
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
+
+def send_notification(user, content):
+    """Create notification and send via WebSocket"""
+    notification = Notification.objects.create(
+        user=user,
+        content=content
+    )
+    
+    # Send via WebSocket
+    try:
+        channel_layer = get_channel_layer()
+        room_group_name = f'notifications_{user.id}'
+        
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                'type': 'notification_message',
+                'notification': {
+                    'id': notification.id,
+                    'content': notification.content,
+                    'is_read': notification.is_read,
+                    'created_at': notification.created_at.isoformat(),
+                }
+            }
+        )
+    except Exception as e:
+        print(f"Error sending notification via WebSocket: {e}")
+
+
 class HomeView(APIView):
     def get(self, request):
         return Response({"message": "Home page"})
@@ -485,7 +514,7 @@ class CreateExchangeView(APIView):
             existing = Exchange.objects.filter(
                 offer=offer,
                 requester=request.user,
-                status__in=['PENDING', 'ACCEPTED', 'IN_PROGRESS']
+                status__in=['PENDING', 'ACCEPTED']
             ).first()
             if existing:
                 return Response({"error": "Exchange request already exists"}, status=400)
@@ -509,6 +538,12 @@ class CreateExchangeView(APIView):
                 requester=request.user,
                 status='PENDING',
                 time_spent=offer.time_required
+            )
+
+            # Send notification to provider (offer owner)
+            send_notification(
+                offer.user,
+                f"You have received a new handshake request for '{offer.title}' from {request.user.first_name} {request.user.last_name}"
             )
 
             return Response({
@@ -810,6 +845,12 @@ class ProposeDateTimeView(APIView):
             exchange.proposed_time = proposed_time
             exchange.save()
             
+            # Send notification to provider
+            send_notification(
+                exchange.provider,
+                f"{exchange.requester.first_name} {exchange.requester.last_name} proposed a date/time for '{exchange.offer.title}': {proposed_date} {proposed_time or ''}"
+            )
+            
             # Send websocket update
             self.send_exchange_update(exchange)
 
@@ -867,6 +908,12 @@ class AcceptExchangeView(APIView):
             exchange.status = 'ACCEPTED'
             exchange.save()
             
+            # Send notification to requester
+            send_notification(
+                exchange.requester,
+                f"Your handshake request for '{exchange.offer.title}' has been accepted!"
+            )
+            
             # Send websocket update
             self.send_exchange_update(exchange)
 
@@ -901,8 +948,54 @@ class RejectExchangeView(APIView):
             exchange.status = 'CANCELLED'
             exchange.save()
 
+            # Send notification to requester
+            send_notification(
+                exchange.requester,
+                f"Your handshake request for '{exchange.offer.title}' has been rejected. Your time credits have been unfrozen."
+            )
+
             return Response({
                 "message": "Exchange rejected and time unfrozen",
+                "status": exchange.status,
+            })
+
+        except Exchange.DoesNotExist:
+            return Response({"error": "Exchange not found"}, status=404)
+
+
+class CancelExchangeView(APIView):
+    """Requester cancels their own exchange request"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, exchange_id):
+        try:
+            exchange = Exchange.objects.get(id=exchange_id)
+            
+            # Only requester can cancel their own request
+            if exchange.requester != request.user:
+                return Response({"error": "Only requester can cancel their own request"}, status=403)
+
+            if exchange.status not in ['PENDING', 'ACCEPTED']:
+                return Response({"error": "Exchange cannot be cancelled in current status"}, status=400)
+
+            # Unfreeze requester's time
+            try:
+                requester_timebank = exchange.requester.timebank
+                requester_timebank.unblock_credit(exchange.time_spent)
+            except Exception:
+                pass
+
+            exchange.status = 'CANCELLED'
+            exchange.save()
+
+            # Send notification to provider
+            send_notification(
+                exchange.provider,
+                f"Handshake request for '{exchange.offer.title}' has been cancelled by {exchange.requester.first_name}."
+            )
+
+            return Response({
+                "message": "Exchange cancelled and time unfrozen",
                 "status": exchange.status,
             })
 
@@ -916,55 +1009,84 @@ class ConfirmCompletionView(APIView):
 
     def post(self, request, exchange_id):
         try:
-            exchange = Exchange.objects.get(id=exchange_id)
-            
-            # Check if user is part of exchange
-            if exchange.provider != request.user and exchange.requester != request.user:
-                return Response({"error": "Not authorized"}, status=403)
-
-            if exchange.status != 'ACCEPTED':
-                return Response({"error": "Exchange must be accepted first"}, status=400)
-
-            # Mark confirmation
-            if request.user == exchange.requester:
-                exchange.requester_confirmed = True
-            elif request.user == exchange.provider:
-                exchange.provider_confirmed = True
-
-            # If both confirmed, mark as completed and transfer time
-            if exchange.requester_confirmed and exchange.provider_confirmed:
-                exchange.status = 'COMPLETED'
-                exchange.completed_at = datetime.now()
+            # Use select_for_update to prevent race conditions
+            with transaction.atomic():
+                exchange = Exchange.objects.select_for_update().get(id=exchange_id)
                 
-                # Unblock and transfer time immediately when completed
-                requester_timebank = exchange.requester.timebank
-                provider_timebank, _ = TimeBank.objects.get_or_create(
-                    user=exchange.provider,
-                    defaults={'amount': 0, 'blocked_amount': 0, 'available_amount': 0, 'total_amount': 0}
-                )
-                
-                # Unfreeze requester's time
-                requester_timebank.unblock_credit(exchange.time_spent)
-                
-                # Transfer time
-                if requester_timebank.amount >= exchange.time_spent:
-                    requester_timebank.spend_credit(exchange.time_spent)
-                    provider_timebank.add_credit(exchange.time_spent)
+                # Check if user is part of exchange
+                if exchange.provider != request.user and exchange.requester != request.user:
+                    return Response({"error": "Not authorized"}, status=403)
+
+                if exchange.status == 'COMPLETED':
+                    return Response({"error": "Exchange is already completed"}, status=400)
+
+                if exchange.status != 'ACCEPTED':
+                    return Response({"error": "Exchange must be accepted first"}, status=400)
+
+                # Mark confirmation
+                if request.user == exchange.requester:
+                    if exchange.requester_confirmed:
+                        return Response({"error": "You have already confirmed"}, status=400)
+                    exchange.requester_confirmed = True
+                    # Notify provider that requester confirmed
+                    send_notification(
+                        exchange.provider,
+                        f"{exchange.requester.first_name} {exchange.requester.last_name} confirmed completion of '{exchange.offer.title}'"
+                    )
+                elif request.user == exchange.provider:
+                    if exchange.provider_confirmed:
+                        return Response({"error": "You have already confirmed"}, status=400)
+                    exchange.provider_confirmed = True
+                    # Notify requester that provider confirmed
+                    send_notification(
+                        exchange.requester,
+                        f"{exchange.provider.first_name} {exchange.provider.last_name} confirmed completion of '{exchange.offer.title}'"
+                    )
+
+                # If both confirmed, mark as completed and transfer time
+                if exchange.requester_confirmed and exchange.provider_confirmed:
+                    exchange.status = 'COMPLETED'
+                    exchange.completed_at = datetime.now()
                     
-                    # Create transaction record if it doesn't exist
-                    if not TimeBankTransaction.objects.filter(exchange=exchange).exists():
-                        TimeBankTransaction.objects.create(
-                            from_user=exchange.requester,
-                            to_user=exchange.provider,
-                            exchange=exchange,
-                            time_amount=exchange.time_spent,
-                            transaction_type='SPEND',
-                            description=f'Exchange completed: {exchange.offer.title}'
+                    # Unblock and transfer time immediately when completed
+                    requester_timebank = TimeBank.objects.select_for_update().get(user=exchange.requester)
+                    provider_timebank, _ = TimeBank.objects.select_for_update().get_or_create(
+                        user=exchange.provider,
+                        defaults={'amount': 0, 'blocked_amount': 0, 'available_amount': 0, 'total_amount': 0}
+                    )
+                    
+                    # Unfreeze requester's time first
+                    requester_timebank.unblock_credit(exchange.time_spent)
+                    
+                    # Transfer time - check available_amount after unblocking
+                    if requester_timebank.available_amount >= exchange.time_spent:
+                        requester_timebank.spend_credit(exchange.time_spent)
+                        provider_timebank.add_credit(exchange.time_spent)
+                        
+                        # Create transaction record if it doesn't exist
+                        if not TimeBankTransaction.objects.filter(exchange=exchange).exists():
+                            TimeBankTransaction.objects.create(
+                                from_user=exchange.requester,
+                                to_user=exchange.provider,
+                                exchange=exchange,
+                                time_amount=exchange.time_spent,
+                                transaction_type='SPEND',
+                                description=f'Exchange completed: {exchange.offer.title}'
+                            )
+                        
+                        # Send completion notifications
+                        send_notification(
+                            exchange.requester,
+                            f"Exchange '{exchange.offer.title}' has been completed! {exchange.time_spent}H time credits have been transferred."
+                        )
+                        send_notification(
+                            exchange.provider,
+                            f"Exchange '{exchange.offer.title}' has been completed! You received {exchange.time_spent}H time credits."
                         )
 
-            exchange.save()
+                exchange.save()
             
-            # Send websocket update
+            # Send websocket update (outside transaction)
             self.send_exchange_update(exchange)
 
             return Response({
@@ -1401,7 +1523,7 @@ class UserProfileDetailView(APIView):
             
             has_in_progress = Exchange.objects.filter(
                 offer=offer,
-                status__in=['ACCEPTED', 'IN_PROGRESS'],
+                status='ACCEPTED',
                 proposed_date__gte=today
             ).exists()
             
@@ -1440,7 +1562,7 @@ class UserProfileDetailView(APIView):
             
             has_in_progress = Exchange.objects.filter(
                 offer=want,
-                status__in=['ACCEPTED', 'IN_PROGRESS'],
+                status='ACCEPTED',
                 proposed_date__gte=today
             ).exists()
             
@@ -1771,35 +1893,42 @@ class AdminReportResolveView(APIView):
                         offer.status = 'CANCELLED'
                         offer.save()
                         # Notify content owner
-                        Notification.objects.create(
-                            user=offer.user,
-                            content=f"Your {report.target_type} '{offer.title}' has been removed due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
+                        send_notification(
+                            offer.user,
+                            f"Your {report.target_type} '{offer.title}' has been removed due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
                         )
                     except Offer.DoesNotExist:
                         pass
                 elif report.target_type == 'exchange':
                     try:
                         exchange = Exchange.objects.get(id=report.target_id)
+                        # Return frozen time to requester before cancelling
+                        if exchange.status in ['PENDING', 'ACCEPTED'] and exchange.requester:
+                            try:
+                                requester_timebank = exchange.requester.timebank
+                                requester_timebank.unblock_credit(exchange.time_spent)
+                            except Exception:
+                                pass
                         exchange.status = 'CANCELLED'
                         exchange.save()
                         # Notify both participants
                         if exchange.provider:
-                            Notification.objects.create(
-                                user=exchange.provider,
-                                content=f"Exchange #{exchange.id} has been cancelled due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
+                            send_notification(
+                                exchange.provider,
+                                f"Exchange #{exchange.id} has been cancelled due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
                             )
                         if exchange.requester:
-                            Notification.objects.create(
-                                user=exchange.requester,
-                                content=f"Exchange #{exchange.id} has been cancelled due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
+                            send_notification(
+                                exchange.requester,
+                                f"Exchange #{exchange.id} has been cancelled due to a report. Your frozen time credits have been returned. Reason: {admin_notes or 'Violation of community guidelines'}"
                             )
                     except Exchange.DoesNotExist:
                         pass
 
                 # Send notification to reporter
-                Notification.objects.create(
-                    user=report.reporter,
-                    content=f"Action has been taken on your report #{report.id}. The reported content has been removed."
+                send_notification(
+                    report.reporter,
+                    f"Action has been taken on your report #{report.id}. The reported content has been removed."
                 )
 
                 report.status = 'RESOLVED'
@@ -1835,15 +1964,15 @@ class AdminReportResolveView(APIView):
 
                 # Send notification to banned user
                 if banned_user:
-                    Notification.objects.create(
-                        user=banned_user,
-                        content=f"Your account has been banned. Reason: {admin_notes or 'Violation of community guidelines'}"
+                    send_notification(
+                        banned_user,
+                        f"Your account has been banned. Reason: {admin_notes or 'Violation of community guidelines'}"
                     )
 
                 # Send notification to reporter
-                Notification.objects.create(
-                    user=report.reporter,
-                    content=f"Action has been taken on your report #{report.id}. The reported user has been banned."
+                send_notification(
+                    report.reporter,
+                    f"Action has been taken on your report #{report.id}. The reported user has been banned."
                 )
 
                 report.status = 'RESOLVED'
@@ -1862,9 +1991,9 @@ class AdminReportResolveView(APIView):
                     warned_user.warning_count = (warned_user.warning_count or 0) + 1
                     warned_user.save()
                     
-                    Notification.objects.create(
-                        user=warned_user,
-                        content=f"Admin Warning: {admin_notes or 'You have been warned due to a report.'}"
+                    send_notification(
+                        warned_user,
+                        f"Admin Warning: {admin_notes or 'You have been warned due to a report.'}"
                     )
                 report.status = 'RESOLVED'
                 report.resolved_by = request.user
@@ -1872,9 +2001,9 @@ class AdminReportResolveView(APIView):
                 report.save()
 
                 # Send notification to reporter
-                Notification.objects.create(
-                    user=report.reporter,
-                    content=f"Action has been taken on your report #{report.id}. The reported user has been warned."
+                send_notification(
+                    report.reporter,
+                    f"Action has been taken on your report #{report.id}. The reported user has been warned."
                 )
 
             elif action == 'dismiss':
@@ -1885,9 +2014,9 @@ class AdminReportResolveView(APIView):
                 report.save()
 
                 # Send notification to reporter
-                Notification.objects.create(
-                    user=report.reporter,
-                    content=f"Your report #{report.id} has been reviewed and dismissed. {admin_notes or 'Thank you for your report.'}"
+                send_notification(
+                    report.reporter,
+                    f"Your report #{report.id} has been reviewed and dismissed. {admin_notes or 'Thank you for your report.'}"
                 )
 
             else:
@@ -2035,9 +2164,9 @@ class AdminWarnUserView(APIView):
         target_user.save()
 
         # Create a notification for the user
-        Notification.objects.create(
-            user=target_user,
-            content=f"Admin Warning: {message}"
+        send_notification(
+            target_user,
+            f"Admin Warning: {message}"
         )
 
         return Response({
@@ -2201,13 +2330,22 @@ class NotificationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+        # Filter by read status if query param provided
+        is_read = request.query_params.get('is_read')
+        
+        notifications = Notification.objects.filter(user=request.user)
+        
+        if is_read is not None:
+            notifications = notifications.filter(is_read=is_read.lower() == 'true')
+        
+        notifications = notifications.order_by('-created_at')
         
         notifications_data = []
         for notification in notifications:
             notifications_data.append({
                 "id": notification.id,
                 "content": notification.content,
+                "is_read": notification.is_read,
                 "created_at": notification.created_at.isoformat(),
             })
         
@@ -2215,8 +2353,25 @@ class NotificationsView(APIView):
 
 
 class MarkNotificationReadView(APIView):
-    """Mark notification as read (delete it)"""
+    """Mark notification as read or delete it"""
     permission_classes = [IsAuthenticated]
+
+    def patch(self, request, notification_id):
+        """Mark notification as read/unread"""
+        try:
+            notification = Notification.objects.get(id=notification_id, user=request.user)
+            # Toggle or set is_read based on request data
+            is_read = request.data.get('is_read', True)
+            notification.is_read = is_read
+            notification.save()
+            return Response({
+                "id": notification.id,
+                "content": notification.content,
+                "is_read": notification.is_read,
+                "created_at": notification.created_at.isoformat(),
+            })
+        except Notification.DoesNotExist:
+            return Response({"error": "Notification not found"}, status=404)
 
     def delete(self, request, notification_id):
         try:
@@ -2225,3 +2380,12 @@ class MarkNotificationReadView(APIView):
             return Response({"message": "Notification deleted"})
         except Notification.DoesNotExist:
             return Response({"error": "Notification not found"}, status=404)
+
+
+class MarkAllNotificationsReadView(APIView):
+    """Mark all notifications as read"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({"message": "All notifications marked as read"})

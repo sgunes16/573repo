@@ -1,7 +1,9 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from rest_api.models import User, Exchange, Message, Chat
+from channels.layers import get_channel_layer
+from asgiref.sync import sync_to_async
+from rest_api.models import User, Exchange, Message, Chat, Notification
 
 
 class AuthenticatedWebsocketConsumer(AsyncWebsocketConsumer):
@@ -132,8 +134,14 @@ class ChatConsumer(AuthenticatedWebsocketConsumer):
                 }))
                 return
             
-            # Save message to database
-            message = await self.save_message(exchange, message_content)
+            # Save message to database and create notification
+            result = await self.save_message_and_notify(exchange, message_content)
+            message = result['message']
+            notification_data = result.get('notification_data')
+            
+            # Send notification via WebSocket if created
+            if notification_data:
+                await self.send_notification_websocket(notification_data)
             
             # Get user avatar
             user_avatar = await self.get_user_avatar(message.user)
@@ -190,8 +198,8 @@ class ChatConsumer(AuthenticatedWebsocketConsumer):
         return exchange.provider == self.user or exchange.requester == self.user
     
     @database_sync_to_async
-    def save_message(self, exchange, content):
-        """Save message to database"""
+    def save_message_and_notify(self, exchange, content):
+        """Save message to database and create notification"""
         # Get or create chat for this exchange
         chat, created = Chat.objects.get_or_create(
             exchange=exchange,
@@ -205,7 +213,50 @@ class ChatConsumer(AuthenticatedWebsocketConsumer):
             content=content
         )
         
-        return message
+        # Determine the other user and create notification
+        notification_data = None
+        other_user = exchange.requester if exchange.provider == self.user else exchange.provider
+        if other_user:
+            # Get offer title safely
+            offer_title = exchange.offer.title if exchange.offer else 'Exchange'
+            notification_content = f"New message from {self.user.first_name} {self.user.last_name} in '{offer_title}': {content[:50]}{'...' if len(content) > 50 else ''}"
+            
+            notification = Notification.objects.create(
+                user=other_user,
+                content=notification_content
+            )
+            
+            # Return data needed for WebSocket (primitive types only)
+            notification_data = {
+                'user_id': other_user.id,
+                'id': notification.id,
+                'content': notification.content,
+                'created_at': notification.created_at.isoformat(),
+            }
+        
+        return {
+            'message': message,
+            'notification_data': notification_data,
+        }
+    
+    async def send_notification_websocket(self, notification_data):
+        """Send notification via WebSocket"""
+        try:
+            room_group_name = f'notifications_{notification_data["user_id"]}'
+            
+            await self.channel_layer.group_send(
+                room_group_name,
+                {
+                    'type': 'notification_message',
+                    'notification': {
+                        'id': notification_data['id'],
+                        'content': notification_data['content'],
+                        'created_at': notification_data['created_at'],
+                    }
+                }
+            )
+        except Exception as e:
+            print(f"Error sending chat notification via WebSocket: {e}")
     
     async def send_existing_messages(self):
         """Send existing messages to client"""
@@ -368,3 +419,51 @@ class ExchangeConsumer(AuthenticatedWebsocketConsumer):
         except Exception as e:
             print(f"Error getting exchange data: {e}")
             return None
+
+
+class NotificationConsumer(AuthenticatedWebsocketConsumer):
+    """Consumer for real-time notifications"""
+    
+    async def connect(self):
+        # User-specific room group
+        self.user_id = None
+        user = await self.authenticate_user()
+        if not user:
+            await self.close()
+            return
+        
+        self.user = user
+        self.user_id = str(user.id)
+        self.room_group_name = f'notifications_{self.user_id}'
+        
+        # Join room group
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+        
+        await self.accept()
+        print(f"[NotificationConsumer] Connected for user {user.email}")
+    
+    async def disconnect(self, close_code):
+        # Leave room group
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+    
+    async def receive(self, text_data):
+        """Receive message from WebSocket"""
+        # Notification consumer is read-only, only sends updates
+        pass
+    
+    async def notification_message(self, event):
+        """Receive notification from room group"""
+        notification = event['notification']
+        
+        # Send notification to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'notification',
+            'data': notification
+        }))

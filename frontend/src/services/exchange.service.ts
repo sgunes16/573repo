@@ -57,6 +57,10 @@ export const exchangeService = {
     return await apiService.post(`/exchanges/${exchangeId}/reject/`)
   },
 
+  async cancelExchange(exchangeId: string): Promise<{ message: string; status: string }> {
+    return await apiService.post(`/exchanges/${exchangeId}/cancel/`)
+  },
+
   async confirmCompletion(exchangeId: string): Promise<{ message: string; requester_confirmed: boolean; provider_confirmed: boolean; status: string }> {
     return await apiService.post(`/exchanges/${exchangeId}/confirm-completion/`)
   },

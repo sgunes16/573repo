@@ -134,15 +134,12 @@ class Exchange(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
         ('ACCEPTED', 'Accepted'),
-        ('IN_PROGRESS', 'In Progress'),
         ('COMPLETED', 'Completed'),
         ('CANCELLED', 'Cancelled'),
     ]
 
     offer = models.ForeignKey(
         Offer, on_delete=models.CASCADE, null=True, blank=True)
-    offer_2 = models.ForeignKey(
-        Offer, on_delete=models.CASCADE, null=True, blank=True, related_name='offer_2', limit_choices_to={'type': 'want'})
     provider = models.ForeignKey(User, on_delete=models.CASCADE,
                                  related_name='exchanges_provided', null=True, blank=True)
     requester = models.ForeignKey(
@@ -187,17 +184,6 @@ class TimeBankTransaction(models.Model):
         return f"{self.from_user.email} → {self.to_user.email}: {self.time_amount}h ({self.transaction_type})"
 
 
-class Handshake(models.Model):
-    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    status = models.CharField(max_length=255, choices=[(
-        "pending", "Pending"), ("accepted", "Accepted"), ("rejected", "Rejected")])
-    
-    def __str__(self):
-        return f"{self.exchange.offer.title} - {self.exchange.offer_2.title}"
-
-
 class Comment(models.Model):
     TARGET_TYPE_CHOICES = [
         ('exchange', 'Exchange'),
@@ -231,12 +217,13 @@ class Chat(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.exchange.offer.title} - {self.exchange.offer_2.title}"
+        return f"Chat for Exchange #{self.exchange.id}"
 
 
 class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -252,7 +239,7 @@ class Message(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.chat.exchange.offer.title} - {self.chat.exchange.offer_2.title}"
+        return f"Message by {self.user.email} in Exchange #{self.chat.exchange.id}"
 
 
 class TimeBank(models.Model):

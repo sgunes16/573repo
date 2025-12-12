@@ -28,6 +28,10 @@ import {
 import { TimeBank, UserProfile } from "@/types";
 import { useEffect, useState } from "react";
 import { useGeoStore } from "@/store/useGeoStore";
+import { notificationService } from "@/services/notification.service";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { getAccessToken } from "@/utils/cookies";
+import { Badge } from "@chakra-ui/react";
 
 interface NavbarProps {
   showUserInfo?: boolean;
@@ -38,17 +42,51 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
   const { user, logout } = useAuthStore();
   const [userProfile, setUserProfile] = useState<UserProfile | undefined>(undefined);
   const [timeBank, setTimeBank] = useState<TimeBank | undefined>(undefined);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   const { setGeoLocation } = useGeoStore();
 
   useEffect(() => {
     if (user) {
       fetchUserProfile();
+      fetchNotificationCount();
       if (navigator.geolocation) {
         fetchGeoLocation();
       }
     }
   }, [user]);
+
+  // WebSocket for real-time notifications
+  useWebSocket({
+    url: '/ws/notifications/',
+    token: user ? getAccessToken() || undefined : undefined,
+    onMessage: (message) => {
+      if (message.type === 'notification') {
+        // New notification received, increment count
+        setNotificationCount((prev) => prev + 1);
+        // Optionally refetch notifications if on notifications page
+        if (window.location.pathname === '/notifications') {
+          fetchNotificationCount();
+        }
+      }
+    },
+    onOpen: () => {
+      console.log('[Navbar] Notification WebSocket connected');
+    },
+    onClose: () => {
+      console.log('[Navbar] Notification WebSocket disconnected');
+    },
+    reconnect: true,
+  });
+
+  const fetchNotificationCount = async () => {
+    try {
+      const notifications = await notificationService.getUnreadNotifications();
+      setNotificationCount(notifications.length);
+    } catch (error) {
+      console.error('Failed to fetch notification count:', error);
+    }
+  };
 
   const fetchUserProfile = async () => {
     const response = await profileService.getUserProfile();
@@ -115,15 +153,39 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
         {showUserInfo && user && (
           <HStack spacing={3}>
             {/* Notifications */}
-            <IconButton
-              aria-label="Notifications"
-              icon={<MdNotifications />}
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/notifications")}
-              color="gray.600"
-              _hover={{ bg: 'gray.50', color: 'yellow.600' }}
-            />
+            <Box position="relative">
+              <IconButton
+                aria-label="Notifications"
+                icon={<MdNotifications />}
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  navigate("/notifications");
+                  fetchNotificationCount();
+                }}
+                color="gray.600"
+                _hover={{ bg: 'gray.50', color: 'yellow.600' }}
+              />
+              {notificationCount > 0 && (
+                <Badge
+                  position="absolute"
+                  top="-1"
+                  right="-1"
+                  bg="red.500"
+                  color="white"
+                  borderRadius="full"
+                  fontSize="xs"
+                  minW="18px"
+                  h="18px"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  px={1}
+                >
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </Badge>
+              )}
+            </Box>
             
             {/* Time Credits */}
             <HStack

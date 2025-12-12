@@ -4,5 +4,6 @@ from . import consumers
 websocket_urlpatterns = [
     re_path(r'ws/chat/(?P<exchange_id>\w+)/$', consumers.ChatConsumer.as_asgi()),
     re_path(r'ws/exchange/(?P<exchange_id>\w+)/$', consumers.ExchangeConsumer.as_asgi()),
+    re_path(r'ws/notifications/$', consumers.NotificationConsumer.as_asgi()),
 ]
 

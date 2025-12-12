@@ -4,11 +4,11 @@ from .views import (
     HomeView, UserView, OffersView, OfferDetailView, UserProfileView, UserProfileDetailView, CreateOfferView,
     UploadOfferImageView, DeleteOfferImageView, SetPrimaryImageView,
     CreateExchangeView, ExchangeDetailView, MyExchangesView, ExchangeByOfferView, ExchangesByOfferView, ProposeDateTimeView,
-    AcceptExchangeView, RejectExchangeView, ConfirmCompletionView, SubmitRatingView,
+    AcceptExchangeView, RejectExchangeView, CancelExchangeView, ConfirmCompletionView, SubmitRatingView,
     TransactionsView, LatestTransactionsView,
     CreateReportView, AdminReportsListView, AdminReportUpdateView, AdminReportResolveView,
     AdminKPIView, AdminBanUserView, AdminWarnUserView, AdminDeleteOfferView, AdminExchangeDetailView,
-    NotificationsView, MarkNotificationReadView
+    NotificationsView, MarkNotificationReadView, MarkAllNotificationsReadView
 )
 from .auth.views import LoginView, RegisterView, LogoutView
 
@@ -36,6 +36,7 @@ urlpatterns = [
     path("exchanges/<int:exchange_id>/propose-datetime/", ProposeDateTimeView.as_view(), name="propose-datetime"),
     path("exchanges/<int:exchange_id>/accept/", AcceptExchangeView.as_view(), name="accept-exchange"),
     path("exchanges/<int:exchange_id>/reject/", RejectExchangeView.as_view(), name="reject-exchange"),
+    path("exchanges/<int:exchange_id>/cancel/", CancelExchangeView.as_view(), name="cancel-exchange"),
     path("exchanges/<int:exchange_id>/confirm-completion/", ConfirmCompletionView.as_view(), name="confirm-completion"),
     path("exchanges/<int:exchange_id>/rate/", SubmitRatingView.as_view(), name="submit-rating"),
     
@@ -46,6 +47,7 @@ urlpatterns = [
     # Notification endpoints
     path("notifications/", NotificationsView.as_view(), name="notifications"),
     path("notifications/<int:notification_id>/", MarkNotificationReadView.as_view(), name="mark-notification-read"),
+    path("notifications/mark-all-read/", MarkAllNotificationsReadView.as_view(), name="mark-all-notifications-read"),
     
     # Report endpoints
     path("reports/", CreateReportView.as_view(), name="create-report"),
