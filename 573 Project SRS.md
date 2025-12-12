@@ -31,10 +31,8 @@ Hive is a non-profit project designed for a community where users can submit off
 - Handshake: A process where two users agree to exchange services
 - Rating: A rating given by a user to another user
 - Transaction: A record of a service exchange between two users
-- Achievement: A goal that a user can achieve by completing offers and wants
 - Profile: A user's profile information
 - TimeBankTransaction: A record of a time bank transaction
-- AchievementTree: A tree of achievements that a user can achieve by completing offers and wants
 
 ### 1.4 References
 
@@ -157,6 +155,8 @@ This feature allows registered users to create and publish offers. Users can add
 | FR-4 | The system shall save offers and display them in the public feed.                                              | High     |       |
 | FR-5 | Users shall only be able to edit or delete their own offers.                                                   | High     |       |
 | FR-6 | The system shall validate that required fields are not empty before submission.                                | High     |       |
+| FR-6a | The system shall prevent editing of offers with PENDING, ACCEPTED, or COMPLETED exchanges.                    | High     |       |
+| FR-6b | The system shall display edit lock status to the user when an offer cannot be edited.                         | Medium   |       |
 
 #### 3.1.1.5 Nonfunctional Requirements
 
@@ -199,6 +199,8 @@ This feature allows registered users to create and publish wants. Users can add 
 | FR-10 | The system shall save wants and display them in the public feed.                                                | High     |       |
 | FR-11 | Users shall only be able to edit or delete their own wants.                                                     | High     |       |
 | FR-12 | The system shall validate that required fields are not empty before submission.                                 | High     |       |
+| FR-12a | The system shall prevent editing of wants with PENDING, ACCEPTED, or COMPLETED exchanges.                      | High     |       |
+| FR-12b | The system shall display edit lock status to the user when a want cannot be edited.                            | Medium   |       |
 
 #### 3.1.2.5 Nonfunctional Requirements
 
@@ -293,49 +295,7 @@ This feature allows users to onboard themselves to the platform. Users can creat
 | Usability       | The onboarding form shall be responsive and accessible on desktop and mobile devices.                                  | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
-### 3.1.5 Feature 1.5 - Achievement Tree
-
-#### 3.1.5.1 Description
-
-This feature allows users to view the achievement tree. Users can view the achievement tree and track their progress. The system stores the achievement tree for retrieval, editing, and display on the public feed.
-
-#### 3.1.5.2 User Story
-
-> As a _user_, I want to _view the achievement tree_ so that _I can track my progress_.
-
-#### 3.1.5.3 Acceptance Criteria
-
-- Given a user, when they view the achievement tree, then the achievement tree is displayed in the tree.
-
-- Given no achievements are available, the system shall display a message indicating that there are no achievements to display.
-
-- Users shall be able to view the details of an achievement by clicking on it.
-
-- Users shall be able to track their progress by clicking on the achievement tree.
-
-- Admins shall be able to add new achievements to the achievement tree.
-
-- Admins shall be able to edit or delete existing achievements from the achievement tree.
-
-#### 3.1.5.4 Functional Requirements
-
-| ID    | Requirement                                                                                                     | Priority | Notes |
-|-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
-| FR-23 | Users shall be able to view the achievement tree.                                                               | High     |       |
-| FR-24 | Users shall be able to view the details of an achievement by clicking on it.                                    | High     |       |
-| FR-25 | Admins shall be able to add new achievements to the achievement tree.                                           | High     |       |
-| FR-26 | Admins shall be able to edit or delete existing achievements from the achievement tree.                         | High     |       |
-
-#### 3.1.5.5 Nonfunctional Requirements
-
-| Type            | Description                                                                                                            | Priority |
-|-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
-| Performance     | Achievements shall be displayed in the tree within 2 seconds under normal load.                                       | High      |
-| Security        | Only authenticated users shall be able to view the achievement tree.                                                   | High      |
-| Usability       | The achievement tree shall be responsive and accessible on desktop and mobile devices.                                 | Medium    |
-| Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
-
-### 3.1.6 Feature 1.6 - Transaction History
+### 3.1.5 Feature 1.5 - Transaction History
 
 #### 3.1.6.1 Description
 
@@ -405,6 +365,13 @@ This feature allows users to initiate a handshake and rating process with anothe
 | FR-34 | The system shall display a message indicating that there are no handshake and rating processes to display.                             | High     |       |
 | FR-35 | The system shall prevent unauthorized users from initiating a handshake and rating process.                                            | High     |       |
 | FR-36 | The system shall validate that required fields are not empty before submission.                                                        | High     |       |
+| FR-36a | A requester shall be able to cancel their PENDING or ACCEPTED exchange.                                                                | High     |       |
+| FR-36b | The system shall return blocked time credits upon exchange cancellation.                                                               | High     |       |
+| FR-36c | The system shall notify the provider when an exchange is cancelled by the requester.                                                   | High     |       |
+| FR-36d | The system shall provide real-time updates for exchange status changes via WebSocket.                                                  | High     |       |
+| FR-36e | A user shall be able to rate communication (1-5), punctuality (1-5), and recommendation after completing an exchange.                  | High     |       |
+| FR-36f | A user shall be able to add a comment with their rating.                                                                               | Medium   |       |
+| FR-36g | The system shall calculate and display average ratings on user profiles.                                                               | High     |       |
 
 #### 3.1.7.5 Nonfunctional Requirements
 
@@ -439,6 +406,10 @@ This feature allows users to view their time bank. Users can view their time ban
 |-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
 | FR-37 | A user shall be able to view their time bank.                                                                   | High     |       |
 | FR-38 | A user shall be able to view the details of a time bank by clicking on it.                                      | High     |       |
+| FR-38a | The system shall block requester's time credits when an exchange is created.                                   | High     |       |
+| FR-38b | The system shall display available and blocked amounts separately.                                             | High     |       |
+| FR-38c | The system shall unblock credits upon exchange cancellation.                                                   | High     |       |
+| FR-38d | The system shall transfer credits from requester to provider upon exchange completion.                         | High     |       |
 
 #### 3.1.8.5 Nonfunctional Requirements
 
@@ -473,9 +444,12 @@ This feature allows users to view the map. Users can list the map and see the us
 
 | ID    | Requirement                                                                                                     | Priority | Notes |
 |-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
-| FR-39 | A user shall be able to list the map and see the users on the map.                                              | High     |       |
-| FR-40 | A user shall be able to view the details of a user by clicking on it.                                           | High     |       |
-| FR-41 | A user shall be able to track the progress of the map by clicking on the map.                                   | High     |       |
+| FR-39 | A user shall be able to list the map and see the offers/wants on the map.                                       | High     |       |
+| FR-40 | A user shall be able to view the details of an offer/want by clicking on it on the map.                         | High     |       |
+| FR-41 | A user shall be able to set a geo-location for their offer/want.                                                | High     |       |
+| FR-41a | A user shall be able to filter offers/wants by distance radius from their location.                            | Medium   |       |
+| FR-41b | A user shall be able to choose between remote (online) or in-person location type for offers/wants.            | High     |       |
+| FR-41c | The system shall display nearby offers/wants count on the map.                                                 | Low      |       |
 
 #### 3.1.9.5 Nonfunctional Requirements
 
@@ -490,11 +464,11 @@ This feature allows users to view the map. Users can list the map and see the us
 
 #### 3.1.10.1 Description
 
-This feature allows users to view their profile. Users can view their profile and see their offers, wants, time bank, and achievements. The system stores the profile for retrieval, editing, and display on the public feed.
+This feature allows users to view their profile. Users can view their profile and see their offers, wants, and time bank. The system stores the profile for retrieval, editing, and display on the public feed.
 
 #### 3.1.10.2 User Story
 
-> As a _user_, I want to _view my profile and see my offers, wants, time bank, and achievements_ so that _I can see what I can offer and what I can request_.
+> As a _user_, I want to _view my profile and see my offers, wants, and time bank_ so that _I can see what I can offer and what I can request_.
 
 #### 3.1.10.3 Acceptance Criteria
 
@@ -506,24 +480,21 @@ This feature allows users to view their profile. Users can view their profile an
 
 - Given no time bank is available, the system shall display a message indicating that there are no time bank to display.
 
-- Given no achievements are available, the system shall display a message indicating that there are no achievements to display.
-
 #### 3.1.10.4 Functional Requirements
 
 | ID    | Requirement                                                                                                                           | Priority | Notes |
 |-------|---------------------------------------------------------------------------------------------------------------------------------------|----------|-------|
-| FR-42 | A user shall be able to view their profile and see their offers, wants, time bank, and achievements.                                 | High     |       |
+| FR-42 | A user shall be able to view their profile and see their offers, wants, and time bank.                                               | High     |       |
 | FR-43 | A user shall be able to view their offers by clicking on the offers.                                                                 | High     |       |
 | FR-44 | A user shall be able to view their wants by clicking on the wants.                                                                   | High     |       |
 | FR-45 | A user shall be able to view their time bank by clicking on the time bank.                                                           | High     |       |
-| FR-46 | A user shall be able to view their achievements by clicking on the achievements.                                                     | High     |       |
 
 #### 3.1.10.5 Nonfunctional Requirements
 
 | Type            | Description                                                                                                            | Priority |
 |-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
 | Performance     | Profile shall be displayed in the profile within 2 seconds under normal load.                                           | High      |
-| Security        | Only authenticated users shall be able to view their profile and see their offers, wants, time bank, and achievements. | High      |
+| Security        | Only authenticated users shall be able to view their profile and see their offers, wants, and time bank.               | High      |
 | Usability       | The profile shall be responsive and accessible on desktop and mobile devices.                                          | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
@@ -531,11 +502,11 @@ This feature allows users to view their profile. Users can view their profile an
 
 #### 3.1.11.1 Description
 
-This feature allows users to see other users' profiles. Users can see other users' profiles and see their offers, wants, ratings, comments and achievements. The system stores the other users' profile for retrieval, editing, and display on the public feed.
+This feature allows users to see other users' profiles. Users can see other users' profiles and see their offers, wants, ratings, and comments. The system stores the other users' profile for retrieval, editing, and display on the public feed.
 
 #### 3.1.11.2 User Story
 
-> As a _user_, I want to _see other users' profiles and see their offers, wants, ratings, comments and achievements_ so that _I can see what they can offer and what they can request_.
+> As a _user_, I want to _see other users' profiles and see their offers, wants, ratings, and comments_ so that _I can see what they can offer and what they can request_.
 
 #### 3.1.11.3 Acceptance Criteria
 
@@ -549,25 +520,22 @@ This feature allows users to see other users' profiles. Users can see other user
 
 - Given no comments are available, the system shall display a message indicating that there are no comments to display.
 
-- Given no achievements are available, the system shall display a message indicating that there are no achievements to display.
-
 #### 3.1.11.4 Functional Requirements
 
 | ID    | Requirement                                                                                                                           | Priority | Notes |
 |-------|---------------------------------------------------------------------------------------------------------------------------------------|----------|-------|
-| FR-47 | A user shall be able to see other users' profiles and see their offers, wants, ratings, comments and achievements.                   | High     |       |
+| FR-47 | A user shall be able to see other users' profiles and see their offers, wants, ratings, and comments.                                | High     |       |
 | FR-48 | A user shall be able to view their offers by clicking on the offers.                                                                 | High     |       |
 | FR-49 | A user shall be able to view their wants by clicking on the wants.                                                                   | High     |       |
 | FR-50 | A user shall be able to view their ratings by clicking on the ratings.                                                               | High     |       |
 | FR-51 | A user shall be able to view their comments by clicking on the comments.                                                             | High     |       |
-| FR-52 | A user shall be able to view their achievements by clicking on the achievements.                                                     | High     |       |
 
 #### 3.1.11.5 Nonfunctional Requirements
 
 | Type            | Description                                                                                                            | Priority |
 |-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
 | Performance     | Other users' profiles shall be displayed in the other users' profiles within 2 seconds under normal load.             | High      |
-| Security        | Only authenticated users shall be able to see other users' profiles and see their offers, wants, ratings, comments and achievements. | High      |
+| Security        | Only authenticated users shall be able to see other users' profiles and see their offers, wants, ratings, and comments. | High      |
 | Usability       | The other users' profiles shall be responsive and accessible on desktop and mobile devices.                            | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
@@ -575,15 +543,15 @@ This feature allows users to see other users' profiles. Users can see other user
 
 #### 3.1.12.1 Description
 
-This feature allows admins to view the admin panel. Admins can view the admin panel and see the users, offers, wants, ratings, comments and achievements. The system stores the admin panel for retrieval, editing, and display on the public feed.
+This feature allows admins to view the admin panel. Admins can view the admin panel and see the users, offers, wants, ratings, and comments. The system stores the admin panel for retrieval, editing, and display on the public feed.
 
 #### 3.1.12.2 User Story
 
-> As a _admin_, I want to _view the admin panel and see the users, offers, wants, ratings, comments and achievements_ so that _I can manage the platform_.
+> As an _admin_, I want to _view the admin panel and see the users, offers, wants, ratings, and comments_ so that _I can manage the platform_.
 
 #### 3.1.12.3 Acceptance Criteria
 
-- Given a admin, when they view the admin panel, then the admin panel is displayed in the admin panel.
+- Given an admin, when they view the admin panel, then the admin panel is displayed in the admin panel.
 
 - Given no users are available, the system shall display a message indicating that there are no users to display.
 
@@ -595,29 +563,34 @@ This feature allows admins to view the admin panel. Admins can view the admin pa
 
 - Given no comments are available, the system shall display a message indicating that there are no comments to display.
 
-- Given no achievements are available, the system shall display a message indicating that there are no achievements to display.
-
 #### 3.1.12.4 Functional Requirements
 
 | ID    | Requirement                                                                                                                           | Priority | Notes |
 |-------|---------------------------------------------------------------------------------------------------------------------------------------|----------|-------|
-| FR-53 | A admin shall be able to view the admin panel and see the users, offers, wants, ratings, comments and achievements.                  | High     |       |
-| FR-54 | A admin shall be able to view the users by clicking on the users.                                                                    | High     |       |
-| FR-55 | A admin shall be able to view the offers by clicking on the offers.                                                                  | High     |       |
-| FR-56 | A admin shall be able to view the wants by clicking on the wants.                                                                    | High     |       |
-| FR-57 | A admin shall be able to view the ratings by clicking on the ratings.                                                                | High     |       |
-| FR-58 | A admin shall be able to view the comments by clicking on the comments.                                                              | High     |       |
-| FR-59 | A admin shall be able to view the achievements by clicking on the achievements.                                                      | High     |       |
-| FR-60 | A admin shall be able to view the transactions by clicking on the transactions.                                                      | High     |       |
-| FR-61 | A admin shall be able to view the time bank by clicking on the time bank.                                                            | High     |       |
-| FR-62 | A admin shall be able to view the handshake and rating processes by clicking on the handshake and rating processes.                  | High     |       |
+| FR-53 | An admin shall be able to view the admin panel and see the users, offers, wants, ratings, and comments.                              | High     |       |
+| FR-54 | An admin shall be able to view the users by clicking on the users.                                                                   | High     |       |
+| FR-55 | An admin shall be able to view the offers by clicking on the offers.                                                                 | High     |       |
+| FR-56 | An admin shall be able to view the wants by clicking on the wants.                                                                   | High     |       |
+| FR-57 | An admin shall be able to view the ratings by clicking on the ratings.                                                               | High     |       |
+| FR-58 | An admin shall be able to view the comments by clicking on the comments.                                                             | High     |       |
+| FR-59 | An admin shall be able to view the transactions by clicking on the transactions.                                                     | High     |       |
+| FR-61 | An admin shall be able to view the time bank by clicking on the time bank.                                                           | High     |       |
+| FR-62 | An admin shall be able to view the handshake and rating processes by clicking on the handshake and rating processes.                 | High     |       |
+| FR-62a | An admin shall be able to view KPI dashboard with total users, exchanges, and pending reports count.                                | High     |       |
+| FR-62b | An admin shall be able to issue warnings to users with a message.                                                                   | High     |       |
+| FR-62c | An admin shall be able to ban users with a reason.                                                                                  | High     |       |
+| FR-62d | The system shall track warning count for each user.                                                                                 | High     |       |
+| FR-62e | Banned users shall not be able to log in to the platform.                                                                           | High     |       |
+| FR-62f | An admin shall be able to delete offers or wants.                                                                                   | High     |       |
+| FR-62g | An admin shall be able to cancel exchanges and return blocked credits.                                                              | High     |       |
+| FR-62h | The system shall notify affected users when content is removed or action is taken.                                                  | Medium   |       |
 
 #### 3.1.12.5 Nonfunctional Requirements
 
 | Type            | Description                                                                                                            | Priority |
 |-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
 | Performance     | Admin panel shall be displayed in the admin panel within 2 seconds under normal load.                                   | High      |
-| Security        | Only authenticated admins shall be able to view the admin panel and see the users, offers, wants, ratings, comments and achievements. | High      |
+| Security        | Only authenticated admins shall be able to view the admin panel and see the users, offers, wants, ratings, and comments. | High      |
 | Usability       | The admin panel shall be responsive and accessible on desktop and mobile devices.                                      | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
@@ -692,6 +665,83 @@ This feature allows users to login and register to the platform. Users can login
 | Usability       | The login and registration page shall be responsive and accessible on desktop and mobile devices.                      | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
+### 3.1.15 Feature 1.15 - Notification System
+
+#### 3.1.15.1 Description
+
+This feature allows users to receive and manage notifications. Users can view notifications, mark them as read/unread, and clear all notifications. The system sends notifications for important events like exchange requests, acceptances, completions, and admin actions.
+
+#### 3.1.15.2 User Story
+
+> As a _registered user_, I want to _receive notifications about my exchanges and platform activities_ so that _I can stay informed about important events_.
+
+#### 3.1.15.3 Acceptance Criteria
+
+- Given a user, when an important event occurs (exchange request, acceptance, completion), then the user receives a notification.
+
+- Users shall be able to view all their notifications in a dedicated page.
+
+- Users shall be able to mark individual notifications as read or unread.
+
+- Users shall be able to mark all notifications as read at once.
+
+- Unread notification count shall be displayed in the navigation bar.
+
+#### 3.1.15.4 Functional Requirements
+
+| ID    | Requirement                                                                                                     | Priority | Notes |
+|-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
+| FR-70 | The system shall send notifications to users when important events occur.                                       | High     |       |
+| FR-71 | A user shall be able to view all their notifications.                                                           | High     |       |
+| FR-72 | A user shall be able to mark individual notifications as read or unread.                                        | Medium   |       |
+| FR-73 | A user shall be able to mark all notifications as read at once.                                                 | Medium   |       |
+| FR-74 | The system shall display unread notification count in the navigation bar.                                       | High     |       |
+| FR-75 | A user shall be able to filter notifications by read/unread status.                                             | Low      |       |
+
+#### 3.1.15.5 Nonfunctional Requirements
+
+| Type            | Description                                                                                                            | Priority |
+|-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
+| Performance     | Notifications shall be delivered within 1 second of the triggering event.                                              | High      |
+| Security        | Only the user to whom the notification belongs shall be able to view or manage it.                                     | High      |
+| Usability       | The notification interface shall be intuitive and accessible on all devices.                                           | Medium    |
+
+### 3.1.16 Feature 1.16 - User Report System
+
+#### 3.1.16.1 Description
+
+This feature allows registered users to report inappropriate content or behavior. Users can report offers, wants, exchanges, or other users with a reason and description. Admins can then review and act on these reports.
+
+#### 3.1.16.2 User Story
+
+> As a _registered user_, I want to _report inappropriate content or users_ so that _the platform remains safe and respectful_.
+
+#### 3.1.16.3 Acceptance Criteria
+
+- Given a user, when they encounter inappropriate content, then they can submit a report with a reason.
+
+- Users shall be able to select a reason category (spam, inappropriate, harassment, fraud, etc.).
+
+- Users shall be able to add an optional description to the report.
+
+- The system shall prevent duplicate reports from the same user for the same target.
+
+#### 3.1.16.4 Functional Requirements
+
+| ID    | Requirement                                                                                                     | Priority | Notes |
+|-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
+| FR-76 | A user shall be able to report an offer, want, exchange, or another user.                                       | High     |       |
+| FR-77 | A user shall be able to select a reason category for the report.                                                | High     |       |
+| FR-78 | A user shall be able to add a description to the report.                                                        | Medium   |       |
+| FR-79 | The system shall prevent duplicate reports from the same user for the same target.                              | Medium   |       |
+
+#### 3.1.16.5 Nonfunctional Requirements
+
+| Type            | Description                                                                                                            | Priority |
+|-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
+| Performance     | Report submission shall complete within 2 seconds.                                                                     | High      |
+| Security        | Reports shall only be viewable by admins and the reporting user.                                                       | High      |
+
 ---
 
 ## 4. Nonfunctional Requirements
@@ -756,10 +806,20 @@ This feature allows users to login and register to the platform. Users can login
 
 - **Offer** - An offer to provide a service.
 - **Want** - A want to request a service.
-- **Exchange** - An exchange of a service.
-- **Handshake** - A handshake between two users.
-- **TimeBank** - A time bank for the system.
-- **TimeBankTransaction** - A time bank transaction.
+- **Exchange** - An exchange of a service between two users.
+- **Handshake** - A handshake (exchange process) between two users.
+- **TimeBank** - A time bank for the system where users store time credits.
+- **TimeBankTransaction** - A time bank transaction record.
+- **Notification** - A message sent to a user about platform events.
+- **Report** - A user-submitted complaint about content or behavior.
+- **Rating** - Feedback given after completing an exchange.
+- **WebSocket** - A real-time communication protocol for instant updates.
+- **Blocked Credits** - Time credits reserved for pending exchanges.
+- **Available Credits** - Time credits available for new exchanges.
+- **KPI** - Key Performance Indicator, metrics for monitoring platform health.
+- **Geo-location** - Geographic coordinates (latitude/longitude) of a location.
+- **Provider** - The user who offers/provides a service in an exchange.
+- **Requester** - The user who requests/receives a service in an exchange.
 
 ---
 
