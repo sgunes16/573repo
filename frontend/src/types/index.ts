@@ -152,6 +152,7 @@ export interface Offer {
   status: OfferStatus
   created_at: string
   updated_at: string
+  can_edit?: boolean
 }
 
 export interface CreateOfferResponse {

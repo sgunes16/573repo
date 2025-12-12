@@ -274,6 +274,13 @@ class OfferDetailView(APIView):
         except Offer.DoesNotExist:
             return Response({"error": "Offer not found"}, status=404)
         
+        # Check if offer can be edited (no active or completed exchanges)
+        has_blocking_exchange = Exchange.objects.filter(
+            offer=offer,
+            status__in=['PENDING', 'ACCEPTED', 'COMPLETED']
+        ).exists()
+        can_edit = not has_blocking_exchange
+        
         return Response({
             "id": offer.id,
             "user_id": offer.user_id,
@@ -315,6 +322,7 @@ class OfferDetailView(APIView):
             "to_date": offer.to_date,
             "created_at": offer.created_at,
             "updated_at": offer.updated_at,
+            "can_edit": can_edit,
         })
     
     def put(self, request, offer_id):
@@ -325,6 +333,17 @@ class OfferDetailView(APIView):
             # Only owner can update
             if offer.user != request.user:
                 return Response({"error": "Not authorized to update this offer"}, status=403)
+            
+            # Check if offer has active or completed exchanges
+            has_blocking_exchange = Exchange.objects.filter(
+                offer=offer,
+                status__in=['PENDING', 'ACCEPTED', 'COMPLETED']
+            ).exists()
+            
+            if has_blocking_exchange:
+                return Response({
+                    "error": "Cannot edit this offer. There are active or completed exchanges associated with it."
+                }, status=400)
             
             # Update fields
             if 'title' in request.data:

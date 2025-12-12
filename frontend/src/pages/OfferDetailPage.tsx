@@ -351,8 +351,10 @@ const OfferDetailPage = () => {
                     leftIcon={<Icon as={MdEdit} boxSize={4} />}
                     onClick={() => navigate(`/create-offer?edit=${offer.id}`)}
                     mb={3}
+                    isDisabled={offer.can_edit === false}
+                    title={offer.can_edit === false ? 'Cannot edit - has active or completed exchanges' : undefined}
                   >
-                    Edit
+                    {offer.can_edit === false ? 'Edit Locked' : 'Edit'}
                   </Button>
                   
                   {exchanges.length > 0 && (
