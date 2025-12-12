@@ -10,6 +10,8 @@ import {
   MenuList,
   Text,
   IconButton,
+  Tooltip,
+  VStack,
 } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -188,20 +190,45 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
             </Box>
             
             {/* Time Credits */}
-            <HStack
-              spacing={1}
-              bg="yellow.50"
+            <Tooltip
+              label={
+                <VStack spacing={1} py={1} align="stretch">
+                  <HStack justify="space-between" spacing={4}>
+                    <Text fontSize="xs" color="gray.300">Available:</Text>
+                    <Text fontSize="xs" fontWeight="600" color="green.300">{timeBank?.available_amount || 0}H</Text>
+                  </HStack>
+                  <HStack justify="space-between" spacing={4}>
+                    <Text fontSize="xs" color="gray.300">Blocked:</Text>
+                    <Text fontSize="xs" fontWeight="600" color="orange.300">{timeBank?.blocked_amount || 0}H</Text>
+                  </HStack>
+                </VStack>
+              }
+              placement="bottom"
+              hasArrow
+              bg="gray.800"
+              borderRadius="md"
               px={3}
-              py={1.5}
-              borderRadius="full"
-              border="1px solid"
-              borderColor="yellow.200"
+              py={2}
             >
-              <Icon as={MdOutlineTimer} color="yellow.600" boxSize={4} />
-              <Text fontSize="sm" fontWeight="600" color="yellow.700">
-                {timeBank?.amount || 0}H
-              </Text>
-            </HStack>
+              <HStack
+                spacing={1}
+                bg="yellow.50"
+                px={3}
+                py={1.5}
+                borderRadius="full"
+                border="1px solid"
+                borderColor="yellow.200"
+                cursor="pointer"
+                onClick={() => navigate("/transactions")}
+                _hover={{ bg: 'yellow.100' }}
+                transition="background 0.15s"
+              >
+                <Icon as={MdOutlineTimer} color="yellow.600" boxSize={4} />
+                <Text fontSize="sm" fontWeight="600" color="yellow.700">
+                  {timeBank?.amount || 0}H
+                </Text>
+              </HStack>
+            </Tooltip>
 
             {/* User Menu */}
             <Menu>

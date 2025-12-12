@@ -25,11 +25,17 @@ import {
   MdAdd,
   MdEdit,
   MdStar,
+  MdChevronLeft,
+  MdChevronRight,
 } from "react-icons/md";
+
+const ITEMS_PER_PAGE = 6;
+const HANDSHAKES_PER_PAGE = 5;
+const COMMENTS_PER_PAGE = 5;
 import Navbar from "@/components/Navbar";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuthStore } from "@/store/useAuthStore";
-import { User, UserProfile, TimeBank, TimeBankTransaction, Comment, Exchange } from "@/types";
+import { User, UserProfile, TimeBank, Comment, Exchange } from "@/types";
 import { profileService } from "@/services/profile.service";
 import { exchangeService } from "@/services/exchange.service";
 
@@ -43,7 +49,6 @@ const ProfilePage = () => {
   const [wants, setWants] = useState<any[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [timebank, setTimebank] = useState<TimeBank | null>(null);
-  const [recentTransactions, setRecentTransactions] = useState<TimeBankTransaction[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [myHandshakes, setMyHandshakes] = useState<Exchange[]>([]);
   const [incomingHandshakes, setIncomingHandshakes] = useState<Exchange[]>([]);
@@ -78,7 +83,6 @@ const ProfilePage = () => {
           const profileDetail = await profileService.getUserProfileDetail(currentUser.id);
           setOffers(profileDetail.recent_offers);
           setWants(profileDetail.recent_wants);
-          setRecentTransactions(profileDetail.recent_transactions);
           setComments(profileDetail.comments || []);
           setRatingsSummary(profileDetail.ratings_summary || null);
           
@@ -116,7 +120,6 @@ const ProfilePage = () => {
           } as User);
           setOffers(profileDetail.recent_offers);
           setWants(profileDetail.recent_wants);
-          setRecentTransactions(profileDetail.recent_transactions);
           setComments(profileDetail.comments || []);
           setRatingsSummary(profileDetail.ratings_summary || null);
         }
@@ -256,7 +259,6 @@ const ProfilePage = () => {
                 <Tab fontSize="sm">Offers</Tab>
                 <Tab fontSize="sm">Wants</Tab>
                 {isOwnProfile && <Tab fontSize="sm">Handshakes</Tab>}
-                <Tab fontSize="sm">Transactions</Tab>
                 <Tab fontSize="sm">Comments</Tab>
               </TabList>
 
@@ -288,211 +290,47 @@ const ProfilePage = () => {
                   <TabPanel px={0}>
                     <VStack spacing={6} align="stretch">
                       {/* Incoming Requests - Gelen İstekler */}
-                      <Box>
-                        <Text fontWeight="600" fontSize="sm" mb={3} color="orange.600">
-                          Incoming Requests ({incomingHandshakes.filter(ex => ex.status === 'PENDING').length})
-                        </Text>
-                        {incomingHandshakes.filter(ex => ex.status === 'PENDING').length > 0 ? (
-                          <VStack spacing={2} align="stretch">
-                            {incomingHandshakes.filter(ex => ex.status === 'PENDING').map((exchange) => (
-                              <Box
-                                key={exchange.id}
-                                p={3}
-                                borderRadius="md"
-                                border="1px solid"
-                                borderColor="orange.200"
-                                bg="orange.50"
-                                cursor="pointer"
-                                _hover={{ bg: 'orange.100' }}
-                                onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
-                              >
-                                <Flex justify="space-between" align="center">
-                                  <HStack spacing={2}>
-                                    <UserAvatar size="sm" user={exchange.requester} />
-                                    <Box>
-                                      <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
-                                      <Text fontSize="xs" color="gray.500">from {exchange.requester?.first_name}</Text>
-                                    </Box>
-                                  </HStack>
-                                  <Badge colorScheme="orange" fontSize="10px">
-                                    PENDING
-                                  </Badge>
-                                </Flex>
-                              </Box>
-                            ))}
-                          </VStack>
-                        ) : (
-                          <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
-                            <Text color="gray.500" fontSize="xs">No incoming requests</Text>
-                          </Box>
-                        )}
-                      </Box>
+                      <PaginatedHandshakesList 
+                        title="Incoming Requests"
+                        titleColor="orange.600"
+                        exchanges={incomingHandshakes.filter(ex => ex.status === 'PENDING')}
+                        navigate={navigate}
+                        emptyText="No incoming requests"
+                        userField="requester"
+                        userLabel="from"
+                        variant="incoming"
+                      />
 
                       {/* All Incoming Exchanges (Accepted, Completed etc.) */}
                       {incomingHandshakes.filter(ex => ex.status !== 'PENDING').length > 0 && (
-                        <Box>
-                          <Text fontWeight="600" fontSize="sm" mb={3}>
-                            Incoming (Other) ({incomingHandshakes.filter(ex => ex.status !== 'PENDING').length})
-                          </Text>
-                          <VStack spacing={2} align="stretch">
-                            {incomingHandshakes.filter(ex => ex.status !== 'PENDING').map((exchange) => (
-                              <Box
-                                key={exchange.id}
-                                p={3}
-                                borderRadius="md"
-                                border="1px solid"
-                                borderColor="gray.100"
-                                cursor="pointer"
-                                _hover={{ bg: 'gray.50' }}
-                                onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
-                              >
-                                <Flex justify="space-between" align="center">
-                                  <HStack spacing={2}>
-                                    <UserAvatar size="sm" user={exchange.requester} />
-                                    <Box>
-                                      <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
-                                      <Text fontSize="xs" color="gray.500">from {exchange.requester?.first_name}</Text>
-                                    </Box>
-                                  </HStack>
-                                  <Badge
-                                    colorScheme={
-                                      exchange.status === 'COMPLETED' ? 'green' :
-                                      exchange.status === 'ACCEPTED' ? 'blue' : 'gray'
-                                    }
-                                    fontSize="10px"
-                                  >
-                                    {exchange.status}
-                                  </Badge>
-                                </Flex>
-                              </Box>
-                            ))}
-                          </VStack>
-                        </Box>
+                        <PaginatedHandshakesList 
+                          title="Incoming (Other)"
+                          exchanges={incomingHandshakes.filter(ex => ex.status !== 'PENDING')}
+                          navigate={navigate}
+                          emptyText=""
+                          userField="requester"
+                          userLabel="from"
+                          variant="default"
+                        />
                       )}
 
                       {/* My Requests - Gönderdiğim İstekler */}
-                      <Box>
-                        <Text fontWeight="600" fontSize="sm" mb={3}>My Requests ({myHandshakes.length})</Text>
-                        {myHandshakes.length > 0 ? (
-                          <VStack spacing={2} align="stretch">
-                            {myHandshakes.map((exchange) => (
-                              <Box
-                                key={exchange.id}
-                                p={3}
-                                borderRadius="md"
-                                border="1px solid"
-                                borderColor="gray.100"
-                                cursor="pointer"
-                                _hover={{ bg: 'gray.50' }}
-                                onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
-                              >
-                                <Flex justify="space-between" align="center">
-                                  <HStack spacing={2}>
-                                    <UserAvatar size="sm" user={exchange.provider} />
-                                    <Box>
-                                      <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
-                                      <Text fontSize="xs" color="gray.500">with {exchange.provider?.first_name}</Text>
-                                    </Box>
-                                  </HStack>
-                                  <Badge
-                                    colorScheme={
-                                      exchange.status === 'COMPLETED' ? 'green' :
-                                      exchange.status === 'ACCEPTED' ? 'blue' :
-                                      exchange.status === 'PENDING' ? 'yellow' : 'gray'
-                                    }
-                                    fontSize="10px"
-                                  >
-                                    {exchange.status === 'PENDING' ? 'REQUESTED' : exchange.status}
-                                  </Badge>
-                                </Flex>
-                              </Box>
-                            ))}
-                          </VStack>
-                        ) : (
-                          <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
-                            <Text color="gray.500" fontSize="xs">No outgoing requests</Text>
-                          </Box>
-                        )}
-                      </Box>
+                      <PaginatedHandshakesList 
+                        title="My Requests"
+                        exchanges={myHandshakes}
+                        navigate={navigate}
+                        emptyText="No outgoing requests"
+                        userField="provider"
+                        userLabel="with"
+                        variant="outgoing"
+                      />
                     </VStack>
                   </TabPanel>
                 )}
 
-                {/* Transactions Tab */}
-                <TabPanel px={0}>
-                  {isOwnProfile && timebank && (
-                    <SimpleGrid columns={3} gap={2} mb={4}>
-                      <Box bg="gray.50" p={3} borderRadius="md" textAlign="center">
-                        <Text fontSize="lg" fontWeight="700">{timebank?.available_amount ?? 0}H</Text>
-                        <Text fontSize="xs" color="gray.500">Available</Text>
-                      </Box>
-                      <Box bg="gray.50" p={3} borderRadius="md" textAlign="center">
-                        <Text fontSize="lg" fontWeight="700">{timebank?.blocked_amount ?? 0}H</Text>
-                        <Text fontSize="xs" color="gray.500">Blocked</Text>
-                      </Box>
-                      <Box bg="gray.50" p={3} borderRadius="md" textAlign="center">
-                        <Text fontSize="lg" fontWeight="700">{timebank?.total_amount ?? 0}H</Text>
-                        <Text fontSize="xs" color="gray.500">Total</Text>
-                      </Box>
-                    </SimpleGrid>
-                  )}
-                  <Text fontWeight="600" fontSize="sm" mb={3}>Recent</Text>
-                  {recentTransactions.length > 0 ? (
-                    <VStack spacing={2} align="stretch">
-                      {recentTransactions.map((tx) => {
-                        const isEarn = tx.transaction_type === 'EARN'
-                        const otherUser = tx.from_user.id === viewingUser?.id ? tx.to_user : tx.from_user
-                        return (
-                          <Flex key={tx.id} p={3} borderRadius="md" border="1px solid" borderColor="gray.100" justify="space-between" align="center">
-                            <HStack spacing={2}>
-                              <UserAvatar size="sm" user={otherUser} />
-                              <Box>
-                                <Text fontSize="sm" fontWeight="500">{tx.exchange?.offer.title || tx.description}</Text>
-                                <Text fontSize="xs" color="gray.500">{new Date(tx.created_at).toLocaleDateString()}</Text>
-                              </Box>
-                            </HStack>
-                            <Badge colorScheme={isEarn ? 'green' : 'red'} fontSize="xs">
-                              {isEarn ? '+' : '-'}{tx.time_amount}H
-                            </Badge>
-                          </Flex>
-                        )
-                      })}
-                    </VStack>
-                  ) : (
-                    <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
-                      <Text color="gray.500" fontSize="xs">No transactions</Text>
-                    </Box>
-                  )}
-                </TabPanel>
-
                 {/* Comments Tab */}
                 <TabPanel px={0}>
-                  <Text fontWeight="600" fontSize="sm" mb={3}>Comments ({comments.length})</Text>
-                  {comments.length > 0 ? (
-                    <VStack spacing={2} align="stretch">
-                      {comments.map((comment) => (
-                        <Box key={comment.id} p={3} borderRadius="md" border="1px solid" borderColor="gray.100">
-                          <Flex align="center" gap={2} mb={2}>
-                            <UserAvatar size="xs" user={comment.user} onClick={() => comment.user?.id && navigate(`/profile/${comment.user.id}`)} cursor="pointer" />
-                            <Text fontSize="xs" fontWeight="500">{comment.user?.first_name} {comment.user?.last_name}</Text>
-                            {comment.rating && (
-                              <HStack spacing={0.5} ml="auto">
-                                {[...Array(comment.rating)].map((_, idx) => (
-                                  <Icon key={idx} as={MdStar} color="yellow.400" boxSize={3} />
-                                ))}
-                              </HStack>
-                            )}
-                          </Flex>
-                          <Text fontSize="xs" color="gray.600">{comment.content}</Text>
-                          <Text fontSize="xs" color="gray.400" mt={1}>{new Date(comment.created_at).toLocaleDateString()}</Text>
-                        </Box>
-                      ))}
-                    </VStack>
-                  ) : (
-                    <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
-                      <Text color="gray.500" fontSize="xs">No comments</Text>
-                    </Box>
-                  )}
+                  <PaginatedCommentsList comments={comments} navigate={navigate} />
                 </TabPanel>
               </TabPanels>
             </Tabs>
@@ -503,30 +341,31 @@ const ProfilePage = () => {
   );
 };
 
-const renderOffersList = (
-  data: { inProgress?: any[]; completed?: any[]; active?: any[]; all?: any[] },
-  navigate: any,
+const PaginatedOffersList = ({
+  data,
+  navigate,
+  pendingCounts
+}: {
+  data: { inProgress?: any[]; completed?: any[]; active?: any[]; all?: any[] }
+  navigate: any
   pendingCounts?: Record<string, number>
-) => {
-  if (data.all) {
-    if (data.all.length === 0) {
-      return (
-        <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
-          <Text color="gray.500" fontSize="xs">None yet</Text>
-        </Box>
-      )
-    }
-    return (
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
-        {data.all.map((item: any) => <OfferCard key={item.id} item={item} navigate={navigate} pendingCount={pendingCounts?.[String(item.id)]} />)}
-      </SimpleGrid>
-    )
-  }
-
-  const { inProgress = [], completed = [], active = [] } = data
-  const hasAny = inProgress.length > 0 || completed.length > 0 || active.length > 0
-
-  if (!hasAny) {
+}) => {
+  const [currentPage, setCurrentPage] = useState(1)
+  
+  // Combine all items for pagination
+  const allItems = data.all || [
+    ...(data.inProgress || []).map(item => ({ ...item, _status: 'in_progress' })),
+    ...(data.active || []).map(item => ({ ...item, _status: 'active' })),
+    ...(data.completed || []).map(item => ({ ...item, _status: 'completed' })),
+  ]
+  
+  const totalPages = Math.ceil(allItems.length / ITEMS_PER_PAGE)
+  const paginatedItems = allItems.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+  
+  if (allItems.length === 0) {
     return (
       <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
         <Text color="gray.500" fontSize="xs">None yet</Text>
@@ -535,33 +374,66 @@ const renderOffersList = (
   }
 
   return (
-    <VStack spacing={4} align="stretch">
-      {inProgress.length > 0 && (
-        <Box>
-          <Text fontSize="xs" fontWeight="600" color="blue.600" mb={2}>In Progress ({inProgress.length})</Text>
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
-            {inProgress.map((item: any) => <OfferCard key={item.id} item={item} navigate={navigate} status="in_progress" pendingCount={pendingCounts?.[String(item.id)]} />)}
-          </SimpleGrid>
-        </Box>
-      )}
-      {completed.length > 0 && (
-        <Box>
-          <Text fontSize="xs" fontWeight="600" color="green.600" mb={2}>Completed ({completed.length})</Text>
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
-            {completed.map((item: any) => <OfferCard key={item.id} item={item} navigate={navigate} status="completed" pendingCount={pendingCounts?.[String(item.id)]} />)}
-          </SimpleGrid>
-        </Box>
-      )}
-      {active.length > 0 && (
-        <Box>
-          <Text fontSize="xs" fontWeight="600" mb={2}>Active ({active.length})</Text>
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
-            {active.map((item: any) => <OfferCard key={item.id} item={item} navigate={navigate} status="active" pendingCount={pendingCounts?.[String(item.id)]} />)}
-          </SimpleGrid>
-        </Box>
+    <VStack spacing={3} align="stretch">
+      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+        {paginatedItems.map((item: any) => (
+          <OfferCard 
+            key={item.id} 
+            item={item} 
+            navigate={navigate} 
+            status={item._status} 
+            pendingCount={pendingCounts?.[String(item.id)]} 
+          />
+        ))}
+      </SimpleGrid>
+      
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <Flex justify="center" align="center" gap={2} pt={2}>
+          <Button
+            size="xs"
+            variant="ghost"
+            leftIcon={<MdChevronLeft />}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            isDisabled={currentPage === 1}
+          >
+            Prev
+          </Button>
+          <HStack spacing={1}>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <Button
+                key={page}
+                size="xs"
+                variant={currentPage === page ? 'solid' : 'ghost'}
+                colorScheme={currentPage === page ? 'yellow' : 'gray'}
+                onClick={() => setCurrentPage(page)}
+                minW="24px"
+              >
+                {page}
+              </Button>
+            ))}
+          </HStack>
+          <Button
+            size="xs"
+            variant="ghost"
+            rightIcon={<MdChevronRight />}
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            isDisabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </Flex>
       )}
     </VStack>
   )
+}
+
+const renderOffersList = (
+  data: { inProgress?: any[]; completed?: any[]; active?: any[]; all?: any[] },
+  navigate: any,
+  pendingCounts?: Record<string, number>
+) => {
+  return <PaginatedOffersList data={data} navigate={navigate} pendingCounts={pendingCounts} />
 }
 
 const OfferCard = ({ item, navigate, status, pendingCount }: { item: any; navigate: any; status?: string; pendingCount?: number }) => (
@@ -601,5 +473,224 @@ const OfferCard = ({ item, navigate, status, pendingCount }: { item: any; naviga
     </HStack>
   </Box>
 )
+
+// Paginated Handshakes List Component
+const PaginatedHandshakesList = ({
+  title,
+  titleColor,
+  exchanges,
+  navigate,
+  emptyText,
+  userField,
+  userLabel,
+  variant
+}: {
+  title: string
+  titleColor?: string
+  exchanges: Exchange[]
+  navigate: any
+  emptyText: string
+  userField: 'requester' | 'provider'
+  userLabel: string
+  variant: 'incoming' | 'outgoing' | 'default'
+}) => {
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = Math.ceil(exchanges.length / HANDSHAKES_PER_PAGE)
+  const paginatedExchanges = exchanges.slice(
+    (currentPage - 1) * HANDSHAKES_PER_PAGE,
+    currentPage * HANDSHAKES_PER_PAGE
+  )
+
+  const getStatusBadge = (exchange: Exchange) => {
+    if (variant === 'incoming' && exchange.status === 'PENDING') {
+      return <Badge colorScheme="orange" fontSize="10px">PENDING</Badge>
+    }
+    if (variant === 'outgoing' && exchange.status === 'PENDING') {
+      return <Badge colorScheme="yellow" fontSize="10px">REQUESTED</Badge>
+    }
+    return (
+      <Badge
+        colorScheme={
+          exchange.status === 'COMPLETED' ? 'green' :
+          exchange.status === 'ACCEPTED' ? 'blue' : 'gray'
+        }
+        fontSize="10px"
+      >
+        {exchange.status}
+      </Badge>
+    )
+  }
+
+  return (
+    <Box>
+      <Text fontWeight="600" fontSize="sm" mb={3} color={titleColor}>
+        {title} ({exchanges.length})
+      </Text>
+      {exchanges.length > 0 ? (
+        <VStack spacing={2} align="stretch">
+          {paginatedExchanges.map((exchange) => {
+            const user = exchange[userField]
+            return (
+              <Box
+                key={exchange.id}
+                p={3}
+                borderRadius="md"
+                border="1px solid"
+                borderColor={variant === 'incoming' && exchange.status === 'PENDING' ? 'orange.200' : 'gray.100'}
+                bg={variant === 'incoming' && exchange.status === 'PENDING' ? 'orange.50' : 'white'}
+                cursor="pointer"
+                _hover={{ bg: variant === 'incoming' && exchange.status === 'PENDING' ? 'orange.100' : 'gray.50' }}
+                onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
+              >
+                <Flex justify="space-between" align="center">
+                  <HStack spacing={2}>
+                    <UserAvatar size="sm" user={user} />
+                    <Box>
+                      <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
+                      <Text fontSize="xs" color="gray.500">{userLabel} {user?.first_name}</Text>
+                    </Box>
+                  </HStack>
+                  {getStatusBadge(exchange)}
+                </Flex>
+              </Box>
+            )
+          })}
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <Flex justify="center" align="center" gap={2} pt={2}>
+              <Button
+                size="xs"
+                variant="ghost"
+                leftIcon={<MdChevronLeft />}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                isDisabled={currentPage === 1}
+              >
+                Prev
+              </Button>
+              <HStack spacing={1}>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <Button
+                    key={page}
+                    size="xs"
+                    variant={currentPage === page ? 'solid' : 'ghost'}
+                    colorScheme={currentPage === page ? 'yellow' : 'gray'}
+                    onClick={() => setCurrentPage(page)}
+                    minW="24px"
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </HStack>
+              <Button
+                size="xs"
+                variant="ghost"
+                rightIcon={<MdChevronRight />}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                isDisabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </Flex>
+          )}
+        </VStack>
+      ) : emptyText ? (
+        <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+          <Text color="gray.500" fontSize="xs">{emptyText}</Text>
+        </Box>
+      ) : null}
+    </Box>
+  )
+}
+
+// Paginated Comments List Component
+const PaginatedCommentsList = ({
+  comments,
+  navigate
+}: {
+  comments: Comment[]
+  navigate: any
+}) => {
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = Math.ceil(comments.length / COMMENTS_PER_PAGE)
+  const paginatedComments = comments.slice(
+    (currentPage - 1) * COMMENTS_PER_PAGE,
+    currentPage * COMMENTS_PER_PAGE
+  )
+
+  return (
+    <Box>
+      <Text fontWeight="600" fontSize="sm" mb={3}>Comments ({comments.length})</Text>
+      {comments.length > 0 ? (
+        <VStack spacing={2} align="stretch">
+          {paginatedComments.map((comment) => (
+            <Box key={comment.id} p={3} borderRadius="md" border="1px solid" borderColor="gray.100">
+              <Flex align="center" gap={2} mb={2}>
+                <UserAvatar 
+                  size="xs" 
+                  user={comment.user} 
+                  onClick={() => comment.user?.id && navigate(`/profile/${comment.user.id}`)} 
+                  cursor="pointer" 
+                />
+                <Text fontSize="xs" fontWeight="500">{comment.user?.first_name} {comment.user?.last_name}</Text>
+                {comment.rating && (
+                  <HStack spacing={0.5} ml="auto">
+                    {[...Array(comment.rating)].map((_, idx) => (
+                      <Icon key={idx} as={MdStar} color="yellow.400" boxSize={3} />
+                    ))}
+                  </HStack>
+                )}
+              </Flex>
+              <Text fontSize="xs" color="gray.600">{comment.content}</Text>
+              <Text fontSize="xs" color="gray.400" mt={1}>{new Date(comment.created_at).toLocaleDateString()}</Text>
+            </Box>
+          ))}
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <Flex justify="center" align="center" gap={2} pt={2}>
+              <Button
+                size="xs"
+                variant="ghost"
+                leftIcon={<MdChevronLeft />}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                isDisabled={currentPage === 1}
+              >
+                Prev
+              </Button>
+              <HStack spacing={1}>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <Button
+                    key={page}
+                    size="xs"
+                    variant={currentPage === page ? 'solid' : 'ghost'}
+                    colorScheme={currentPage === page ? 'yellow' : 'gray'}
+                    onClick={() => setCurrentPage(page)}
+                    minW="24px"
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </HStack>
+              <Button
+                size="xs"
+                variant="ghost"
+                rightIcon={<MdChevronRight />}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                isDisabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </Flex>
+          )}
+        </VStack>
+      ) : (
+        <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+          <Text color="gray.500" fontSize="xs">No comments</Text>
+        </Box>
+      )}
+    </Box>
+  )
+}
 
 export default ProfilePage;
