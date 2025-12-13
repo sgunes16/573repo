@@ -39,12 +39,41 @@ def send_notification(user, content):
         print(f"Error sending notification via WebSocket: {e}")
 
 
+def send_exchange_update_ws(exchange):
+    """Send exchange update via WebSocket - utility function"""
+    try:
+        channel_layer = get_channel_layer()
+        room_group_name = f'exchange_{exchange.id}'
+        
+        exchange_data = {
+            'id': str(exchange.id),
+            'status': exchange.status,
+            'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
+            'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
+            'requester_confirmed': exchange.requester_confirmed,
+            'provider_confirmed': exchange.provider_confirmed,
+            'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
+        }
+        
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                'type': 'exchange_update',
+                'exchange': exchange_data
+            }
+        )
+    except Exception as e:
+        print(f"Error sending websocket update: {e}")
+
+
 class HomeView(APIView):
     def get(self, request):
         return Response({"message": "Home page"})
 
 
 class UserView(APIView):
+    permission_classes = [IsAuthenticated]
+    
     def get(self, request):
         user = request.user
         return Response({
@@ -59,7 +88,10 @@ class UserView(APIView):
                 "updated_at": user.updated_at,
             },
         })
+
+
 class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
     
     def get(self, request):
@@ -139,7 +171,7 @@ class UserProfileView(APIView):
                 import json
                 try:
                     skills = json.loads(skills)
-                except:
+                except (json.JSONDecodeError, ValueError):
                     skills = [s.strip() for s in skills.split(',') if s.strip()]
             user_profile.skills = skills
         if 'phone_number' in request.data:
@@ -188,10 +220,12 @@ class UserProfileView(APIView):
                 "total_amount": timebank.total_amount,
             },
         })
+
+
 class OffersView(APIView):
+    """Public endpoint - no authentication required"""
+    
     def get(self, request):
-        from datetime import date
-        
         offers = Offer.objects.select_related('user', 'user__profile').prefetch_related('exchange_set').filter(
             status='ACTIVE'  # Only show active offers
         )
@@ -257,7 +291,7 @@ class OffersView(APIView):
                     for img in offer.offer_images.all()
                 ],
                 "date": offer.date,
-                "time": offer.time,
+                "time": str(offer.time) if offer.time else None,
                 "from_date": offer.from_date,
                 "to_date": offer.to_date,
                 "created_at": offer.created_at,
@@ -405,7 +439,7 @@ class OfferDetailView(APIView):
                 if date_str:
                     try:
                         offer.date = date.fromisoformat(date_str)
-                    except:
+                    except (ValueError, TypeError):
                         pass
                 else:
                     offer.date = None
@@ -415,7 +449,7 @@ class OfferDetailView(APIView):
                 if time_str:
                     try:
                         offer.time = time.fromisoformat(time_str)
-                    except:
+                    except (ValueError, TypeError):
                         pass
                 else:
                     offer.time = None
@@ -451,28 +485,28 @@ class CreateOfferView(APIView):
             if from_date_str:
                 try:
                     from_date = datetime.fromisoformat(from_date_str.replace('Z', '+00:00'))
-                except:
+                except (ValueError, TypeError):
                     from_date = None
             
             if to_date_str:
                 try:
                     to_date = datetime.fromisoformat(to_date_str.replace('Z', '+00:00'))
-                except:
+                except (ValueError, TypeError):
                     to_date = None
             
             if date_str:
                 try:
                     date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()
-                except:
+                except (ValueError, TypeError):
                     date_obj = None
             
             if time_str:
                 try:
                     time_obj = datetime.strptime(time_str, '%H:%M').time()
-                except:
+                except (ValueError, TypeError):
                     try:
                         time_obj = datetime.strptime(time_str, '%H:%M:%S').time()
-                    except:
+                    except (ValueError, TypeError):
                         time_obj = None
             
             location_data = request.data.get('location', {})
@@ -500,7 +534,7 @@ class CreateOfferView(APIView):
             return Response({
                 "message": "Offer created successfully", 
                 "offer_id": str(offer.id)
-            })
+            }, status=201)
         except Exception as e:
             return Response({
                 "message": "Failed to create offer",
@@ -958,17 +992,17 @@ class ProposeDateTimeView(APIView):
 
             try:
                 proposed_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            except:
+            except (ValueError, TypeError):
                 return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
 
             proposed_time = None
             if time_str:
                 try:
                     proposed_time = datetime.strptime(time_str, '%H:%M').time()
-                except:
+                except (ValueError, TypeError):
                     try:
                         proposed_time = datetime.strptime(time_str, '%H:%M:%S').time()
-                    except:
+                    except (ValueError, TypeError):
                         return Response({"error": "Invalid time format. Use HH:MM"}, status=400)
 
             exchange.proposed_date = proposed_date
@@ -982,7 +1016,7 @@ class ProposeDateTimeView(APIView):
             )
             
             # Send websocket update
-            self.send_exchange_update(exchange)
+            send_exchange_update_ws(exchange)
 
             return Response({
                 "message": "Date and time proposed successfully",
@@ -992,32 +1026,6 @@ class ProposeDateTimeView(APIView):
 
         except Exchange.DoesNotExist:
             return Response({"error": "Exchange not found"}, status=404)
-    
-    def send_exchange_update(self, exchange):
-        """Send exchange update via websocket"""
-        try:
-            channel_layer = get_channel_layer()
-            room_group_name = f'exchange_{exchange.id}'
-            
-            exchange_data = {
-                'id': str(exchange.id),
-                'status': exchange.status,
-                'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
-                'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
-                'requester_confirmed': exchange.requester_confirmed,
-                'provider_confirmed': exchange.provider_confirmed,
-                'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
-            }
-            
-            async_to_sync(channel_layer.group_send)(
-                room_group_name,
-                {
-                    'type': 'exchange_update',
-                    'exchange': exchange_data
-                }
-            )
-        except Exception as e:
-            print(f"Error sending websocket update: {e}")
 
 
 class AcceptExchangeView(APIView):
@@ -1076,7 +1084,7 @@ class AcceptExchangeView(APIView):
             )
             
             # Send websocket update
-            self._send_exchange_update(exchange)
+            send_exchange_update_ws(exchange)
 
             return Response({
                 "message": "Exchange accepted successfully",
@@ -1085,32 +1093,6 @@ class AcceptExchangeView(APIView):
 
         except Exchange.DoesNotExist:
             return Response({"error": "Exchange not found"}, status=404)
-    
-    def _send_exchange_update(self, exchange):
-        """Send exchange update via websocket"""
-        try:
-            channel_layer = get_channel_layer()
-            room_group_name = f'exchange_{exchange.id}'
-            
-            exchange_data = {
-                'id': str(exchange.id),
-                'status': exchange.status,
-                'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
-                'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
-                'requester_confirmed': exchange.requester_confirmed,
-                'provider_confirmed': exchange.provider_confirmed,
-                'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
-            }
-            
-            async_to_sync(channel_layer.group_send)(
-                room_group_name,
-                {
-                    'type': 'exchange_update',
-                    'exchange': exchange_data
-                }
-            )
-        except Exception as e:
-            print(f"Error sending websocket update: {e}")
 
 
 class RejectExchangeView(APIView):
@@ -1245,7 +1227,7 @@ class ConfirmCompletionView(APIView):
                     requester_timebank = TimeBank.objects.select_for_update().get(user=exchange.requester)
                     provider_timebank, _ = TimeBank.objects.select_for_update().get_or_create(
                         user=exchange.provider,
-                        defaults={'amount': 0, 'blocked_amount': 0, 'available_amount': 0, 'total_amount': 0}
+                        defaults={'amount': 1, 'blocked_amount': 0, 'available_amount': 1, 'total_amount': 1}
                     )
                     
                     # Unfreeze requester's time first
@@ -1317,7 +1299,7 @@ class ConfirmCompletionView(APIView):
                 exchange.save()
             
             # Send websocket update (outside transaction)
-            self.send_exchange_update(exchange)
+            send_exchange_update_ws(exchange)
 
             return Response({
                 "message": "Completion confirmed",
@@ -1328,32 +1310,6 @@ class ConfirmCompletionView(APIView):
 
         except Exchange.DoesNotExist:
             return Response({"error": "Exchange not found"}, status=404)
-    
-    def send_exchange_update(self, exchange):
-        """Send exchange update via websocket"""
-        try:
-            channel_layer = get_channel_layer()
-            room_group_name = f'exchange_{exchange.id}'
-            
-            exchange_data = {
-                'id': str(exchange.id),
-                'status': exchange.status,
-                'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
-                'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
-                'requester_confirmed': exchange.requester_confirmed,
-                'provider_confirmed': exchange.provider_confirmed,
-                'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
-            }
-            
-            async_to_sync(channel_layer.group_send)(
-                room_group_name,
-                {
-                    'type': 'exchange_update',
-                    'exchange': exchange_data
-                }
-            )
-        except Exception as e:
-            print(f"Error sending websocket update: {e}")
 
 
 class SubmitRatingView(APIView):
@@ -1503,16 +1459,8 @@ class TransactionsView(APIView):
                 user_transaction_type = tx.transaction_type
 
             # Get avatar URLs
-            from_user_profile = None
-            to_user_profile = None
-            try:
-                from_user_profile = tx.from_user.profile
-            except:
-                pass
-            try:
-                to_user_profile = tx.to_user.profile
-            except:
-                pass
+            from_user_profile = getattr(tx.from_user, 'profile', None)
+            to_user_profile = getattr(tx.to_user, 'profile', None)
 
             transactions_data.append({
                 "id": tx.id,
@@ -1591,16 +1539,8 @@ class LatestTransactionsView(APIView):
                 user_transaction_type = tx.transaction_type
 
             # Get avatar URLs
-            from_user_profile = None
-            to_user_profile = None
-            try:
-                from_user_profile = tx.from_user.profile
-            except:
-                pass
-            try:
-                to_user_profile = tx.to_user.profile
-            except:
-                pass
+            from_user_profile = getattr(tx.from_user, 'profile', None)
+            to_user_profile = getattr(tx.to_user, 'profile', None)
 
             transactions_data.append({
                 "id": tx.id,
@@ -1647,10 +1587,7 @@ class UserProfileDetailView(APIView):
             return Response({"error": "User not found"}, status=404)
 
         # Get user profile
-        try:
-            user_profile = target_user.profile
-        except:
-            user_profile = None
+        user_profile = getattr(target_user, 'profile', None)
 
         # Get user's recent offers (all, not limited)
         recent_offers = Offer.objects.filter(
@@ -1817,11 +1754,7 @@ class UserProfileDetailView(APIView):
         # Format comments
         comments_data = []
         for comment in user_comments:
-            user_profile = None
-            try:
-                user_profile = comment.user.profile
-            except:
-                pass
+            comment_user_profile = getattr(comment.user, 'profile', None)
             
             comments_data.append({
                 "id": comment.id,
@@ -1831,8 +1764,8 @@ class UserProfileDetailView(APIView):
                     "last_name": comment.user.last_name,
                     "email": comment.user.email,
                     "profile": {
-                        "avatar": request.build_absolute_uri(user_profile.avatar.url) if user_profile and user_profile.avatar else None,
-                    } if user_profile else None,
+                        "avatar": request.build_absolute_uri(comment_user_profile.avatar.url) if comment_user_profile and comment_user_profile.avatar else None,
+                    } if comment_user_profile else None,
                 },
                 "content": comment.content,
                 "rating": comment.rating,
@@ -2017,7 +1950,7 @@ class AdminReportsListView(APIView):
                         "first_name": target.first_name,
                         "last_name": target.last_name,
                     }
-            except:
+            except (Offer.DoesNotExist, Exchange.DoesNotExist, User.DoesNotExist):
                 target_info = {"id": report.target_id, "deleted": True}
 
             reports_data.append({
