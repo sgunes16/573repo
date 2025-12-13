@@ -753,6 +753,45 @@ This feature allows registered users to report inappropriate content or behavior
 | Performance     | Report submission shall complete within 2 seconds.                                                                     | High      |
 | Security        | Reports shall only be viewable by admins and the reporting user.                                                       | High      |
 
+### 3.1.17 Feature 1.17 - Password Validation and Email Verification
+
+#### 3.1.17.1 Description
+
+This feature enforces password security requirements during registration and requires users to verify their email address before accessing certain features. Strong password validation ensures account security, while email verification confirms user identity and prevents fake accounts.
+
+#### 3.1.17.2 User Story
+
+> As a _new user_, I want to _create a secure account with a strong password and verify my email_ so that _my account is protected and I can access all platform features_.
+
+#### 3.1.17.3 Acceptance Criteria
+
+- Given a user registering, when they enter a password, then the system shall validate it against security requirements.
+
+- Given a weak password, the system shall display specific error messages indicating which requirements are not met.
+
+- Given a successful registration, the system shall send a verification email to the user's email address.
+
+- Given an unverified user, they shall be restricted from creating offers or exchanges until email verification is complete.
+
+- Given a verification token, when the user clicks the link, then their email shall be verified and they gain full access.
+
+#### 3.1.17.4 Functional Requirements
+
+| ID    | Requirement                                                                                                     | Priority | Notes |
+|-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
+| FR-80 | The system shall validate that passwords are at least 8 characters with 1 uppercase, 1 lowercase, and 1 digit.  | High     |       |
+| FR-81 | The system shall send a verification email upon user registration.                                              | High     |       |
+| FR-82 | Unverified users shall not be able to create offers or exchanges.                                               | High     |       |
+| FR-83 | A user shall be able to request a new verification email.                                                       | Medium   |       |
+
+#### 3.1.17.5 Nonfunctional Requirements
+
+| Type            | Description                                                                                                            | Priority |
+|-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
+| Performance     | Verification emails shall be sent within 5 seconds of registration.                                                    | High      |
+| Security        | Verification tokens shall expire after 24 hours.                                                                       | High      |
+| Usability       | Password requirements shall be displayed in real-time as the user types.                                               | Medium    |
+
 ---
 
 ## 4. Nonfunctional Requirements

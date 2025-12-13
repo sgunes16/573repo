@@ -245,3 +245,14 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 APPEND_SLASH = False
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 465))  # Gmail SSL port
+EMAIL_USE_SSL = True  # Use SSL instead of TLS for port 465
+EMAIL_USE_TLS = False
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+# DEFAULT_FROM_EMAIL should match EMAIL_HOST_USER for Gmail
+DEFAULT_FROM_EMAIL = os.getenv('EMAIL_HOST_USER', '')

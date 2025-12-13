@@ -1,4 +1,6 @@
-import { Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, useLocation } from 'react-router-dom'
+import { Center, Spinner } from '@chakra-ui/react'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
@@ -13,15 +15,44 @@ import EditProfilePage from './pages/EditProfilePage'
 import OnboardingPage from './pages/OnboardingPage'
 import AdminPage from './pages/AdminPage'
 import NotificationsPage from './pages/NotificationsPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import VerifyEmailSentPage from './pages/VerifyEmailSentPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminProtectedRoute from './components/AdminProtectedRoute'
+import { useAuthStore } from './store/useAuthStore'
 
 function App() {
+  const { checkAuth, isLoading, user } = useAuthStore()
+  const location = useLocation()
+  
+  const isAuthPage = location.pathname === '/login' || 
+                     location.pathname === '/signup' ||
+                     location.pathname === '/' ||
+                     location.pathname.startsWith('/verify')
+
+  // Check auth status on app load (from cookies) - skip on auth pages
+  useEffect(() => {
+    if (!isAuthPage) {
+      checkAuth()
+    }
+  }, []) // Only run once on mount
+
+  // Show loading spinner while checking auth (not on auth pages)
+  if (isLoading && !user && !isAuthPage) {
+    return (
+      <Center h="100vh">
+        <Spinner size="xl" color="yellow.500" thickness="4px" />
+      </Center>
+    )
+  }
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/verify-email-sent" element={<VerifyEmailSentPage />} />
       <Route
         path="/onboarding"
         element={

@@ -38,10 +38,13 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ isLoading: true, error: null })
     try {
       const authResponse = await authService.login(credentials)
-      set({ authUser: authResponse, isAuthenticated: true })
-
-      const userDetails = await authService.getCurrentUser()
-      set({ user: userDetails.user, isLoading: false })
+      // User info is already in login response, no need to call getCurrentUser
+      set({ 
+        authUser: authResponse, 
+        user: authResponse.user as User,
+        isAuthenticated: true,
+        isLoading: false 
+      })
     } catch (error) {
       const errorMessage = error instanceof ApiErrorResponse
         ? error.data.message
@@ -55,10 +58,13 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ isLoading: true, error: null })
     try {
       const authResponse = await authService.register(registerData)
-      set({ authUser: authResponse, isAuthenticated: true })
-
-      const userDetails = await authService.getCurrentUser()
-      set({ user: userDetails.user, isLoading: false })
+      // User info is already in register response, no need to call getCurrentUser
+      set({ 
+        authUser: authResponse, 
+        user: authResponse.user as User,
+        isAuthenticated: true,
+        isLoading: false 
+      })
     } catch (error) {
       const errorMessage = error instanceof ApiErrorResponse
         ? error.data.message
@@ -74,11 +80,26 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   checkAuth: async () => {
+    // Don't check if already authenticated
+    const state = useAuthStore.getState()
+    if (state.isAuthenticated && state.user) {
+      return
+    }
+    
+    // Check if cookies exist before making API call
+    const hasToken = document.cookie.includes('access_token') || document.cookie.includes('refresh_token')
+    if (!hasToken) {
+      // No cookies, user is not logged in
+      set({ authUser: null, user: null, isAuthenticated: false, isLoading: false })
+      return
+    }
+    
     set({ isLoading: true })
     try {
       const userDetails = await authService.getCurrentUser()
       set({ user: userDetails.user, isAuthenticated: true, isLoading: false })
     } catch (error) {
+      // Silently fail - user is not logged in
       set({ authUser: null, user: null, isAuthenticated: false, isLoading: false })
     }
   },

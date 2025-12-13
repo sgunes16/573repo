@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertIcon,
   Badge,
   Box,
   Button,
@@ -17,6 +19,7 @@ import {
   Tag,
   Text,
   VStack,
+  useToast,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -27,6 +30,9 @@ import {
   MdStar,
   MdChevronLeft,
   MdChevronRight,
+  MdVerified,
+  MdEmail,
+  MdSettings,
 } from "react-icons/md";
 
 const ITEMS_PER_PAGE = 6;
@@ -38,6 +44,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { User, UserProfile, TimeBank, Comment, Exchange } from "@/types";
 import { profileService } from "@/services/profile.service";
 import { exchangeService } from "@/services/exchange.service";
+import { authService } from "@/services/auth.service";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -259,6 +266,7 @@ const ProfilePage = () => {
                 <Tab fontSize="sm">Wants</Tab>
                 {isOwnProfile && <Tab fontSize="sm">Handshakes</Tab>}
                 <Tab fontSize="sm">Comments</Tab>
+                {isOwnProfile && <Tab fontSize="sm"><Icon as={MdSettings} mr={1} />Settings</Tab>}
               </TabList>
 
               <TabPanels>
@@ -331,6 +339,13 @@ const ProfilePage = () => {
                 <TabPanel px={0}>
                   <PaginatedCommentsList comments={comments} navigate={navigate} />
                 </TabPanel>
+
+                {/* Settings Tab */}
+                {isOwnProfile && (
+                  <TabPanel px={0}>
+                    <SettingsPanel user={currentUser} />
+                  </TabPanel>
+                )}
               </TabPanels>
             </Tabs>
           </Box>
@@ -599,6 +614,112 @@ const PaginatedHandshakesList = ({
         </Box>
       ) : null}
     </Box>
+  )
+}
+
+// Settings Panel Component
+const SettingsPanel = ({ user }: { user: User }) => {
+  const toast = useToast()
+  const [isResending, setIsResending] = useState(false)
+
+  const handleResendVerification = async () => {
+    if (!user?.email) return
+    
+    setIsResending(true)
+    try {
+      await authService.resendVerificationEmail(user.email)
+      toast({
+        title: 'Verification email sent!',
+        description: 'Please check your inbox and spam folder.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      })
+    } catch (error: any) {
+      toast({
+        title: 'Failed to send email',
+        description: error.message || 'Please try again later',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+    } finally {
+      setIsResending(false)
+    }
+  }
+
+  return (
+    <VStack spacing={4} align="stretch">
+      {/* Email Verification Section */}
+      <Box p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" bg="gray.50">
+        <HStack spacing={2} mb={3}>
+          <Icon as={MdEmail} boxSize={5} color="gray.600" />
+          <Text fontWeight="600" fontSize="sm">Email Verification</Text>
+        </HStack>
+        
+        <VStack spacing={3} align="stretch">
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">Email</Text>
+            <Text fontSize="sm" fontWeight="500">{user?.email}</Text>
+          </HStack>
+          
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">Status</Text>
+            {user?.is_verified ? (
+              <HStack>
+                <Icon as={MdVerified} color="green.500" />
+                <Badge colorScheme="green" fontSize="xs">Verified</Badge>
+              </HStack>
+            ) : (
+              <Badge colorScheme="red" fontSize="xs">Not Verified</Badge>
+            )}
+          </HStack>
+
+          {!user?.is_verified && (
+            <>
+              <Alert status="warning" borderRadius="md" fontSize="sm">
+                <AlertIcon />
+                <Text>You need to verify your email to create offers and exchanges.</Text>
+              </Alert>
+              
+              <Button
+                leftIcon={<MdEmail />}
+                colorScheme="yellow"
+                size="sm"
+                onClick={handleResendVerification}
+                isLoading={isResending}
+                loadingText="Sending..."
+              >
+                Resend Verification Email
+              </Button>
+            </>
+          )}
+        </VStack>
+      </Box>
+
+      {/* Account Info Section */}
+      <Box p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" bg="gray.50">
+        <Text fontWeight="600" fontSize="sm" mb={3}>Account Information</Text>
+        <VStack spacing={2} align="stretch">
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">Name</Text>
+            <Text fontSize="sm" fontWeight="500">{user?.first_name} {user?.last_name}</Text>
+          </HStack>
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">Account Status</Text>
+            <Badge colorScheme={user?.is_active ? "green" : "red"} fontSize="xs">
+              {user?.is_active ? "Active" : "Inactive"}
+            </Badge>
+          </HStack>
+          {user?.is_admin && (
+            <HStack justify="space-between">
+              <Text fontSize="sm" color="gray.600">Role</Text>
+              <Badge colorScheme="purple" fontSize="xs">Admin</Badge>
+            </HStack>
+          )}
+        </VStack>
+      </Box>
+    </VStack>
   )
 }
 

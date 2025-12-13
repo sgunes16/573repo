@@ -473,6 +473,13 @@ class CreateOfferView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
+        # Check if user has verified email
+        if not request.user.is_verified:
+            return Response({
+                "error": "Please verify your email before creating offers",
+                "code": "EMAIL_NOT_VERIFIED"
+            }, status=403)
+        
         try:
             from_date_str = request.data.get('from_date')
             to_date_str = request.data.get('to_date')
@@ -656,6 +663,13 @@ class CreateExchangeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        # Check if user has verified email
+        if not request.user.is_verified:
+            return Response({
+                "error": "Please verify your email before creating exchange requests",
+                "code": "EMAIL_NOT_VERIFIED"
+            }, status=403)
+        
         try:
             offer_id = request.data.get('offer_id')
             if not offer_id:

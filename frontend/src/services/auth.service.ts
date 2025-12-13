@@ -2,6 +2,15 @@ import { apiService } from './api'
 import type { LoginCredentials, RegisterData, AuthResponse, RegisterResponse, MeResponse } from '@/types'
 import type { LogoutResponse } from '@/types'
 
+interface VerifyEmailResponse {
+  message: string
+  user?: {
+    id: number
+    email: string
+    is_verified: boolean
+  }
+}
+
 export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await apiService.post<AuthResponse>('/auth/login', credentials)
@@ -19,12 +28,27 @@ export const authService = {
     return response
   },
 
-    async getCurrentUser(): Promise<MeResponse> {
+  async getCurrentUser(): Promise<MeResponse> {
     return apiService.get<MeResponse>('/auth/me')
   },
 
   async refreshToken(): Promise<AuthResponse> {
     const response = await apiService.post<AuthResponse>('/auth/token/refresh')
+    return response
+  },
+
+  async verifyEmail(token: string): Promise<VerifyEmailResponse> {
+    const response = await apiService.post<VerifyEmailResponse>('/auth/verify-email', { token })
+    return response
+  },
+
+  async sendVerificationEmail(): Promise<{ message: string }> {
+    const response = await apiService.post<{ message: string }>('/auth/send-verification')
+    return response
+  },
+
+  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    const response = await apiService.post<{ message: string }>('/auth/resend-verification', { email })
     return response
   }
 }

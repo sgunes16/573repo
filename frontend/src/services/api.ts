@@ -50,8 +50,11 @@ class ApiService {
             // Retry original request
             return this.client(originalRequest)
           } catch (refreshError) {
-            // Redirect to login only if refresh fails
-            window.location.href = '/login'
+            // Redirect to login only if refresh fails and not already on auth pages
+            const currentPath = window.location.pathname
+            if (!currentPath.startsWith('/login') && !currentPath.startsWith('/signup') && !currentPath.startsWith('/verify')) {
+              window.location.href = '/login'
+            }
             return Promise.reject(refreshError)
           }
         }

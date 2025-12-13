@@ -4,10 +4,10 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total FRs in SRS** | 79 |
-| **FRs with Tests** | 58 |
-| **Coverage** | **73%** |
-| **Total Test Cases** | 201 |
+| **Total FRs in SRS** | 83 |
+| **FRs with Tests** | 62 |
+| **Coverage** | **75%** |
+| **Total Test Cases** | 228 |
 
 ---
 
@@ -171,9 +171,18 @@
 | FR ID | Requirement | Priority | Test File | Test Coverage | Status |
 |-------|-------------|----------|-----------|---------------|--------|
 | FR-66 | User login | High | `auth/tests.py` | `LoginViewTests` | ✅ |
-| FR-67 | User registration | High | `auth/tests.py` | `RegisterViewTests` | ✅ |
+| FR-67 | User registration | High | `test_auth_views.py` | `test_register_valid_password_succeeds`, `test_register_with_first_last_name` | ✅ |
 | FR-68 | View login page | High | - | Frontend | ⚠️ |
 | FR-69 | View registration page | High | - | Frontend | ⚠️ |
+
+## Feature 1.17 - Password & Email Verification (FR-80 to FR-83)
+
+| FR ID | Requirement | Priority | Test File | Test Coverage | Status |
+|-------|-------------|----------|-----------|---------------|--------|
+| FR-80 | Password validation (8 chars, upper, lower, digit) | High | `test_auth_views.py` | `TestPasswordValidation::*`, `TestRegisterWithPasswordValidation::*` | ✅ |
+| FR-81 | Send verification email on registration | High | `test_auth_views.py` | `test_register_creates_verification_token`, `test_verify_email_success` | ✅ |
+| FR-82 | Unverified users cannot create offers/exchanges | High | `test_auth_views.py` | `test_unverified_user_cannot_create_offer`, `test_unverified_user_cannot_create_exchange`, `test_verified_user_can_create_offer` | ✅ |
+| FR-83 | Resend verification email | Medium | `test_auth_views.py` | `test_resend_verification_success`, `test_resend_verification_invalidates_old_tokens` | ✅ |
 
 ## Feature 1.15 - Notification System (FR-70 to FR-75)
 
@@ -216,6 +225,7 @@
 | 1.14 Login/Registration | 4 | 2 | 50% |
 | 1.15 Notifications | 6 | 6 | **100%** ⬆️ |
 | 1.16 User Reports | 4 | 4 | **100%** ⬆️ |
+| 1.17 Password & Email Verification | 4 | 4 | **100%** ✨ NEW |
 
 ---
 
@@ -223,9 +233,9 @@
 
 | Priority | Total FRs | Covered | Coverage |
 |----------|-----------|---------|----------|
-| **High** | 68 | 50 | **74%** ⬆️ |
-| **Medium** | 11 | 8 | **73%** ⬆️ |
-| **Low** | 2 | 1 | **50%** ⬆️ |
+| **High** | 71 | 53 | **75%** ⬆️ |
+| **Medium** | 12 | 9 | **75%** ⬆️ |
+| **Low** | 2 | 1 | **50%** |
 
 ---
 
@@ -240,6 +250,7 @@
 | `test_views/test_admin_views.py` | 25 | FR-53 to FR-65 |
 | `test_views/test_report_views.py` | 20 | FR-76 to FR-79 |
 | `test_views/test_notification_views.py` | 17 | FR-70 to FR-75 |
+| `test_views/test_auth_views.py` | 27 | FR-80 to FR-83 (Password & Email Verification) |
 | `test_utils.py` | 23 | Utility functions |
 | `test_consumers.py` | 11 | WebSocket tests |
 | `integration/test_exchange_flow.py` | 11 | Exchange flow tests |

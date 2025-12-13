@@ -374,3 +374,20 @@ class Report(models.Model):
 
     def __str__(self):
         return f"Report #{self.id} - {self.reason} on {self.target_type} {self.target_id}"
+
+
+class EmailVerificationToken(models.Model):
+    """Token for email verification"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_tokens')
+    token = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Verification token for {self.user.email}"
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
