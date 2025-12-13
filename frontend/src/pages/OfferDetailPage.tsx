@@ -290,7 +290,15 @@ const OfferDetailPage = () => {
                   <Icon as={offer.activity_type === 'group' ? MdGroup : MdPerson} color="gray.400" boxSize={4} />
                   <Box>
                     <Text color="gray.500" fontSize="xs">Type</Text>
-                    <Text fontWeight="500">{offer.activity_type === 'group' ? 'Group' : '1-to-1'}</Text>
+                    <Text fontWeight="500">
+                      {offer.activity_type === 'group' ? 'Group' : '1-to-1'}
+                      {offer.activity_type === 'group' && (
+                        <Badge ml={2} colorScheme={offer.slots_available ? 'green' : 'orange'} fontSize="10px">
+                          {offer.active_slots || 0}/{offer.total_slots || offer.person_count} active
+                          {(offer.completed_slots || 0) > 0 && ` (${offer.completed_slots} done)`}
+                        </Badge>
+                      )}
+                    </Text>
                   </Box>
                 </HStack>
                 <HStack>
@@ -442,17 +450,28 @@ const OfferDetailPage = () => {
                   </Button>
                 </Box>
               ) : (
-                <Button
-                  w="100%"
-                  size="sm"
-                  bg="yellow.400"
-                  color="black"
-                  leftIcon={<Icon as={MdHandshake} boxSize={4} />}
-                  _hover={{ bg: 'yellow.500' }}
-                  onClick={() => navigate(`/handshake/offer/${offer.id}`)}
-                >
-                  {offer.type === 'offer' ? 'Request' : 'Offer Help'}
-                </Button>
+                <Box>
+                  {offer.activity_type === 'group' && !offer.slots_available && (
+                    <Box mb={2} p={2} bg="orange.50" borderRadius="md">
+                      <Text fontSize="xs" color="orange.600" textAlign="center">
+                        All slots are currently active ({offer.active_slots}/{offer.total_slots})
+                        {(offer.completed_slots || 0) > 0 && ` - ${offer.completed_slots} completed`}
+                      </Text>
+                    </Box>
+                  )}
+                  <Button
+                    w="100%"
+                    size="sm"
+                    bg="yellow.400"
+                    color="black"
+                    leftIcon={<Icon as={MdHandshake} boxSize={4} />}
+                    _hover={{ bg: 'yellow.500' }}
+                    onClick={() => navigate(`/handshake/offer/${offer.id}`)}
+                    isDisabled={offer.activity_type === 'group' && !offer.slots_available}
+                  >
+                    {offer.type === 'offer' ? 'Request' : 'Offer Help'}
+                  </Button>
+                </Box>
               )}
             </Box>
 

@@ -152,6 +152,13 @@ export interface Offer {
   created_at: string
   updated_at: string
   can_edit?: boolean
+  // Group offer slot information
+  filled_slots?: number
+  total_slots?: number
+  slots_available?: boolean
+  active_slots?: number
+  completed_slots?: number
+  provider_paid?: boolean
 }
 
 export interface CreateOfferResponse {

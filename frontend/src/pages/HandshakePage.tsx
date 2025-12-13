@@ -217,7 +217,18 @@ const HandshakePage = () => {
     const myConfirmed = isRequester ? exchange.requester_confirmed : exchange.provider_confirmed
     const otherConfirmed = isRequester ? exchange.provider_confirmed : exchange.requester_confirmed
     const isWaitingForOther = myConfirmed && !otherConfirmed && exchange.status === 'ACCEPTED'
+    const isGroupOffer = exchange.offer?.activity_type === 'group'
     
+    // Group offers: no "Date Set" step
+    if (isGroupOffer) {
+      return [
+        { done: true, waiting: false }, // Request Sent
+        { done: exchange.status === 'ACCEPTED' || exchange.status === 'COMPLETED', waiting: false }, // Accepted
+        { done: exchange.status === 'COMPLETED', waiting: isWaitingForOther }, // Completed
+      ]
+    }
+    
+    // 1-to-1 offers: include "Date Set" step
     return [
       { done: true, waiting: false }, // Request Sent
       { done: !!exchange.proposed_date, waiting: false }, // Date Proposed
@@ -417,7 +428,10 @@ const HandshakePage = () => {
   const provider = exchange.provider
   const requester = exchange.requester
   const steps = getProgressSteps()
-  const stepLabels = ['Requested', 'Date Set', 'Accepted', 'Done']
+  const isGroupOffer = offer?.activity_type === 'group'
+  const stepLabels = isGroupOffer 
+    ? ['Requested', 'Accepted', 'Done'] 
+    : ['Requested', 'Date Set', 'Accepted', 'Done']
 
   return (
     <Box bg="white" minH="100vh">
@@ -507,15 +521,17 @@ const HandshakePage = () => {
                     <Text fontWeight="500" color="gray.600">{formatDate(offer.date)} {offer.time || ''}</Text>
                   </Flex>
                 )}
-                {/* Proposed Date */}
-                <Flex justify="space-between">
-                  <HStack><Icon as={MdCalendarToday} boxSize={3} color={exchange.proposed_date ? 'green.500' : 'gray.400'} /><Text>Proposed Date</Text></HStack>
-                  {exchange.proposed_date ? (
-                    <Text fontWeight="600" color="green.600">{formatDate(exchange.proposed_date)} {exchange.proposed_time || ''}</Text>
-                  ) : (
-                    <Text fontWeight="500" color="orange.500">Not set yet</Text>
-                  )}
-                </Flex>
+                {/* Proposed Date - only show for 1-to-1 offers */}
+                {offer.activity_type !== 'group' && (
+                  <Flex justify="space-between">
+                    <HStack><Icon as={MdCalendarToday} boxSize={3} color={exchange.proposed_date ? 'green.500' : 'gray.400'} /><Text>Proposed Date</Text></HStack>
+                    {exchange.proposed_date ? (
+                      <Text fontWeight="600" color="green.600">{formatDate(exchange.proposed_date)} {exchange.proposed_time || ''}</Text>
+                    ) : (
+                      <Text fontWeight="500" color="orange.500">Not set yet</Text>
+                    )}
+                  </Flex>
+                )}
                 <Flex justify="space-between">
                   <HStack><Icon as={MdLocationPin} boxSize={3} /><Text>Location</Text></HStack>
                   <Text fontWeight="500" noOfLines={1} maxW="140px">
@@ -528,9 +544,29 @@ const HandshakePage = () => {
                 </Flex>
                 <Flex justify="space-between">
                   <HStack><Icon as={MdPeople} boxSize={3} /><Text>Type</Text></HStack>
-                  <Text fontWeight="500">{offer.activity_type === 'group' ? 'Group' : '1-to-1'}</Text>
+                  <HStack spacing={1}>
+                    <Text fontWeight="500">{offer.activity_type === 'group' ? 'Group' : '1-to-1'}</Text>
+                    {offer.activity_type === 'group' && offer.person_count && (
+                      <Badge colorScheme="purple" fontSize="9px">
+                        {offer.person_count} slots
+                      </Badge>
+                    )}
+                  </HStack>
                 </Flex>
               </VStack>
+              
+              {/* Group Offer Notice */}
+              {offer.activity_type === 'group' && (
+                <Box mt={3} p={2} bg="purple.50" borderRadius="md">
+                  <Text fontSize="xs" color="purple.700" fontWeight="500">
+                    🎯 Group Activity
+                  </Text>
+                  <Text fontSize="10px" color="purple.600" mt={1}>
+                    This is a group offer with {offer.person_count} participant slots. 
+                    Each participant confirms completion individually.
+                  </Text>
+                </Box>
+              )}
             </Box>
 
             {/* Participants */}
@@ -568,18 +604,32 @@ const HandshakePage = () => {
             </Box>
 
             {/* Actions */}
-            {exchange.status === 'PENDING' && isRequester && !exchange.proposed_date && (
+            {exchange.status === 'PENDING' && isRequester && !exchange.proposed_date && offer.activity_type !== 'group' && (
               <VStack spacing={2} align="stretch">
                 <Button colorScheme="yellow" size="sm" onClick={onProposeOpen}>Propose Date</Button>
                 <Button colorScheme="red" variant="outline" size="sm" onClick={handleCancel} isLoading={isSubmitting}>Cancel Request</Button>
               </VStack>
             )}
 
-            {exchange.status === 'PENDING' && isRequester && exchange.proposed_date && (
+            {/* Group offer - requester can only cancel, no propose date needed */}
+            {exchange.status === 'PENDING' && isRequester && offer.activity_type === 'group' && (
+              <Button colorScheme="red" variant="outline" size="sm" onClick={handleCancel} isLoading={isSubmitting}>Cancel Request</Button>
+            )}
+
+            {exchange.status === 'PENDING' && isRequester && exchange.proposed_date && offer.activity_type !== 'group' && (
               <Button colorScheme="red" variant="outline" size="sm" onClick={handleCancel} isLoading={isSubmitting}>Cancel Request</Button>
             )}
             
-            {exchange.status === 'PENDING' && isProvider && exchange.proposed_date && (
+            {/* For 1-to-1: Provider can accept/reject only if proposed_date is set */}
+            {exchange.status === 'PENDING' && isProvider && exchange.proposed_date && offer.activity_type !== 'group' && (
+              <HStack spacing={2}>
+                <Button colorScheme="green" size="sm" flex={1} onClick={handleAccept} isLoading={isSubmitting}>Accept</Button>
+                <Button colorScheme="red" variant="outline" size="sm" flex={1} onClick={handleReject} isLoading={isSubmitting}>Reject</Button>
+              </HStack>
+            )}
+
+            {/* For Group offers: Provider can accept/reject without proposed_date */}
+            {exchange.status === 'PENDING' && isProvider && offer.activity_type === 'group' && (
               <HStack spacing={2}>
                 <Button colorScheme="green" size="sm" flex={1} onClick={handleAccept} isLoading={isSubmitting}>Accept</Button>
                 <Button colorScheme="red" variant="outline" size="sm" flex={1} onClick={handleReject} isLoading={isSubmitting}>Reject</Button>

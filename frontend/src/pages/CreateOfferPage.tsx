@@ -433,10 +433,26 @@ const CreateOfferPage = () => {
               </Box>
               <Box>
                 <Text fontSize="sm" fontWeight="500" mb={1}>Type</Text>
-                <RadioGroup value={activityType} onChange={(val) => setActivityType(val as '1to1' | 'group')}>
+                <RadioGroup 
+                  value={activityType} 
+                  onChange={(val) => {
+                    // Only allow group for offers, not wants
+                    if (val === 'group' && (pageType === 'want' || offerType === 'want')) {
+                      return
+                    }
+                    setActivityType(val as '1to1' | 'group')
+                  }}
+                >
                   <HStack spacing={4}>
                     <Radio value="1to1" size="sm">1-to-1</Radio>
-                    <Radio value="group" size="sm">Group</Radio>
+                    <Radio 
+                      value="group" 
+                      size="sm" 
+                      isDisabled={pageType === 'want' || offerType === 'want'}
+                      title={pageType === 'want' || offerType === 'want' ? "Group is only available for offers" : ""}
+                    >
+                      Group {(pageType === 'want' || offerType === 'want') && <Badge ml={1} fontSize="2xs" colorScheme="gray">Offers only</Badge>}
+                    </Radio>
                   </HStack>
                 </RadioGroup>
               </Box>

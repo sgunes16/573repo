@@ -192,23 +192,33 @@ class OffersView(APIView):
     def get(self, request):
         from datetime import date
         
-        offers = Offer.objects.select_related('user', 'user__profile').prefetch_related('exchange_set').all()
+        offers = Offer.objects.select_related('user', 'user__profile').prefetch_related('exchange_set').filter(
+            status='ACTIVE'  # Only show active offers
+        )
         
-        # Filter out offers that have accepted exchanges with future proposed_date
+        # Filter out offers based on their exchange status
         available_offers = []
-        today = date.today()
         
         for offer in offers:
-            # Check if offer has accepted exchange with future proposed_date
-            has_future_accepted_exchange = Exchange.objects.filter(
-                offer=offer,
-                status='ACCEPTED',
-                proposed_date__gt=today
-            ).exists()
+            if offer.activity_type == 'group':
+                # Group offer: count ACCEPTED + COMPLETED exchanges
+                filled_count = Exchange.objects.filter(
+                    offer=offer,
+                    status__in=['ACCEPTED', 'COMPLETED']
+                ).count()
+                # Hide if all slots are filled (accepted or completed)
+                if filled_count >= offer.person_count:
+                    continue  # Skip this offer - all slots are filled
+            else:
+                # 1-to-1 offer: hide if any exchange is accepted
+                accepted_count = Exchange.objects.filter(
+                    offer=offer,
+                    status='ACCEPTED'
+                ).count()
+                if accepted_count > 0:
+                    continue  # Skip this offer - already has accepted exchange
             
-            # Only include offers that don't have future accepted exchanges
-            if not has_future_accepted_exchange:
-                available_offers.append(offer)
+            available_offers.append(offer)
         
         return Response([
             {
@@ -279,6 +289,20 @@ class OfferDetailView(APIView):
         ).exists()
         can_edit = not has_blocking_exchange
         
+        # Calculate slot information for group offers
+        # Count active slots (PENDING + ACCEPTED) and completed slots
+        active_exchanges = Exchange.objects.filter(
+            offer=offer,
+            status__in=['PENDING', 'ACCEPTED']
+        ).count()
+        completed_exchanges = Exchange.objects.filter(
+            offer=offer,
+            status='COMPLETED'
+        ).count()
+        filled_slots = active_exchanges + completed_exchanges  # Total slots taken (including completed)
+        total_slots = offer.person_count if offer.activity_type == 'group' else 1
+        slots_available = active_exchanges < total_slots  # Only active exchanges block new requests
+        
         return Response({
             "id": offer.id,
             "user_id": offer.user_id,
@@ -321,6 +345,12 @@ class OfferDetailView(APIView):
             "created_at": offer.created_at,
             "updated_at": offer.updated_at,
             "can_edit": can_edit,
+            "filled_slots": filled_slots,
+            "total_slots": total_slots,
+            "slots_available": slots_available,
+            "active_slots": active_exchanges,
+            "completed_slots": completed_exchanges,
+            "provider_paid": offer.provider_paid,
         })
     
     def put(self, request, offer_id):
@@ -600,6 +630,15 @@ class CreateExchangeView(APIView):
             # Check if user is requesting their own offer
             if offer.user == request.user:
                 return Response({"error": "Cannot request your own offer"}, status=400)
+
+            # Check slot availability for group offers
+            if offer.activity_type == 'group':
+                active_exchanges_count = Exchange.objects.filter(
+                    offer=offer,
+                    status__in=['PENDING', 'ACCEPTED']
+                ).count()
+                if active_exchanges_count >= offer.person_count:
+                    return Response({"error": "All slots are filled for this group offer"}, status=400)
 
             # Check if exchange already exists
             existing = Exchange.objects.filter(
@@ -987,7 +1026,7 @@ class AcceptExchangeView(APIView):
 
     def post(self, request, exchange_id):
         try:
-            exchange = Exchange.objects.get(id=exchange_id)
+            exchange = Exchange.objects.select_related('offer').get(id=exchange_id)
             
             # Only provider can accept
             if exchange.provider != request.user:
@@ -1002,6 +1041,30 @@ class AcceptExchangeView(APIView):
 
             if exchange.status != 'PENDING':
                 return Response({"error": "Exchange is not in pending status"}, status=400)
+
+            # Check if slots are available for accepting
+            offer = exchange.offer
+            
+            if offer.activity_type == 'group':
+                # Group offer: count ACCEPTED + COMPLETED (filled slots)
+                filled_count = Exchange.objects.filter(
+                    offer=offer,
+                    status__in=['ACCEPTED', 'COMPLETED']
+                ).count()
+                if filled_count >= offer.person_count:
+                    return Response({
+                        "error": f"All {offer.person_count} slots are already filled"
+                    }, status=400)
+            else:
+                # 1-to-1 offer: only one can be accepted at a time
+                accepted_count = Exchange.objects.filter(
+                    offer=offer,
+                    status='ACCEPTED'
+                ).count()
+                if accepted_count > 0:
+                    return Response({
+                        "error": "This offer already has an accepted exchange. Only one exchange can be accepted for 1-to-1 offers."
+                    }, status=400)
 
             exchange.status = 'ACCEPTED'
             exchange.save()
@@ -1191,7 +1254,54 @@ class ConfirmCompletionView(APIView):
                     # Transfer time - check available_amount after unblocking
                     if requester_timebank.available_amount >= exchange.time_spent:
                         requester_timebank.spend_credit(exchange.time_spent)
-                        provider_timebank.add_credit(exchange.time_spent)
+                        
+                        offer = exchange.offer
+                        is_group_offer = offer and offer.activity_type == 'group'
+                        
+                        # For group offers, only pay provider once
+                        if is_group_offer:
+                            if not offer.provider_paid:
+                                # First completion - provider receives payment
+                                provider_timebank.add_credit(exchange.time_spent)
+                                offer.provider_paid = True
+                                offer.save()
+                                
+                                # Send notifications
+                                send_notification(
+                                    exchange.requester,
+                                    f"Exchange '{offer.title}' has been completed! {exchange.time_spent}H time credits have been transferred."
+                                )
+                                send_notification(
+                                    exchange.provider,
+                                    f"Exchange '{offer.title}' has been completed! You received {exchange.time_spent}H time credits."
+                                )
+                            else:
+                                # Subsequent completions - credit is burned (provider already paid)
+                                send_notification(
+                                    exchange.requester,
+                                    f"Group exchange '{offer.title}' has been completed! {exchange.time_spent}H time credits have been used."
+                                )
+                                send_notification(
+                                    exchange.provider,
+                                    f"Group exchange '{offer.title}' with {exchange.requester.first_name} has been completed!"
+                                )
+                        else:
+                            # Normal 1-1 offer - standard transfer
+                            provider_timebank.add_credit(exchange.time_spent)
+                            
+                            send_notification(
+                                exchange.requester,
+                                f"Exchange '{offer.title}' has been completed! {exchange.time_spent}H time credits have been transferred."
+                            )
+                            send_notification(
+                                exchange.provider,
+                                f"Exchange '{offer.title}' has been completed! You received {exchange.time_spent}H time credits."
+                            )
+                            
+                            # Mark 1-1 offer as completed
+                            if offer:
+                                offer.status = 'COMPLETED'
+                                offer.save()
                         
                         # Create transaction record if it doesn't exist
                         if not TimeBankTransaction.objects.filter(exchange=exchange).exists():
@@ -1201,23 +1311,8 @@ class ConfirmCompletionView(APIView):
                                 exchange=exchange,
                                 time_amount=exchange.time_spent,
                                 transaction_type='SPEND',
-                                description=f'Exchange completed: {exchange.offer.title}'
+                                description=f'Exchange completed: {offer.title}'
                             )
-                        
-                        # Send completion notifications
-                        send_notification(
-                            exchange.requester,
-                            f"Exchange '{exchange.offer.title}' has been completed! {exchange.time_spent}H time credits have been transferred."
-                        )
-                        send_notification(
-                            exchange.provider,
-                            f"Exchange '{exchange.offer.title}' has been completed! You received {exchange.time_spent}H time credits."
-                        )
-                        
-                        # Mark offer as completed
-                        if exchange.offer:
-                            exchange.offer.status = 'COMPLETED'
-                            exchange.offer.save()
 
                 exchange.save()
             

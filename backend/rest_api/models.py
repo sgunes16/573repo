@@ -109,6 +109,7 @@ class Offer(models.Model):
     offer_type = models.CharField(
         max_length=20, choices=OFFER_TYPE_CHOICES, default='1time')
     person_count = models.IntegerField(default=1)
+    provider_paid = models.BooleanField(default=False)  # For group offers - tracks if provider received payment
     location_type = models.CharField(
         max_length=20, choices=LOCATION_TYPE_CHOICES, default='myLocation')
     tags = models.JSONField(default=list)
