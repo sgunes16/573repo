@@ -32,11 +32,6 @@ LOCATION_TYPE_CHOICES = [
     ('otherLocation', 'Remote'),
 ]
 
-OFFER_TYPE = [
-    ('offer', 'Offer'),
-    ('want', 'Want'),
-]
-
 
 class User(models.Model):
     email = models.EmailField(unique=True)
@@ -84,7 +79,7 @@ class UserProfile(models.Model):
     def time_credits(self):
         try:
             return self.user.timebank.amount
-        except:
+        except (models.ObjectDoesNotExist, AttributeError):
             return 0
 
     def __str__(self):

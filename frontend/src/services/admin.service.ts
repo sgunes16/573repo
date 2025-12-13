@@ -32,35 +32,35 @@ export interface WarnUserData {
 
 export const adminService = {
   async getKPI(): Promise<KPIData> {
-    return await apiService.get('/admin/kpi/')
+    return await apiService.get('/admin/kpi')
   },
 
   async getReports(): Promise<Report[]> {
-    return await apiService.get('/admin/reports/')
+    return await apiService.get('/admin/reports')
   },
 
   async updateReport(reportId: number, data: UpdateReportData): Promise<{ message: string; report: any }> {
-    return await apiService.patch(`/admin/reports/${reportId}/`, data)
+    return await apiService.patch(`/admin/reports/${reportId}`, data)
   },
 
   async resolveReport(reportId: number, data: ResolveReportData): Promise<{ message: string; report_id: number; status: string }> {
-    return await apiService.post(`/admin/reports/${reportId}/resolve/`, data)
+    return await apiService.post(`/admin/reports/${reportId}/resolve`, data)
   },
 
   async banUser(userId: number, data: BanUserData): Promise<{ message: string; user: any; reason?: string; duration_days?: number }> {
-    return await apiService.post(`/admin/users/${userId}/ban/`, data)
+    return await apiService.post(`/admin/users/${userId}/ban`, data)
   },
 
   async warnUser(userId: number, data: WarnUserData): Promise<{ message: string; user: any }> {
-    return await apiService.post(`/admin/users/${userId}/warn/`, data)
+    return await apiService.post(`/admin/users/${userId}/warn`, data)
   },
 
   async deleteOffer(offerId: number): Promise<{ message: string; offer: any }> {
-    return await apiService.delete(`/admin/offers/${offerId}/`)
+    return await apiService.delete(`/admin/offers/${offerId}`)
   },
 
   async getExchangeDetail(exchangeId: number): Promise<any> {
-    return await apiService.get(`/admin/exchanges/${exchangeId}/`)
+    return await apiService.get(`/admin/exchanges/${exchangeId}`)
   },
 }
 

@@ -12,7 +12,7 @@ def password_hash(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-def check_password(password, hashed_password):
+def verify_password(password, hashed_password):
     return password_hash(password) == hashed_password
 
 
@@ -63,7 +63,7 @@ class LoginView(APIView):
         except User.DoesNotExist:
             return Response({"message": "Invalid credentials"}, status=401)
 
-        if not check_password(password, user.password):
+        if not verify_password(password, user.password):
             return Response({"message": "Invalid credentials"}, status=401)
 
         tokens = get_tokens_for_user(user)
@@ -93,14 +93,14 @@ class RegisterView(APIView):
     def post(self, request):
         email = request.data.get("email")
         password = request.data.get("password")
-        check_password = request.data.get("check_password")
+        confirm_password = request.data.get("check_password")
         first_name = request.data.get("first_name")
         last_name = request.data.get("last_name")
 
-        if not email or not password or not check_password or not first_name or not last_name:
+        if not email or not password or not confirm_password or not first_name or not last_name:
             return Response({"message": "Email, password, check_password, first and last name are required."}, status=400)
 
-        if password != check_password:
+        if password != confirm_password:
             return Response({"message": "Passwords do not match."}, status=400)
 
         if User.objects.filter(email=email).exists():
@@ -125,7 +125,7 @@ class RegisterView(APIView):
             "access_token": tokens['access'],
             "refresh_token": tokens['refresh'],
         }
-        response = Response(data)
+        response = Response(data, status=201)
         
         # refresh_token stays httpOnly for security, access_token readable by JS for WebSocket auth
         response.set_cookie("refresh_token", tokens['refresh'], **get_cookie_settings(httponly=True))

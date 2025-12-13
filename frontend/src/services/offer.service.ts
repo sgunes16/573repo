@@ -11,7 +11,7 @@ export const offerService = {
   },
 
   async getOfferById(offerId: string | number): Promise<Offer> {
-    const response = await apiService.get<Offer>(`/offers/${offerId}/`)
+    const response = await apiService.get<Offer>(`/offers/${offerId}`)
     return response
   },
 
@@ -21,7 +21,7 @@ export const offerService = {
   },
 
   async updateOffer(offerId: string | number, offer: Partial<Offer>): Promise<CreateOfferResponse> {
-    const response = await apiService.put<CreateOfferResponse>(`/offers/${offerId}/`, offer)
+    const response = await apiService.put<CreateOfferResponse>(`/offers/${offerId}`, offer)
     return response
   },
 
@@ -31,7 +31,7 @@ export const offerService = {
       formData.append('images', file)
     })
 
-    const response = await fetch(`${API_BASE_URL}/offers/${offerId}/images/`, {
+    const response = await fetch(`${API_BASE_URL}/offers/${offerId}/images`, {
       method: 'POST',
       body: formData,
       credentials: 'include',
@@ -46,10 +46,10 @@ export const offerService = {
   },
 
   async deleteImage(offerId: string | number, imageId: number): Promise<void> {
-    await apiService.delete(`/offers/${offerId}/images/${imageId}/`)
+    await apiService.delete(`/offers/${offerId}/images/${imageId}`)
   },
 
   async setPrimaryImage(offerId: string | number, imageId: number): Promise<void> {
-    await apiService.post(`/offers/${offerId}/images/${imageId}/primary/`)
+    await apiService.post(`/offers/${offerId}/images/${imageId}/primary`)
   },
 }

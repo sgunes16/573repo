@@ -8,7 +8,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
 
         token['email'] = user.email
-        token['username'] = user.username if hasattr(user, 'username') else ''
         token['first_name'] = user.first_name
         token['last_name'] = user.last_name
 
@@ -16,18 +15,16 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 def get_tokens_for_user(user):
-
+    """Generate JWT tokens for a user"""
     refresh = RefreshToken.for_user(user)
 
     refresh['email'] = user.email
-    refresh['username'] = user.username if hasattr(user, 'username') else ''
     refresh['first_name'] = user.first_name
     refresh['last_name'] = user.last_name
 
     access = refresh.access_token
 
     access['email'] = user.email
-    access['username'] = user.username if hasattr(user, 'username') else ''
     access['first_name'] = user.first_name
     access['last_name'] = user.last_name
 

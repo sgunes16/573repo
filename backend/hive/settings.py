@@ -244,4 +244,4 @@ CSRF_TRUSTED_ORIGINS = [
     FRONTEND_URL,  # Custom frontend URL from env
 ]
 
-AUTO_SLASH = False
+APPEND_SLASH = False

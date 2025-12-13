@@ -44,7 +44,7 @@ export const profileService = {
       would_recommend_percentage: number
     } | null
   }> {
-    return await apiService.get(`/user-profile/${userId}/`)
+    return await apiService.get(`/user-profile/${userId}`)
   },
 
   async updateProfile(data: UpdateProfileData): Promise<UpdateProfileResponse> {
@@ -58,7 +58,7 @@ export const profileService = {
     if (data.phone_number !== undefined) formData.append('phone_number', data.phone_number)
     if (data.avatar) formData.append('avatar', data.avatar)
     
-    const response = await apiService.put<UpdateProfileResponse>('/user-profile/', formData, {
+    const response = await apiService.put<UpdateProfileResponse>('/user-profile', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
