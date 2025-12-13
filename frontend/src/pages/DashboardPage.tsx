@@ -158,9 +158,18 @@ const OfferCardSkeleton = () => (
 
 const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locationAddress?: string; myExchange?: Exchange }) => {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const rating = offer.user?.profile?.rating ?? 0
   const userName = offer.user?.first_name || 'User'
   const displayLocation = truncateLocation(locationAddress || offer.location || '', 30)
+
+  const handleOfferClick = () => {
+    if (!user) {
+      navigate('/login', { state: { from: `/offer/${offer.id}` } })
+    } else {
+      navigate(`/offer/${offer.id}`)
+    }
+  }
 
   return (
     <Box 
@@ -170,7 +179,7 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
       borderColor="gray.100"
       transition="background 0.15s"
       _hover={{ bg: 'gray.50' }}
-      onClick={() => navigate(`/offer/${offer.id}`)}
+      onClick={handleOfferClick}
     >
       <HStack spacing={3} align="flex-start">
         {/* Avatar */}
@@ -179,7 +188,11 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
           user={offer.user}
           onClick={(e) => {
             e.stopPropagation()
-            if (offer.user?.id) navigate(`/profile/${offer.user.id}`)
+            if (!user) {
+              navigate('/login')
+            } else if (offer.user?.id) {
+              navigate(`/profile/${offer.user.id}`)
+            }
           }}
         />
         
@@ -261,6 +274,7 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
 
 const MapPanel = ({ offers }: { offers: Offer[] }) => {
   const { geoLocation } = useGeoStore()
+  const { user } = useAuthStore()
   const navigate = useNavigate()
   const mapRef = useRef<MapRef>(null)
   const hasInitialized = useRef(false)
@@ -445,7 +459,13 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
                     cursor="pointer"
                     _hover={{ transform: 'scale(1.15)' }}
                     transition="transform 0.2s"
-                    onClick={() => navigate(`/offer/${offer.id}`)}
+                    onClick={() => {
+                      if (!user) {
+                        navigate('/login', { state: { from: `/offer/${offer.id}` } })
+                      } else {
+                        navigate(`/offer/${offer.id}`)
+                      }
+                    }}
                   >
                     <UserAvatar
                       size="md"
@@ -519,7 +539,11 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
                         _hover={{ bg: '#D4A72C' }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          navigate(`/offer/${offer.id}`)
+                          if (!user) {
+                            navigate('/login', { state: { from: `/offer/${offer.id}` } })
+                          } else {
+                            navigate(`/offer/${offer.id}`)
+                          }
                         }}
                       >
                         View Details
@@ -1127,7 +1151,13 @@ const DashboardPage = () => {
               size="xs"
               colorScheme="yellow"
               leftIcon={<Icon as={MdAdd} boxSize={3} />}
-              onClick={() => navigate(activeTab === 'offers' ? '/create-offer' : '/create-offer?type=want')}
+              onClick={() => {
+                if (!user) {
+                  navigate('/login')
+                } else {
+                  navigate(activeTab === 'offers' ? '/create-offer' : '/create-offer?type=want')
+                }
+              }}
             >
               Add
             </Button>
@@ -1266,7 +1296,13 @@ const DashboardPage = () => {
               size="xs"
               colorScheme="yellow"
               leftIcon={<Icon as={MdAdd} boxSize={3} />}
-              onClick={() => navigate(activeTab === 'offers' ? '/create-offer' : '/create-offer?type=want')}
+              onClick={() => {
+                if (!user) {
+                  navigate('/login')
+                } else {
+                  navigate(activeTab === 'offers' ? '/create-offer' : '/create-offer?type=want')
+                }
+              }}
             >
               Add
             </Button>

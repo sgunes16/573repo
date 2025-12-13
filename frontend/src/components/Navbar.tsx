@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Flex,
   HStack,
   Icon,
@@ -152,6 +153,33 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
           </Text>
         </HStack>
 
+        {/* Anonymous User - Show Login/Signup */}
+        {showUserInfo && !user && (
+          <HStack spacing={3}>
+            <Button
+              variant="ghost"
+              size="sm"
+              color="gray.600"
+              fontWeight="500"
+              onClick={() => navigate("/login")}
+              _hover={{ bg: 'gray.50' }}
+            >
+              Login
+            </Button>
+            <Button
+              size="sm"
+              bg="#ECC94B"
+              color="black"
+              fontWeight="500"
+              onClick={() => navigate("/signup")}
+              _hover={{ bg: '#D69E2E' }}
+            >
+              Sign Up
+            </Button>
+          </HStack>
+        )}
+
+        {/* Authenticated User */}
         {showUserInfo && user && (
           <HStack spacing={3}>
             {/* Notifications */}

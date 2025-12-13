@@ -31,28 +31,16 @@ function App() {
         }
       />
       
+      {/* Public Routes - Accessible without login */}
+      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/offer/:id" element={<OfferDetailPage />} />
+
       {/* Protected Routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
       <Route
         path="/create-offer"
         element={
           <ProtectedRoute>
             <CreateOfferPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/offer/:id"
-        element={
-          <ProtectedRoute>
-            <OfferDetailPage />
           </ProtectedRoute>
         }
       />

@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Comment, Report, Notification, Chat, Message
 from datetime import datetime, date, time
@@ -225,6 +225,7 @@ class UserProfileView(APIView):
 
 class OffersView(APIView):
     """Public endpoint - no authentication required"""
+    permission_classes = [AllowAny]
     
     def get(self, request):
         offers = Offer.objects.select_related('user', 'user__profile').prefetch_related('exchange_set').filter(
@@ -306,10 +307,10 @@ class OfferDetailView(APIView):
     """Get details of a single offer/want"""
     
     def get_permissions(self):
-        """GET is public, PUT requires authentication"""
-        if self.request.method == 'PUT':
+        """GET is public, PUT/DELETE requires authentication"""
+        if self.request.method in ['PUT', 'DELETE']:
             return [IsAuthenticated()]
-        return []
+        return [AllowAny()]
     
     def get(self, request, offer_id):
         try:

@@ -87,11 +87,11 @@ const LandingPage = () => {
               The Hive is a neighborhood time bank where generosity circulates. Give an hour of what you do best and receive an hour of the support you need.
             </Text>
             <Stack direction={{ base: 'column', sm: 'row' }} spacing={4}>
-              <Button size="lg" px={10} bg="#ECC94B" color="black" _hover={{ bg: '#D69E2E' }} onClick={() => navigate('/signup')}>
-                Join The Hive
+              <Button size="lg" px={10} bg="#ECC94B" color="black" _hover={{ bg: '#D69E2E' }} onClick={() => navigate('/dashboard')}>
+                Browse Offers & Wants
               </Button>
-              <Button size="lg" px={10} variant="outline" borderColor="#B7791F" color="#B7791F" onClick={() => navigate('/login')}>
-                I already have an account
+              <Button size="lg" px={10} variant="outline" borderColor="#B7791F" color="#B7791F" onClick={() => navigate('/signup')}>
+                Join The Hive
               </Button>
             </Stack>
           </VStack>
