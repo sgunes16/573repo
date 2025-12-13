@@ -993,6 +993,13 @@ class AcceptExchangeView(APIView):
             if exchange.provider != request.user:
                 return Response({"error": "Only provider can accept exchange"}, status=403)
 
+            if exchange.status == 'ACCEPTED':
+                # Already accepted, just return success
+                return Response({
+                    "message": "Exchange already accepted",
+                    "status": exchange.status,
+                })
+
             if exchange.status != 'PENDING':
                 return Response({"error": "Exchange is not in pending status"}, status=400)
 
@@ -1006,7 +1013,7 @@ class AcceptExchangeView(APIView):
             )
             
             # Send websocket update
-            self.send_exchange_update(exchange)
+            self._send_exchange_update(exchange)
 
             return Response({
                 "message": "Exchange accepted successfully",
@@ -1015,6 +1022,32 @@ class AcceptExchangeView(APIView):
 
         except Exchange.DoesNotExist:
             return Response({"error": "Exchange not found"}, status=404)
+    
+    def _send_exchange_update(self, exchange):
+        """Send exchange update via websocket"""
+        try:
+            channel_layer = get_channel_layer()
+            room_group_name = f'exchange_{exchange.id}'
+            
+            exchange_data = {
+                'id': str(exchange.id),
+                'status': exchange.status,
+                'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
+                'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
+                'requester_confirmed': exchange.requester_confirmed,
+                'provider_confirmed': exchange.provider_confirmed,
+                'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
+            }
+            
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'exchange_update',
+                    'exchange': exchange_data
+                }
+            )
+        except Exception as e:
+            print(f"Error sending websocket update: {e}")
 
 
 class RejectExchangeView(APIView):
@@ -1068,6 +1101,12 @@ class CancelExchangeView(APIView):
 
             if exchange.status not in ['PENDING', 'ACCEPTED']:
                 return Response({"error": "Exchange cannot be cancelled in current status"}, status=400)
+
+            # Cannot cancel if provider has already confirmed completion
+            if exchange.provider_confirmed:
+                return Response({
+                    "error": "Cannot cancel - provider has already marked as complete. Please complete the exchange."
+                }, status=400)
 
             # Unfreeze requester's time
             try:
@@ -1174,6 +1213,11 @@ class ConfirmCompletionView(APIView):
                             exchange.provider,
                             f"Exchange '{exchange.offer.title}' has been completed! You received {exchange.time_spent}H time credits."
                         )
+                        
+                        # Mark offer as completed
+                        if exchange.offer:
+                            exchange.offer.status = 'COMPLETED'
+                            exchange.offer.save()
 
                 exchange.save()
             

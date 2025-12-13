@@ -304,6 +304,11 @@ const HandshakePage = () => {
       toast({ title: 'Cannot cancel', description: 'Exchange cannot be cancelled in current status', status: 'warning', duration: 2000 })
       return
     }
+    // Cannot cancel if provider has already confirmed completion
+    if (exchange.provider_confirmed) {
+      toast({ title: 'Cannot cancel', description: 'Provider has already marked as complete. Please complete the exchange.', status: 'warning', duration: 3000 })
+      return
+    }
     setIsSubmitting(true)
     try {
       await exchangeService.cancelExchange(exchange.id.toString())
@@ -612,7 +617,7 @@ const HandshakePage = () => {
                     >
                       Mark Complete
                     </Button>
-                    {isRequester && (
+                    {isRequester && !exchange.provider_confirmed && (
                       <Button 
                         colorScheme="red" 
                         variant="outline" 
