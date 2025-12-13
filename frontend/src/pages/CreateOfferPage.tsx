@@ -18,7 +18,6 @@ import {
   RadioGroup,
   Select,
   Spinner,
-  Stack,
   Tag,
   Text,
   Textarea,
@@ -111,7 +110,7 @@ const CreateOfferPage = () => {
         // Load existing images
         if (offer.images && offer.images.length > 0) {
           const existingImages: UploadedImage[] = offer.images.map((img: any) => ({
-            id: String(img.id),
+            id: img.id,
             url: img.url,
             isNew: false
           }))

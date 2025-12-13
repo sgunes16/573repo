@@ -1,5 +1,5 @@
 import { apiService } from './api'
-import type { Report, CreateReportData } from '@/types'
+import type { CreateReportData } from '@/types'
 
 export const reportService = {
   async createReport(reportData: CreateReportData): Promise<{ message: string; report_id: number }> {

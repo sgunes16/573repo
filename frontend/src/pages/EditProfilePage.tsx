@@ -24,7 +24,7 @@ import { MdArrowBack, MdCameraAlt, MdAdd } from "react-icons/md";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/store/useAuthStore";
 import { profileService, UpdateProfileData } from "@/services/profile.service";
-import { UserProfile, TimeBank, User } from "@/types";
+import { TimeBank, User } from "@/types";
 
 const EditProfilePage = () => {
   const navigate = useNavigate();
@@ -35,7 +35,7 @@ const EditProfilePage = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+
   const [, setTimebank] = useState<TimeBank | null>(null);
 
   const [firstName, setFirstName] = useState("");
@@ -53,7 +53,6 @@ const EditProfilePage = () => {
       setIsLoading(true);
       try {
         const [profileData, timebankData] = await profileService.getUserProfile();
-        setProfile(profileData);
         setTimebank(timebankData);
         setFirstName(currentUser.first_name || "");
         setLastName(currentUser.last_name || "");

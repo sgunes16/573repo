@@ -43,7 +43,7 @@ const TransactionsPage = () => {
       setIsLoading(true)
       try {
         // Fetch both timebank and transactions
-        const [profileData, timebankData] = await profileService.getUserProfile()
+        const [_, timebankData] = await profileService.getUserProfile()
         setTimebank(timebankData)
         
         const txData = await transactionService.getTransactions()

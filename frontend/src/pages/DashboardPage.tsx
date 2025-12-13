@@ -61,62 +61,6 @@ import { mapboxService } from '@/services/mapbox.service'
 
 // @ts-ignore
 const MAPBOX_TOKEN = (import.meta as any).env.VITE_MAPBOX_TOKEN
-type OfferMeta = {
-  date: string
-  cadence: string
-  duration: string
-  group: string
-}
-
-const offerMetaMap: Record<string, OfferMeta> = {
-  '1': { date: '11.11.2025', cadence: '1-time', duration: '1 hr.', group: '1 to 1' },
-  '2': { date: '20.11.2025', cadence: 'Daily', duration: '1 hr.', group: '4 person' },
-  '3': { date: '20.11.2025', cadence: 'Bi-weekly', duration: '2 hr.', group: '2 person' },
-  '4': { date: '12.12.2025', cadence: '1-time', duration: '1 hr.', group: '1 to 1' },
-  '5': { date: '21.12.2025', cadence: '1-time', duration: '1 hr.', group: '8 person' },
-  '6': { date: '11.11.2025', cadence: 'Bi-daily', duration: '1 hr.', group: '1 to 1' },
-  '7': { date: '11.11.2025', cadence: 'Daily', duration: '1 hr.', group: '1 to 1' },
-}
-
-const timeCreditTier = (credits: number) => {
-  if (credits >= 1000) return '1000>'
-  if (credits >= 100) return '100>'
-  if (credits >= 50) return '50>'
-  if (credits >= 10) return '10>'
-  return '<10'
-}
-
-const RatingPill = ({ rating }: { rating: number }) => (
-  <HStack
-    spacing={1}
-    px={2}
-    py={1}
-    bg="#FFFFF0"
-    border="1px solid #F6E05E"
-    borderRadius="3px"
-    minW="60px"
-    justify="center"
-  >
-    <Icon as={MdStar} color="#ECC94B" boxSize={4} />
-    <Text fontSize="sm" fontWeight="bold" color="#ECC94B">
-      {rating.toFixed(1)}
-    </Text>
-  </HStack>
-)
-
-const OutlinePill = ({ label }: { label: string }) => (
-  <Box
-    px={2}
-    py={0.5}
-    border="1px solid #319795"
-    borderRadius="3px"
-    textTransform="uppercase"
-  >
-    <Text fontSize="xs" fontWeight="bold" color="#2C7A7B">
-      {label}
-    </Text>
-  </Box>
-)
 
 const truncateLocation = (location?: string, maxLength = 30): string => {
   if (!location) return 'No location'
