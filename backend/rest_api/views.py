@@ -5,6 +5,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Comment, Report, Notification, Chat, Message
 from datetime import datetime, date, time
 from django.conf import settings
+from django.utils import timezone
 from django.db import transaction, models
 from django.db.models import Q, Avg
 from channels.layers import get_channel_layer
@@ -244,13 +245,13 @@ class OffersView(APIView):
                 if filled_count >= offer.person_count:
                     continue  # Skip this offer - all slots are filled
             else:
-                # 1-to-1 offer: hide if any exchange is accepted
-                accepted_count = Exchange.objects.filter(
+                # 1-to-1 offer: hide if any exchange is accepted or completed
+                active_exchange_count = Exchange.objects.filter(
                     offer=offer,
-                    status='ACCEPTED'
+                    status__in=['ACCEPTED', 'COMPLETED']
                 ).count()
-                if accepted_count > 0:
-                    continue  # Skip this offer - already has accepted exchange
+                if active_exchange_count > 0:
+                    continue  # Skip this offer - already has active/completed exchange
             
             available_offers.append(offer)
         
@@ -1221,7 +1222,7 @@ class ConfirmCompletionView(APIView):
                 # If both confirmed, mark as completed and transfer time
                 if exchange.requester_confirmed and exchange.provider_confirmed:
                     exchange.status = 'COMPLETED'
-                    exchange.completed_at = datetime.now()
+                    exchange.completed_at = timezone.now()
                     
                     # Unblock and transfer time immediately when completed
                     requester_timebank = TimeBank.objects.select_for_update().get(user=exchange.requester)
