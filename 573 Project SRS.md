@@ -372,6 +372,17 @@ This feature allows users to initiate a handshake and rating process with anothe
 | FR-36e | A user shall be able to rate communication (1-5), punctuality (1-5), and recommendation after completing an exchange.                  | High     |       |
 | FR-36f | A user shall be able to add a comment with their rating.                                                                               | Medium   |       |
 | FR-36g | The system shall calculate and display average ratings on user profiles.                                                               | High     |       |
+| FR-36h | A registered user shall be able to create a group offer with multiple participant slots (person_count).                                | High     |       |
+| FR-36i | Group offers shall not require a proposed date for accepting exchanges.                                                                | Medium   |       |
+| FR-36j | Each participant in a group offer shall have their own separate exchange.                                                              | High     |       |
+| FR-36k | Each participant in a group offer shall confirm completion individually.                                                               | High     |       |
+| FR-36l | The provider shall receive time credits only once when the first participant completes (subsequent completions burn credits).          | High     |       |
+| FR-36m | For 1-to-1 offers, only one exchange can be ACCEPTED at a time.                                                                        | High     |       |
+| FR-36n | For group offers, exchanges up to person_count can be ACCEPTED simultaneously.                                                         | High     |       |
+| FR-36o | Offers shall be hidden from dashboard when all slots are filled (ACCEPTED or COMPLETED).                                              | High     |       |
+| FR-36p | The system shall display slot availability status for group offers (e.g., "2/3 active, 1 done").                                       | Medium   |       |
+| FR-36q | Group activity type shall only be available for offers, not for wants.                                                                 | Medium   |       |
+| FR-36r | The requester shall not be able to cancel an exchange after the provider has confirmed completion.                                     | High     |       |
 
 #### 3.1.7.5 Nonfunctional Requirements
 
@@ -820,6 +831,9 @@ This feature allows registered users to report inappropriate content or behavior
 - **Geo-location** - Geographic coordinates (latitude/longitude) of a location.
 - **Provider** - The user who offers/provides a service in an exchange.
 - **Requester** - The user who requests/receives a service in an exchange.
+- **Group Offer** - An offer that allows multiple participants (slots) to join simultaneously.
+- **Slot** - A participant position in a group offer; each slot corresponds to one exchange.
+- **Credit Burning** - When time credits are deducted from a requester but not transferred to the provider (in group offers after first completion).
 
 ---
 
