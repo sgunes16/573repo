@@ -240,10 +240,10 @@ class Message(models.Model):
 class TimeBank(models.Model):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='timebank')
-    amount = models.IntegerField(default=1)
+    amount = models.IntegerField(default=3)  # Initial 3 hours on registration
     blocked_amount = models.IntegerField(default=0)
-    available_amount = models.IntegerField(default=1)
-    total_amount = models.IntegerField(default=1)
+    available_amount = models.IntegerField(default=3)  # Initial 3 hours on registration
+    total_amount = models.IntegerField(default=3)  # Initial 3 hours on registration
     last_update = models.DateTimeField(auto_now=True)
 
     def add_credit(self, hours=1):

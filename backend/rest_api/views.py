@@ -111,10 +111,10 @@ class UserProfileView(APIView):
         timebank, _ = TimeBank.objects.get_or_create(
             user=user,
             defaults={
-                'amount': 1,
+                'amount': 3,
                 'blocked_amount': 0,
-                'available_amount': 1,
-                'total_amount': 1,
+                'available_amount': 3,
+                'total_amount': 3,
             }
         )
         
@@ -187,10 +187,10 @@ class UserProfileView(APIView):
         timebank, _ = TimeBank.objects.get_or_create(
             user=user,
             defaults={
-                'amount': 1,
+                'amount': 3,
                 'blocked_amount': 0,
-                'available_amount': 1,
-                'total_amount': 1,
+                'available_amount': 3,
+                'total_amount': 3,
             }
         )
         

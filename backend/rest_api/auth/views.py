@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_api.models import User, EmailVerificationToken
+from rest_api.models import User, EmailVerificationToken, UserProfile, TimeBank
 from rest_api.auth.serializers import get_tokens_for_user
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
@@ -191,6 +191,24 @@ class RegisterView(APIView):
             first_name=first_name,
             last_name=last_name,
             is_verified=False  # User needs to verify email
+        )
+
+        # Create UserProfile for the new user
+        UserProfile.objects.create(
+            user=user,
+            bio='',
+            location='',
+            skills=[],
+            rating=0.0,
+        )
+
+        # Create TimeBank with initial 3 hours credit
+        TimeBank.objects.create(
+            user=user,
+            amount=3,
+            blocked_amount=0,
+            available_amount=3,
+            total_amount=3,
         )
 
         # Generate verification token and send email
