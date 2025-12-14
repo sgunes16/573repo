@@ -56,6 +56,89 @@ class TestOffersView:
             assert 'title' in offer
             assert 'type' in offer
             assert 'status' in offer
+    
+    def test_get_offers_with_location_filter(self, authenticated_client):
+        """Test filtering offers by location (always uses 20km radius)"""
+        client, _ = authenticated_client
+        
+        # Istanbul coordinates
+        istanbul_lat, istanbul_lng = 41.0082, 28.9784
+        
+        # Create offer in Istanbul (within 20km)
+        OfferFactory(
+            title='Istanbul Offer',
+            geo_location=[istanbul_lat, istanbul_lng],
+            location_type='myLocation'
+        )
+        
+        # Create offer far away (Ankara - ~350km from Istanbul)
+        OfferFactory(
+            title='Ankara Offer',
+            geo_location=[39.9334, 32.8597],
+            location_type='myLocation'
+        )
+        
+        # Create remote offer (should always be included)
+        OfferFactory(
+            title='Remote Offer',
+            location_type='remote',
+            geo_location=[0, 0]
+        )
+        
+        # Filter by Istanbul location (backend uses fixed 20km radius)
+        response = client.get(f'/api/offers?lat={istanbul_lat}&lng={istanbul_lng}')
+        
+        assert response.status_code == status.HTTP_200_OK
+        titles = [o['title'] for o in response.data]
+        
+        # Istanbul offer and Remote offer should be included
+        assert 'Istanbul Offer' in titles
+        assert 'Remote Offer' in titles
+        # Ankara offer should be excluded (too far - beyond 20km)
+        assert 'Ankara Offer' not in titles
+    
+    def test_get_offers_nearby_within_20km(self, authenticated_client):
+        """Test offers within 20km are included"""
+        client, _ = authenticated_client
+        
+        istanbul_lat, istanbul_lng = 41.0082, 28.9784
+        
+        # Create offer ~15km away (within 20km)
+        OfferFactory(
+            title='Nearby Offer',
+            geo_location=[41.1, 29.1],  # Approximately 15km from Istanbul center
+            location_type='myLocation'
+        )
+        
+        response = client.get(f'/api/offers?lat={istanbul_lat}&lng={istanbul_lng}')
+        titles = [o['title'] for o in response.data]
+        
+        assert 'Nearby Offer' in titles
+    
+    def test_get_offers_without_location_returns_all(self, authenticated_client):
+        """Test that without location params, all offers are returned"""
+        client, _ = authenticated_client
+        
+        OfferFactory(title='Offer 1', geo_location=[41.0, 29.0], location_type='myLocation')
+        OfferFactory(title='Offer 2', geo_location=[39.0, 32.0], location_type='myLocation')
+        OfferFactory(title='Remote', location_type='remote', geo_location=[0, 0])
+        
+        response = client.get('/api/offers')
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 3
+    
+    def test_get_offers_remote_always_included(self, authenticated_client):
+        """Test that remote offers are always included"""
+        client, _ = authenticated_client
+        
+        OfferFactory(title='Remote Work', location_type='remote', geo_location=[0, 0])
+        
+        response = client.get('/api/offers?lat=41.0&lng=29.0')
+        
+        assert response.status_code == status.HTTP_200_OK
+        titles = [o['title'] for o in response.data]
+        assert 'Remote Work' in titles
 
 
 class TestOfferDetailView:

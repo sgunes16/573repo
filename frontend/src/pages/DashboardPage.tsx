@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertIcon,
   Badge,
   Box,
   Button,
@@ -34,7 +36,7 @@ import {
   Wrap,
   WrapItem,
 } from '@chakra-ui/react'
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Map, { Marker, Layer, Source } from 'react-map-gl'
 import type { MapRef } from 'react-map-gl'
@@ -216,7 +218,7 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
 }
 
 
-const MapPanel = ({ offers }: { offers: Offer[] }) => {
+const MapPanel = ({ offers, radiusKm }: { offers: Offer[]; radiusKm: number }) => {
   const { geoLocation } = useGeoStore()
   const { user } = useAuthStore()
   const navigate = useNavigate()
@@ -275,22 +277,22 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
       const distance = R * c
       
-      return distance <= 10
+      return distance <= radiusKm
     })
-  }, [offers, geoLocation])
+  }, [offers, geoLocation, radiusKm])
 
   const circleGeoJson = useMemo(() => {
-    if (!geoLocation || geoLocation.latitude === 0) return null
+    if (!geoLocation || geoLocation.latitude === 0 || radiusKm < 1) return null
     
     const center = [geoLocation.longitude, geoLocation.latitude]
-    const radiusInKm = 10
     const points = 64
     const coords = []
     
     for (let i = 0; i < points; i++) {
       const angle = (i / points) * 2 * Math.PI
-      const dx = radiusInKm * Math.cos(angle) / 111.32
-      const dy = radiusInKm * Math.sin(angle) / (111.32 * Math.cos(center[1] * Math.PI / 180))
+      // Fix: dx is for longitude (needs latitude correction), dy is for latitude
+      const dx = radiusKm * Math.cos(angle) / (111.32 * Math.cos(center[1] * Math.PI / 180))
+      const dy = radiusKm * Math.sin(angle) / 111.32
       coords.push([center[0] + dx, center[1] + dy])
     }
     coords.push(coords[0])
@@ -303,7 +305,7 @@ const MapPanel = ({ offers }: { offers: Offer[] }) => {
       },
       properties: {}
     }
-  }, [geoLocation])
+  }, [geoLocation, radiusKm])
 
   const handleRecenter = () => {
     if (geoLocation && geoLocation.latitude !== 0) {
@@ -560,19 +562,7 @@ const defaultFilters: FilterState = {
   activityType: [],
   durationRange: [0, 10],
   sortBy: 'newest',
-  radiusKm: 0,
-}
-
-// Haversine distance calculation (km)
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371 // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLon = (lon2 - lon1) * Math.PI / 180
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-  return R * c
+  radiusKm: 10, // Default 10km radius filter
 }
 
 const DashboardPage = () => {
@@ -588,9 +578,28 @@ const DashboardPage = () => {
   const [myExchanges, setMyExchanges] = useState<Record<string, Exchange>>({}) // offer_id -> Exchange
   const [filters, setFilters] = useState<FilterState>(defaultFilters)
   const { isOpen: isFilterOpen, onOpen: onFilterOpen, onClose: onFilterClose } = useDisclosure()
-  const itemsPerPage = 5 // 100px per card, fits viewport well
+  const fetchedRef = useRef(false) // Prevent duplicate API calls
+  const lastLocationRef = useRef<string>('') // Track location to prevent duplicate fetches
+  
+  // Dynamic items per page based on viewport (roughly 80px per card)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  
+  useEffect(() => {
+    const calculateItemsPerPage = () => {
+      const viewportHeight = window.innerHeight
+      const headerHeight = 56 + 50 + 40 + 50 // navbar + search + tabs + pagination
+      const availableHeight = viewportHeight - headerHeight
+      const cardHeight = 85 // approximate card height
+      const items = Math.max(5, Math.floor(availableHeight / cardHeight))
+      setItemsPerPage(items)
+    }
+    
+    calculateItemsPerPage()
+    window.addEventListener('resize', calculateItemsPerPage)
+    return () => window.removeEventListener('resize', calculateItemsPerPage)
+  }, [])
 
-  // Check if any filters are active
+  // Check if any filters are active (excluding default 10km radius)
   const hasActiveFilters = useMemo(() => {
     return (
       filters.locationType.length > 0 ||
@@ -598,18 +607,18 @@ const DashboardPage = () => {
       filters.durationRange[0] !== 0 ||
       filters.durationRange[1] !== 10 ||
       filters.sortBy !== 'newest' ||
-      filters.radiusKm > 0
+      filters.radiusKm !== 10 // 10km is default, not considered "active filter"
     )
   }, [filters])
 
-  // Count active filters
+  // Count active filters (excluding default 10km radius)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filters.locationType.length > 0) count++
     if (filters.activityType.length > 0) count++
     if (filters.durationRange[0] !== 0 || filters.durationRange[1] !== 10) count++
     if (filters.sortBy !== 'newest') count++
-    if (filters.radiusKm > 0) count++
+    if (filters.radiusKm !== 10) count++ // Only count if changed from default
     return count
   }, [filters])
 
@@ -618,29 +627,66 @@ const DashboardPage = () => {
     onFilterClose()
   }
 
-  useEffect(() => {
-    const fetchOffers = async () => {
-      setIsLoadingLocations(true)
-      const offers = await offerService.getOffers()
-      setOffers(offers)
-      
-      const cache: Record<string, string> = {}
-      for (const offer of offers) {
-        if (offer.geo_location && Array.isArray(offer.geo_location) && offer.geo_location.length === 2) {
-          const [lat, lng] = offer.geo_location
-          if (lat !== 0 && lng !== 0) {
-            const address = await mapboxService.reverseGeocode(lng, lat)
-            cache[offer.id] = address
-          } else if (offer.location_type === 'remote') {
-            cache[offer.id] = 'Remote / Online'
-          }
+  const fetchOffers = useCallback(async (lat?: number, lng?: number) => {
+    // Create a location key to check for duplicates
+    const locationKey = lat && lng ? `${lat.toFixed(4)},${lng.toFixed(4)}` : 'no-location'
+    
+    // Skip if we already fetched with this location
+    if (lastLocationRef.current === locationKey) return
+    lastLocationRef.current = locationKey
+    
+    setIsLoadingLocations(true)
+    
+    const params: { lat?: number; lng?: number } = {}
+    if (lat && lng) {
+      params.lat = lat
+      params.lng = lng
+    }
+    
+    const offers = await offerService.getOffers(params)
+    setOffers(offers)
+    
+    const cache: Record<string, string> = {}
+    for (const offer of offers) {
+      if (offer.location_type === 'remote') {
+        cache[offer.id] = 'Remote / Online'
+      } else if (offer.geo_location && Array.isArray(offer.geo_location) && offer.geo_location.length === 2) {
+        const [offerLat, offerLng] = offer.geo_location
+        if (offerLat !== 0 && offerLng !== 0) {
+          const address = await mapboxService.reverseGeocode(offerLng, offerLat)
+          cache[offer.id] = address
         }
       }
-      setLocationCache(cache)
-      setIsLoadingLocations(false)
     }
-    fetchOffers()
+    setLocationCache(cache)
+    setIsLoadingLocations(false)
   }, [])
+
+  useEffect(() => {
+    // Prevent React StrictMode double-call
+    if (fetchedRef.current) return
+    
+    if (geoLocation && geoLocation.latitude !== 0) {
+      // Location is ready - fetch with location
+      fetchedRef.current = true
+      fetchOffers(geoLocation.latitude, geoLocation.longitude)
+    } else {
+      // Wait for location, then fetch
+      const timeout = setTimeout(() => {
+        if (!fetchedRef.current) {
+          fetchedRef.current = true
+          // Check if location arrived in the meantime
+          const currentGeo = useGeoStore.getState().geoLocation
+          if (currentGeo && currentGeo.latitude !== 0) {
+            fetchOffers(currentGeo.latitude, currentGeo.longitude)
+          } else {
+            fetchOffers()
+          }
+        }
+      }, 1500)
+      return () => clearTimeout(timeout)
+    }
+  }, [geoLocation?.latitude, geoLocation?.longitude, fetchOffers])
 
   // Fetch user's exchanges to show handshake status on cards
   useEffect(() => {
@@ -708,22 +754,33 @@ const DashboardPage = () => {
       })
     }
 
-    // Radius filter (only for in-person offers with user location)
-    if (filters.radiusKm > 0 && geoLocation && geoLocation.latitude !== 0) {
+    // Radius filter - backend returns all offers within 20km, frontend filters by selected radius
+    if (geoLocation && geoLocation.latitude !== 0) {
       filtered = filtered.filter(offer => {
-        // Skip remote offers for radius filter
+        // Always include remote offers
         if (offer.location_type === 'remote') return true
         
         // Check if offer has geo_location
-        if (!offer.geo_location || offer.geo_location.length !== 2) return true
+        if (!offer.geo_location || offer.geo_location.length !== 2) return false
         
         const [offerLat, offerLng] = offer.geo_location
-        const distance = calculateDistance(
-          geoLocation.latitude, geoLocation.longitude,
-          offerLat, offerLng
-        )
+        if (offerLat === 0 && offerLng === 0) return false
+        
+        // Haversine distance calculation
+        const R = 6371 // Earth's radius in km
+        const dLat = (offerLat - geoLocation.latitude) * Math.PI / 180
+        const dLon = (offerLng - geoLocation.longitude) * Math.PI / 180
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(geoLocation.latitude * Math.PI / 180) * Math.cos(offerLat * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2)
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+        const distance = R * c
+        
         return distance <= filters.radiusKm
       })
+    } else {
+      // User has no location - only show remote offers
+      filtered = filtered.filter(offer => offer.location_type === 'remote')
     }
 
     // Sorting
@@ -767,7 +824,7 @@ const DashboardPage = () => {
       >
         {/* Map - Desktop */}
         <Box w="50%" h="100%">
-          <MapPanel offers={offers} />
+          <MapPanel offers={offers} radiusKm={filters.radiusKm} />
         </Box>
 
         {/* Cards Panel - Desktop */}
@@ -888,11 +945,12 @@ const DashboardPage = () => {
                           <Text fontWeight="semibold" fontSize="sm" mb={2}>
                             <Icon as={MdMyLocation} mr={2} />
                             Distance: {filters.radiusKm === 0 ? 'Any' : `${filters.radiusKm} km`}
+                            {filters.radiusKm === 10 && <Text as="span" color="gray.400" fontWeight="normal"> (default)</Text>}
                           </Text>
                           <Slider
-                            min={0}
-                            max={50}
-                            step={5}
+                            min={1}
+                            max={20}
+                            step={1}
                             value={filters.radiusKm}
                             onChange={(val) => setFilters(prev => ({ ...prev, radiusKm: val }))}
                             colorScheme="teal"
@@ -904,14 +962,17 @@ const DashboardPage = () => {
                             <SliderThumb boxSize={5} />
                           </Slider>
                           <HStack justify="space-between" mt={1}>
-                            <Text fontSize="xs" color="gray.500">Any</Text>
-                            <Text fontSize="xs" color="gray.500">50 km</Text>
+                            <Text fontSize="xs" color="gray.500">1 km</Text>
+                            <Text fontSize="xs" color="gray.500">20 km</Text>
                           </HStack>
                           {(!geoLocation || geoLocation.latitude === 0) && (
                             <Text fontSize="xs" color="orange.500" mt={1}>
                               Enable location to use this filter
                             </Text>
                           )}
+                          <Text fontSize="xs" color="gray.400" mt={1}>
+                            Remote offers are always shown regardless of distance.
+                          </Text>
                         </Box>
 
                         <Divider />
@@ -1021,13 +1082,13 @@ const DashboardPage = () => {
                     </Tag>
                   </WrapItem>
                 )}
-                {filters.radiusKm > 0 && (
+                {filters.radiusKm !== 10 && (
                   <WrapItem>
                     <Tag size="sm" colorScheme="teal" borderRadius="full">
                       <TagLabel>{filters.radiusKm} km</TagLabel>
                       <TagCloseButton onClick={() => setFilters(prev => ({
                         ...prev,
-                        radiusKm: 0
+                        radiusKm: 10
                       }))} />
                     </Tag>
                   </WrapItem>
@@ -1109,6 +1170,41 @@ const DashboardPage = () => {
 
           {/* Cards List */}
           <Box flex={1} overflowY="auto">
+            {/* Location Warning */}
+            {(!geoLocation || geoLocation.latitude === 0) && (
+              <Alert status="warning" fontSize="sm" py={2}>
+                <AlertIcon boxSize={4} />
+                <Box>
+                  <Text fontWeight="medium">Location access required</Text>
+                  <Text fontSize="xs" color="gray.600">
+                    Please allow location access to see nearby offers. Remote offers are still visible.
+                  </Text>
+                </Box>
+                <Button
+                  size="xs"
+                  ml="auto"
+                  colorScheme="yellow"
+                  onClick={() => {
+                    if (navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                          useGeoStore.getState().setGeoLocation({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                          })
+                        },
+                        (error) => {
+                          console.error('Location error:', error)
+                        }
+                      )
+                    }
+                  }}
+                >
+                  Allow
+                </Button>
+              </Alert>
+            )}
+            
             {isLoadingLocations ? (
               Array.from({ length: itemsPerPage }).map((_, i) => (
                 <OfferCardSkeleton key={i} />
@@ -1167,7 +1263,7 @@ const DashboardPage = () => {
       <Box display={{ base: 'block', lg: 'none' }}>
         {/* Map - Mobile */}
         <Box h="250px" w="100%">
-          <MapPanel offers={offers} />
+          <MapPanel offers={offers} radiusKm={filters.radiusKm} />
         </Box>
 
         {/* Cards Panel - Mobile */}
@@ -1254,6 +1350,37 @@ const DashboardPage = () => {
 
           {/* Cards List - Mobile */}
           <Box>
+            {/* Location Warning - Mobile */}
+            {(!geoLocation || geoLocation.latitude === 0) && (
+              <Alert status="warning" fontSize="sm" py={2}>
+                <AlertIcon boxSize={4} />
+                <Box flex={1}>
+                  <Text fontWeight="medium" fontSize="xs">Location access required</Text>
+                  <Text fontSize="xs" color="gray.600">
+                    Allow location to see nearby offers.
+                  </Text>
+                </Box>
+                <Button
+                  size="xs"
+                  colorScheme="yellow"
+                  onClick={() => {
+                    if (navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                          useGeoStore.getState().setGeoLocation({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                          })
+                        }
+                      )
+                    }
+                  }}
+                >
+                  Allow
+                </Button>
+              </Alert>
+            )}
+            
             {isLoadingLocations ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <OfferCardSkeleton key={i} />

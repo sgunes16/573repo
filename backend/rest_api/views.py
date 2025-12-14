@@ -227,7 +227,35 @@ class OffersView(APIView):
     """Public endpoint - no authentication required"""
     permission_classes = [AllowAny]
     
+    @staticmethod
+    def haversine_distance(lat1, lon1, lat2, lon2):
+        """Calculate distance between two points using Haversine formula (returns km)"""
+        import math
+        R = 6371  # Earth's radius in km
+        
+        lat1_rad = math.radians(lat1)
+        lat2_rad = math.radians(lat2)
+        delta_lat = math.radians(lat2 - lat1)
+        delta_lon = math.radians(lon2 - lon1)
+        
+        a = math.sin(delta_lat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        
+        return R * c
+    
     def get(self, request):
+        # Get location parameters for filtering - always use max 20km radius
+        user_lat = request.query_params.get('lat')
+        user_lng = request.query_params.get('lng')
+        radius_km = 20  # Always fetch within max 20km radius
+        
+        try:
+            user_lat = float(user_lat) if user_lat else None
+            user_lng = float(user_lng) if user_lng else None
+        except (ValueError, TypeError):
+            user_lat = None
+            user_lng = None
+        
         offers = Offer.objects.select_related('user', 'user__profile').prefetch_related('exchange_set').filter(
             status='ACTIVE'  # Only show active offers
         )
@@ -254,7 +282,24 @@ class OffersView(APIView):
                 if active_exchange_count > 0:
                     continue  # Skip this offer - already has active/completed exchange
             
-            available_offers.append(offer)
+            # Location-based filtering
+            if user_lat is not None and user_lng is not None:
+                # Always include remote offers
+                if offer.location_type == 'remote':
+                    available_offers.append(offer)
+                    continue
+                
+                # Check if offer has valid geo_location
+                if offer.geo_location and len(offer.geo_location) == 2:
+                    offer_lat, offer_lng = offer.geo_location
+                    if offer_lat != 0 and offer_lng != 0:
+                        distance = self.haversine_distance(user_lat, user_lng, offer_lat, offer_lng)
+                        if distance <= radius_km:
+                            available_offers.append(offer)
+                # Skip offers without valid location when filtering by location
+            else:
+                # No location filter - include all available offers
+                available_offers.append(offer)
         
         return Response([
             {

@@ -4,9 +4,21 @@ import type { Offer, CreateOfferResponse, UploadImageResponse } from '@/types'
 const API_BASE_URL =
   (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api'
 
+interface GetOffersParams {
+  lat?: number
+  lng?: number
+}
+
 export const offerService = {
-  async getOffers(): Promise<Offer[]> {
-    const response = await apiService.get<Offer[]>('/offers')
+  async getOffers(params?: GetOffersParams): Promise<Offer[]> {
+    const queryParams = new URLSearchParams()
+    if (params?.lat !== undefined) queryParams.append('lat', params.lat.toString())
+    if (params?.lng !== undefined) queryParams.append('lng', params.lng.toString())
+    
+    const queryString = queryParams.toString()
+    const url = queryString ? `/offers?${queryString}` : '/offers'
+    
+    const response = await apiService.get<Offer[]>(url)
     return response
   },
 
