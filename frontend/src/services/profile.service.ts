@@ -43,6 +43,7 @@ export const profileService = {
       total_count: number
       would_recommend_percentage: number
     } | null
+    completed_exchanges_count: number
   }> {
     return await apiService.get(`/user-profile/${userId}`)
   },

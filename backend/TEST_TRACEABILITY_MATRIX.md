@@ -5,9 +5,9 @@
 | Metric | Value |
 |--------|-------|
 | **Total FRs in SRS** | 158 |
-| **FRs with Tests** | 78 |
-| **Coverage** | **49%** |
-| **Total Test Cases** | 238 |
+| **FRs with Tests** | 92 |
+| **Coverage** | **58%** |
+| **Total Test Cases** | 285 |
 | **Features Fully Tested** | 7/19 |
 
 ---
@@ -20,16 +20,16 @@
 | FR-2 | Add tags to offer | Medium | `test_offer_views.py` | `test_create_offer_with_tags` | ✅ |
 | FR-3 | Upload images to offer | Medium | `test_offer_views.py` | `test_upload_image_requires_authentication` | ⚠️ Partial |
 | FR-4 | Display offers in feed | High | `test_offer_views.py` | `test_get_offers_success` | ✅ |
-| FR-5 | Edit/delete own offers only | High | `test_offer_views.py` | `test_update_own_offer`, `test_update_others_offer_fails` | ✅ |
-| FR-5a | Delete own offer | High | `test_offer_views.py` | `test_delete_own_offer_success`, `test_delete_others_offer_fails` | ✅ |
+| FR-5 | Edit/delete own offers only | High | `test_offer_views.py`, `test_exchange_flow.py` | `test_update_own_offer`, `test_update_others_offer_fails`, `test_edit_offer_success`, `test_edit_others_offer_fails` | ✅ |
+| FR-5a | Delete own offer | High | `test_offer_views.py`, `test_exchange_flow.py` | `test_delete_own_offer_success`, `test_delete_others_offer_fails`, `test_delete_offer_success`, `test_delete_others_offer_fails` | ✅ |
 | FR-5b | Confirmation before delete | Medium | - | Frontend implementation | ⚠️ UI only |
-| FR-5c | Prevent delete with non-cancelled exchanges | High | `test_offer_views.py` | `test_delete_offer_with_pending_exchange_fails`, `test_delete_offer_with_accepted_exchange_fails`, `test_delete_offer_with_completed_exchange_fails` | ✅ |
+| FR-5c | Prevent delete with non-cancelled exchanges | High | `test_offer_views.py`, `test_exchange_flow.py` | `test_delete_offer_with_pending_exchange_fails`, `test_delete_offer_with_accepted_exchange_fails`, `test_delete_offer_with_completed_exchange_fails`, `test_delete_offer_with_cancelled_exchange_success` | ✅ |
 | FR-5d | Remove images on delete | High | `test_offer_views.py` | `test_delete_own_offer_success` | ✅ |
-| FR-6 | Validate required fields | High | - | - | ❌ |
-| FR-6a | Prevent edit with non-cancelled exchanges | High | - | Logic implemented in views | ⚠️ No test |
+| FR-6 | Validate required fields | High | `test_offer_views.py` | `TestPastDateValidation` (5 tests: past date validation for create/update) | ✅ |
+| FR-6a | Prevent edit with non-cancelled exchanges | High | `test_exchange_flow.py` | `test_edit_offer_with_pending_exchange_fails`, `test_edit_offer_with_cancelled_exchange_success` | ✅ |
 | FR-6b | Display edit lock status | Medium | - | Frontend `can_edit` field | ⚠️ Implicit |
 
-**Coverage: 8/12 (67%)**
+**Coverage: 10/12 (83%)**
 
 ---
 
@@ -41,16 +41,16 @@
 | FR-8 | Add tags to want | Medium | - | Covered by FR-2 | ⚠️ Implicit |
 | FR-9 | Upload images to want | Medium | - | Covered by FR-3 | ⚠️ Implicit |
 | FR-10 | Display wants in feed | High | `test_offer_views.py` | `test_get_offers_only_active` | ✅ |
-| FR-11 | Edit/delete own wants only | High | - | Covered by FR-5 | ⚠️ Implicit |
-| FR-11a | Delete own want | High | `test_offer_views.py` | `test_delete_own_want_success` | ✅ |
+| FR-11 | Edit/delete own wants only | High | `test_exchange_flow.py` | `test_want_delete_unblocks_credits`, `test_want_edit_time_required_adjusts_credits` | ✅ |
+| FR-11a | Delete own want | High | `test_offer_views.py`, `test_exchange_flow.py` | `test_delete_own_want_success`, `test_want_delete_unblocks_credits` | ✅ |
 | FR-11b | Confirmation before delete | Medium | - | Frontend implementation | ⚠️ UI only |
 | FR-11c | Prevent delete with non-cancelled exchanges | High | `test_offer_views.py` | Covered by FR-5c tests | ✅ |
 | FR-11d | Remove images on delete | High | `test_offer_views.py` | Covered by FR-5d tests | ✅ |
-| FR-12 | Validate required fields | High | - | - | ❌ |
-| FR-12a | Prevent edit with non-cancelled exchanges | High | - | Logic implemented in views | ⚠️ No test |
+| FR-12 | Validate required fields | High | `test_offer_views.py` | `TestPastDateValidation` (covers want too) | ✅ |
+| FR-12a | Prevent edit with non-cancelled exchanges | High | `test_exchange_flow.py` | `test_edit_offer_with_pending_exchange_fails` (covers want too) | ✅ |
 | FR-12b | Display edit lock status | Medium | - | Frontend `can_edit` field | ⚠️ Implicit |
 
-**Coverage: 5/12 (42%)**
+**Coverage: 8/12 (67%)**
 
 ---
 
@@ -107,7 +107,7 @@
 | FR-33 | Track exchange progress | High | `test_exchange_views.py` | `test_get_my_exchanges` | ✅ |
 | FR-34 | No exchanges message | High | - | - | ❌ |
 | FR-35 | Prevent unauthorized exchange | High | `test_exchange_views.py` | `test_accept_exchange_non_provider_fails` | ✅ |
-| FR-36 | Validate required fields | High | `test_exchange_views.py` | `test_propose_datetime_requires_date` | ✅ |
+| FR-36 | Validate required fields | High | `test_exchange_views.py` | `test_propose_datetime_requires_date`, `test_propose_datetime_past_date_fails`, `test_propose_datetime_today_succeeds` | ✅ |
 | FR-36a | Requester cancel exchange | High | `test_exchange_views.py` | `test_cancel_exchange_success` | ✅ |
 | FR-36b | Return blocked credits on cancel | High | `test_exchange_flow.py` | `test_requester_cancels_pending_exchange` | ✅ |
 | FR-36c | Notify provider on cancel | High | - | Mocked in tests | ⚠️ Partial |
@@ -137,10 +137,10 @@
 |-------|-------------|----------|-----------|---------------|--------|
 | FR-37 | View time bank | High | `test_profile_views.py` | `test_get_own_profile_creates_defaults` | ✅ |
 | FR-38 | View time bank details | High | - | - | ❌ |
-| FR-38a | Block credits on exchange create | High | `test_exchange_views.py` | `test_create_exchange_blocks_requester_credits` | ✅ |
+| FR-38a | Block credits on exchange create | High | `test_exchange_views.py`, `test_exchange_flow.py` | `test_create_exchange_blocks_requester_credits`, `test_want_creation_blocks_credits` | ✅ |
 | FR-38b | Display available/blocked amounts | High | `test_profile_views.py` | Profile response includes amounts | ✅ |
-| FR-38c | Unblock on cancellation | High | `test_exchange_flow.py` | `test_requester_cancels_pending_exchange` | ✅ |
-| FR-38d | Transfer credits on completion | High | `test_exchange_flow.py` | `test_complete_1to1_exchange_flow` | ✅ |
+| FR-38c | Unblock on cancellation | High | `test_exchange_flow.py` | `test_requester_cancels_pending_exchange`, `test_want_delete_unblocks_credits` | ✅ |
+| FR-38d | Transfer credits on completion | High | `test_exchange_flow.py` | `test_complete_1to1_exchange_flow`, `test_want_exchange_payment_flow` | ✅ |
 
 **Coverage: 5/6 (83%)**
 
@@ -210,14 +210,14 @@
 | FR-62 | View handshake processes | High | `test_admin_views.py` | `test_get_exchange_detail` | ✅ |
 | FR-62a | KPI dashboard | High | `test_admin_views.py` | `test_kpi_returns_data`, `test_kpi_counts_correct` | ✅ |
 | FR-62b | Issue warnings | High | `test_admin_views.py` | `test_warn_user_success` | ✅ |
-| FR-62c | Ban users | High | `test_admin_views.py` | `test_ban_user_success`, `test_ban_user_with_duration` | ✅ |
+| FR-62c | Ban users | High | `test_admin_views.py`, `test_admin_resolve_views.py` | `test_ban_user_success`, `test_ban_user_with_duration`, `test_ban_user_cancels_group_offer_with_multiple_slots`, `test_ban_user_as_requester_in_group_offer` | ✅ |
 | FR-62d | Track warning count | High | `test_admin_views.py` | `test_warn_user_increments_count` | ✅ |
 | FR-62e | Banned users can't login | High | - | - | ❌ |
-| FR-62f | Delete offers/wants | High | `test_admin_views.py` | `test_delete_offer` | ✅ |
-| FR-62g | Cancel exchanges | High | - | - | ❌ |
-| FR-62h | Notify affected users | Medium | - | - | ❌ |
+| FR-62f | Delete offers/wants | High | `test_admin_views.py`, `test_admin_resolve_views.py` | `test_delete_offer`, `test_remove_offer_deletes_offer_and_cancels_exchanges`, `test_remove_want_unblocks_owner_credits`, `test_remove_exchange_cancels_and_flags_offer` | ✅ |
+| FR-62g | Cancel exchanges | High | `test_admin_resolve_views.py` | `test_remove_exchange_cancels_and_flags_offer`, `test_ban_user_cancels_all_active_exchanges` | ✅ |
+| FR-62h | Notify affected users | Medium | `test_admin_resolve_views.py` | `test_warn_user_sends_notification` (mocked) | ⚠️ Partial |
 
-**Coverage: 7/16 (44%)**
+**Coverage: 9/16 (56%)**
 
 ---
 
@@ -338,17 +338,17 @@
 
 | Feature | FRs | Tested | Coverage | Status |
 |---------|-----|--------|----------|--------|
-| 1.1 Create Offer | 12 | 8 | 67% | ⚠️ |
-| 1.2 Create Want | 12 | 5 | 42% | ⚠️ |
+| 1.1 Create Offer | 12 | 10 | 83% | ✅ |
+| 1.2 Create Want | 12 | 8 | 67% | ⚠️ |
 | 1.3 View Offers/Wants | 8 | 3 | 38% | ⚠️ |
 | 1.4 User Onboarding | 5 | 4 | 80% | ✅ |
 | 1.5 Transaction History | 3 | 1 | 33% | ⚠️ |
-| 1.7 Handshake/Exchange | 25 | 15 | 60% | ⚠️ |
+| 1.7 Handshake/Exchange | 25 | 17 | 68% | ⚠️ |
 | 1.8 Time Bank | 6 | 5 | 83% | ✅ |
 | 1.9 Map View | 12 | 3 | 25% | ⚠️ |
 | 1.10 User Profile | 4 | 4 | **100%** | ✅ |
 | 1.11 Other Profiles | 5 | 5 | **100%** | ✅ |
-| 1.12 Admin Panel | 16 | 7 | 44% | ⚠️ |
+| 1.12 Admin Panel | 16 | 9 | 56% | ⚠️ |
 | 1.13 Flag/Report | 3 | 2 | 67% | ⚠️ |
 | 1.14 Auth & Account | 11 | 3 | 27% | ⚠️ |
 | 1.15 Notifications | 6 | 6 | **100%** | ✅ |
@@ -356,7 +356,7 @@
 | 1.17 Password/Email | 4 | 4 | **100%** | ✅ |
 | 1.18 Forum | 13 | 0 | 0% | ❌ NOT IMPL |
 | 1.19 Achievement Tree | 9 | 0 | 0% | ❌ NOT IMPL |
-| **TOTAL** | **158** | **78** | **49%** | |
+| **TOTAL** | **158** | **92** | **58%** | |
 
 ---
 
@@ -379,15 +379,16 @@
 | File | Test Count | Focus |
 |------|------------|-------|
 | `test_models.py` | 12 | Model unit tests |
-| `test_offer_views.py` | 42 | Offer/Want CRUD, delete, filters |
-| `test_exchange_views.py` | 35 | Exchange lifecycle |
+| `test_offer_views.py` | 47 | Offer/Want CRUD, delete, filters, past date validation |
+| `test_exchange_views.py` | 37 | Exchange lifecycle, propose date validation |
 | `test_profile_views.py` | 22 | Profile CRUD |
 | `test_admin_views.py` | 18 | Admin KPI, ban, warn |
+| `test_admin_resolve_views.py` | 19 | Admin report resolution (remove content, ban, warn, group offers) |
 | `test_report_views.py` | 12 | Report system |
 | `test_notification_views.py` | 14 | Notifications |
 | `test_auth_views.py` | 27 | Auth, password, email verification |
 | `test_consumers.py` | 8 | WebSocket tests |
-| `test_exchange_flow.py` | 25 | Integration flows |
+| `test_exchange_flow.py` | 34 | Integration flows (exchange, want payment, offer edit/delete) |
 | `test_timebank_flow.py` | 15 | TimeBank integration |
 | `test_utils.py` | 8 | Utility functions |
-| **TOTAL** | **238** | |
+| **TOTAL** | **285** | |

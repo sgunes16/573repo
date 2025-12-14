@@ -41,6 +41,34 @@ class TestOffersView:
         for offer in response.data:
             assert offer['status'] == 'ACTIVE'
     
+    def test_get_offers_excludes_flagged(self, authenticated_client):
+        """Test flagged offers are not shown in dashboard"""
+        client, _ = authenticated_client
+        
+        # Create normal active offer
+        normal_offer = OfferFactory(status='ACTIVE', is_flagged=False)
+        # Create flagged offer (admin removed)
+        flagged_offer = OfferFactory(status='INACTIVE', is_flagged=True, flagged_reason='Violation of guidelines')
+        # Create another flagged but active (shouldn't appear)
+        OfferFactory(status='ACTIVE', is_flagged=True, flagged_reason='Spam')
+        
+        response = client.get('/api/offers')
+        
+        assert response.status_code == status.HTTP_200_OK
+        offer_ids = [o['id'] for o in response.data]
+        
+        # Normal offer should be visible
+        assert normal_offer.id in offer_ids
+        # Flagged offers should NOT be visible
+        assert flagged_offer.id not in offer_ids
+        # Active but flagged should also NOT be visible
+        for offer in response.data:
+            # None of the returned offers should be flagged
+            pass  # We can't check is_flagged in response as it's not returned in list
+        
+        # Only 1 offer should be returned (the non-flagged active one)
+        assert len(response.data) == 1
+    
     def test_get_offers_returns_offer_data(self, authenticated_client):
         """Test offers contain expected fields"""
         client, _ = authenticated_client
@@ -449,3 +477,105 @@ class TestDeleteOfferView:
         
         assert response.status_code == status.HTTP_200_OK
         assert not Offer.objects.filter(id=group_offer.id).exists()
+
+
+@pytest.mark.django_db
+class TestPastDateValidation:
+    """Tests for past date validation on offers"""
+    
+    def test_create_offer_with_past_date_fails(self, authenticated_client):
+        """Test creating an offer with a past date returns error"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.save()
+        
+        response = client.post('/api/create-offer', {
+            'title': 'Test Offer',
+            'description': 'Test description',
+            'type': 'offer',
+            'time_required': 1,
+            'date': '2020-01-01',  # Past date
+            'activity_type': '1to1',
+        })
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data.get('code') == 'PAST_DATE'
+        assert 'past' in response.data.get('error', '').lower()
+    
+    def test_create_offer_with_past_from_date_fails(self, authenticated_client):
+        """Test creating an offer with a past from_date returns error"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.save()
+        
+        response = client.post('/api/create-offer', {
+            'title': 'Test Offer',
+            'description': 'Test description',
+            'type': 'offer',
+            'time_required': 1,
+            'from_date': '2020-01-01T10:00:00Z',  # Past date
+            'activity_type': '1to1',
+        })
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data.get('code') == 'PAST_DATE'
+    
+    def test_create_offer_with_future_date_succeeds(self, authenticated_client):
+        """Test creating an offer with a future date succeeds"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.save()
+        
+        from datetime import date, timedelta
+        future_date = (date.today() + timedelta(days=7)).isoformat()
+        
+        response = client.post('/api/create-offer', {
+            'title': 'Test Offer',
+            'description': 'Test description',
+            'type': 'offer',
+            'time_required': 1,
+            'date': future_date,
+            'activity_type': '1to1',
+        })
+        
+        assert response.status_code == status.HTTP_201_CREATED
+    
+    def test_create_offer_with_today_date_succeeds(self, authenticated_client):
+        """Test creating an offer with today's date succeeds"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.save()
+        
+        from datetime import date
+        today = date.today().isoformat()
+        
+        response = client.post('/api/create-offer', {
+            'title': 'Test Offer',
+            'description': 'Test description',
+            'type': 'offer',
+            'time_required': 1,
+            'date': today,
+            'activity_type': '1to1',
+        })
+        
+        assert response.status_code == status.HTTP_201_CREATED
+    
+    def test_update_offer_with_past_date_fails(self, authenticated_client):
+        """Test updating an offer with a past date returns error"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        
+        from datetime import date, timedelta
+        future_date = date.today() + timedelta(days=7)
+        offer = OfferFactory(user=user, date=future_date)
+        
+        response = client.put(f'/api/offers/{offer.id}', {
+            'date': '2020-01-01',  # Past date
+        })
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data.get('code') == 'PAST_DATE'

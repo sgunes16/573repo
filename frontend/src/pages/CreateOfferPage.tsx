@@ -27,10 +27,12 @@ import {
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
+import BannedBanner from '@/components/BannedBanner'
 import ImageUpload, { UploadedImage } from '@/components/ImageUpload'
 import { MdArrowBack, MdLocationOn, MdTag } from 'react-icons/md'
 import { activity_type, location_type } from '@/types'
 import { useGeoStore } from '@/store/useGeoStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import { mapboxService } from '@/services/mapbox.service'
 import { offerService } from '@/services/offer.service'
 
@@ -38,7 +40,21 @@ const CreateOfferPage = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { geoLocation } = useGeoStore()
+  const { user } = useAuthStore()
   const toast = useToast()
+  
+  // Redirect banned users
+  useEffect(() => {
+    if (user?.is_banned) {
+      toast({
+        title: 'Account Suspended',
+        description: 'You cannot create offers while your account is suspended.',
+        status: 'error',
+        duration: 5000,
+      })
+      navigate('/')
+    }
+  }, [user?.is_banned, navigate, toast])
   
   const editOfferId = searchParams.get('edit')
   const isEditMode = !!editOfferId
@@ -261,9 +277,10 @@ const CreateOfferPage = () => {
       }
       
       navigate(isEditMode ? `/offer/${editOfferId}` : '/dashboard')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save offer:', error)
-      toast({ title: 'Error', description: isEditMode ? 'Failed to update' : 'Failed to publish', status: 'error', duration: 2000 })
+      const errorMessage = error.response?.data?.error || (isEditMode ? 'Failed to update' : 'Failed to publish')
+      toast({ title: 'Error', description: errorMessage, status: 'error', duration: 3000 })
     } finally {
       setIsSubmitting(false)
     }
@@ -403,6 +420,7 @@ const CreateOfferPage = () => {
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
                   size="sm"
                   borderRadius="md"
                 />

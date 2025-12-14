@@ -113,6 +113,8 @@ class Offer(models.Model):
     time = models.TimeField(null=True, blank=True)
     from_date = models.DateTimeField(null=True, blank=True)
     to_date = models.DateTimeField(null=True, blank=True)
+    is_flagged = models.BooleanField(default=False)  # Flagged by admin for removal
+    flagged_reason = models.TextField(blank=True)  # Reason for flagging
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -177,31 +179,6 @@ class TimeBankTransaction(models.Model):
 
     def __str__(self):
         return f"{self.from_user.email} → {self.to_user.email}: {self.time_amount}h ({self.transaction_type})"
-
-
-class Comment(models.Model):
-    TARGET_TYPE_CHOICES = [
-        ('exchange', 'Exchange'),
-        ('offer', 'Offer'),
-        ('want', 'Want'),
-        ('user', 'User'),
-    ]
-
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='comments')
-    target_type = models.CharField(
-        max_length=20, choices=TARGET_TYPE_CHOICES, default='exchange')
-    # Generic ID for any target
-    target_id = models.CharField(max_length=50, default='0')
-    exchange = models.ForeignKey(
-        Exchange, on_delete=models.CASCADE, null=True, blank=True, related_name='comments')
-    content = models.TextField()
-    rating = models.IntegerField(null=True, blank=True)  # 1-5
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Comment by {self.user.email} on {self.target_type} {self.target_id}"
 
 
 class Chat(models.Model):

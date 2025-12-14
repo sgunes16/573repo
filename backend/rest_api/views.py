@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Comment, Report, Notification, Chat, Message
+from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Report, Notification, Chat, Message
 from datetime import datetime, date, time
 from django.conf import settings
 from django.utils import timezone
@@ -257,7 +257,8 @@ class OffersView(APIView):
             user_lng = None
         
         offers = Offer.objects.select_related('user', 'user__profile').prefetch_related('exchange_set').filter(
-            status='ACTIVE'  # Only show active offers
+            status='ACTIVE',  # Only show active offers
+            is_flagged=False  # Exclude flagged offers from dashboard
         )
         
         # Filter out offers based on their exchange status
@@ -442,6 +443,8 @@ class OfferDetailView(APIView):
         - All exchanges are CANCELLED
         
         Cannot edit if any exchange is PENDING, ACCEPTED, or COMPLETED
+        
+        For WANT: if time_required changes, adjust blocked credits accordingly
         """
         try:
             offer = Offer.objects.get(id=offer_id)
@@ -461,6 +464,30 @@ class OfferDetailView(APIView):
                     "error": "Cannot edit this offer. Only offers with no exchanges or only cancelled exchanges can be edited."
                 }, status=400)
             
+            # For WANT: handle time_required changes by adjusting blocked credits
+            if offer.type == 'want' and 'time_required' in request.data:
+                new_time_required = int(request.data['time_required'])
+                old_time_required = offer.time_required
+                
+                if new_time_required != old_time_required:
+                    user_timebank, _ = TimeBank.objects.get_or_create(
+                        user=offer.user,
+                        defaults={'amount': 3, 'blocked_amount': 0, 'available_amount': 3, 'total_amount': 3}
+                    )
+                    
+                    if new_time_required > old_time_required:
+                        # Need to block more credits
+                        additional_credits = new_time_required - old_time_required
+                        if not user_timebank.block_credit(additional_credits):
+                            return Response({
+                                "error": f"Insufficient time credits. You need {additional_credits}H more available to increase to {new_time_required}H.",
+                                "code": "INSUFFICIENT_CREDITS"
+                            }, status=400)
+                    else:
+                        # Unblock the difference
+                        credits_to_unblock = old_time_required - new_time_required
+                        user_timebank.unblock_credit(credits_to_unblock)
+            
             # Update fields
             if 'title' in request.data:
                 offer.title = request.data['title']
@@ -469,7 +496,7 @@ class OfferDetailView(APIView):
             if 'tags' in request.data:
                 offer.tags = request.data['tags']
             if 'time_required' in request.data:
-                offer.time_required = request.data['time_required']
+                offer.time_required = int(request.data['time_required'])
             if 'activity_type' in request.data:
                 offer.activity_type = request.data['activity_type']
             if 'person_count' in request.data:
@@ -492,7 +519,14 @@ class OfferDetailView(APIView):
                 date_str = request.data['date']
                 if date_str:
                     try:
-                        offer.date = date.fromisoformat(date_str)
+                        parsed_date = date.fromisoformat(date_str)
+                        # Validate date is not in the past
+                        if parsed_date < date.today():
+                            return Response({
+                                "error": "Date cannot be in the past. Please select today or a future date.",
+                                "code": "PAST_DATE"
+                            }, status=400)
+                        offer.date = parsed_date
                     except (ValueError, TypeError):
                         pass
                 else:
@@ -528,6 +562,8 @@ class OfferDetailView(APIView):
         - All exchanges are CANCELLED
         
         Cannot delete if any exchange is PENDING, ACCEPTED, or COMPLETED
+        
+        For WANT: unblocks the creator's credits when deleted
         """
         try:
             offer = Offer.objects.get(id=offer_id)
@@ -549,6 +585,15 @@ class OfferDetailView(APIView):
             
             offer_type = offer.type
             offer_title = offer.title
+            time_required = offer.time_required
+            
+            # For WANT: unblock the creator's credits
+            if offer_type == 'want':
+                try:
+                    user_timebank = TimeBank.objects.get(user=offer.user)
+                    user_timebank.unblock_credit(time_required)
+                except TimeBank.DoesNotExist:
+                    pass
             
             # Delete associated images from storage
             for image in offer.offer_images.all():
@@ -581,6 +626,23 @@ class CreateOfferView(APIView):
             }, status=403)
         
         try:
+            offer_type = request.data.get('type', 'offer')
+            time_required = int(request.data.get('time_required', 1))
+            
+            # For WANT: check and block credits upfront
+            # User must have enough credits to pay for the service they're requesting
+            if offer_type == 'want':
+                user_timebank, _ = TimeBank.objects.get_or_create(
+                    user=request.user,
+                    defaults={'amount': 3, 'blocked_amount': 0, 'available_amount': 3, 'total_amount': 3}
+                )
+                
+                if not user_timebank.block_credit(time_required):
+                    return Response({
+                        "error": f"Insufficient time credits. You need at least {time_required}H available to create this want.",
+                        "code": "INSUFFICIENT_CREDITS"
+                    }, status=400)
+            
             from_date_str = request.data.get('from_date')
             to_date_str = request.data.get('to_date')
             date_str = request.data.get('date')
@@ -594,6 +656,12 @@ class CreateOfferView(APIView):
             if from_date_str:
                 try:
                     from_date = datetime.fromisoformat(from_date_str.replace('Z', '+00:00'))
+                    # Validate from_date is not in the past
+                    if from_date.date() < date.today():
+                        return Response({
+                            "error": "Start date cannot be in the past. Please select today or a future date.",
+                            "code": "PAST_DATE"
+                        }, status=400)
                 except (ValueError, TypeError):
                     from_date = None
             
@@ -606,6 +674,12 @@ class CreateOfferView(APIView):
             if date_str:
                 try:
                     date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()
+                    # Validate date is not in the past
+                    if date_obj < date.today():
+                        return Response({
+                            "error": "Date cannot be in the past. Please select today or a future date.",
+                            "code": "PAST_DATE"
+                        }, status=400)
                 except (ValueError, TypeError):
                     date_obj = None
             
@@ -622,11 +696,11 @@ class CreateOfferView(APIView):
             
             offer = Offer.objects.create(
                 user=request.user,
-                type=request.data.get('type', 'offer'),
+                type=offer_type,
                 title=request.data.get('title', ''),
                 description=request.data.get('description', ''),
                 tags=request.data.get('tags', []),
-                time_required=request.data.get('time_required', 1),
+                time_required=time_required,
                 location=location_data.get('address', '') if isinstance(location_data, dict) else str(location_data),
                 geo_location=[location_data.get('latitude', 0), location_data.get('longitude', 0)] if isinstance(location_data, dict) else [],
                 offer_type=request.data.get('offer_type', '1time'),
@@ -759,7 +833,7 @@ class SetPrimaryImageView(APIView):
 
 
 class CreateExchangeView(APIView):
-    """Create an exchange request and freeze 1H time"""
+    """Create an exchange request for offer/want"""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -790,6 +864,10 @@ class CreateExchangeView(APIView):
                 if active_exchanges_count >= offer.person_count:
                     return Response({"error": "All slots are filled for this group offer"}, status=400)
 
+            # Roles are always the same:
+            # - Provider: offer/want owner (offer.user)
+            # - Requester: handshake initiator (request.user)
+            
             # Check if exchange already exists
             existing = Exchange.objects.filter(
                 offer=offer,
@@ -799,28 +877,32 @@ class CreateExchangeView(APIView):
             if existing:
                 return Response({"error": "Exchange request already exists"}, status=400)
 
-            # Freeze time from requester (based on offer time_required)
+            is_want = offer.type == 'want'
             time_to_block = offer.time_required
-            requester_timebank, _ = TimeBank.objects.get_or_create(
-                user=request.user,
-                defaults={'amount': 1, 'blocked_amount': 0, 'available_amount': 1, 'total_amount': 1}
-            )
-            
-            if not requester_timebank.block_credit(time_to_block):
-                return Response({
-                    "error": f"Insufficient time credits. You need at least {time_to_block}H available."
-                }, status=400)
+
+            # For OFFER: block requester's (handshake initiator) credits
+            # For WANT: credits already blocked when want was created, no blocking needed here
+            if not is_want:
+                requester_timebank, _ = TimeBank.objects.get_or_create(
+                    user=request.user,
+                    defaults={'amount': 1, 'blocked_amount': 0, 'available_amount': 1, 'total_amount': 1}
+                )
+                
+                if not requester_timebank.block_credit(time_to_block):
+                    return Response({
+                        "error": f"Insufficient time credits. You need at least {time_to_block}H available."
+                    }, status=400)
 
             # Create exchange
             exchange = Exchange.objects.create(
                 offer=offer,
-                provider=offer.user,
-                requester=request.user,
+                provider=offer.user,  # Always offer/want owner
+                requester=request.user,  # Always handshake initiator
                 status='PENDING',
                 time_spent=offer.time_required
             )
 
-            # Send notification to provider (offer owner)
+            # Send notification to offer/want owner
             send_notification(
                 offer.user,
                 f"You have received a new handshake request for '{offer.title}' from {request.user.first_name} {request.user.last_name}"
@@ -829,7 +911,7 @@ class CreateExchangeView(APIView):
             return Response({
                 "message": "Exchange request created successfully",
                 "exchange_id": exchange.id,
-                "time_frozen": time_to_block
+                "time_frozen": time_to_block if not is_want else 0
             }, status=201)
 
         except Offer.DoesNotExist:
@@ -1111,6 +1193,13 @@ class ProposeDateTimeView(APIView):
             except (ValueError, TypeError):
                 return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
 
+            # Validate proposed date is not in the past
+            if proposed_date < date.today():
+                return Response({
+                    "error": "Cannot propose a date in the past. Please select today or a future date.",
+                    "code": "PAST_DATE"
+                }, status=400)
+
             proposed_time = None
             if time_str:
                 try:
@@ -1212,12 +1301,12 @@ class AcceptExchangeView(APIView):
 
 
 class RejectExchangeView(APIView):
-    """Provider rejects the exchange and unfreeze time"""
+    """Provider rejects the exchange and unfreeze time (only for Offer type)"""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, exchange_id):
         try:
-            exchange = Exchange.objects.get(id=exchange_id)
+            exchange = Exchange.objects.select_related('offer').get(id=exchange_id)
             
             # Only provider can reject
             if exchange.provider != request.user:
@@ -1226,21 +1315,31 @@ class RejectExchangeView(APIView):
             if exchange.status != 'PENDING':
                 return Response({"error": "Exchange is not in pending status"}, status=400)
 
-            # Unfreeze requester's time
-            requester_timebank = exchange.requester.timebank
-            requester_timebank.unblock_credit(exchange.time_spent)
+            is_want = exchange.offer.type == 'want'
+            
+            # For OFFER: unblock requester's credits
+            # For WANT: DO NOT unblock - credits are tied to the want listing, not the exchange
+            if not is_want:
+                payer_timebank = exchange.requester.timebank
+                payer_timebank.unblock_credit(exchange.time_spent)
 
             exchange.status = 'CANCELLED'
             exchange.save()
 
             # Send notification to requester
-            send_notification(
-                exchange.requester,
-                f"Your handshake request for '{exchange.offer.title}' has been rejected. Your time credits have been unfrozen."
-            )
+            if is_want:
+                send_notification(
+                    exchange.requester,
+                    f"Your offer to help with '{exchange.offer.title}' has been declined."
+                )
+            else:
+                send_notification(
+                    exchange.requester,
+                    f"Your handshake request for '{exchange.offer.title}' has been rejected. Your time credits have been unfrozen."
+                )
 
             return Response({
-                "message": "Exchange rejected and time unfrozen",
+                "message": "Exchange rejected",
                 "status": exchange.status,
             })
 
@@ -1254,7 +1353,7 @@ class CancelExchangeView(APIView):
 
     def post(self, request, exchange_id):
         try:
-            exchange = Exchange.objects.get(id=exchange_id)
+            exchange = Exchange.objects.select_related('offer').get(id=exchange_id)
             
             # Only requester can cancel their own request
             if exchange.requester != request.user:
@@ -1269,12 +1368,16 @@ class CancelExchangeView(APIView):
                     "error": "Cannot cancel - provider has already marked as complete. Please complete the exchange."
                 }, status=400)
 
-            # Unfreeze requester's time
-            try:
-                requester_timebank = exchange.requester.timebank
-                requester_timebank.unblock_credit(exchange.time_spent)
-            except Exception:
-                pass
+            is_want = exchange.offer.type == 'want'
+            
+            # For OFFER: unblock requester's credits
+            # For WANT: DO NOT unblock - credits are tied to the want listing, not the exchange
+            if not is_want:
+                try:
+                    payer_timebank = exchange.requester.timebank
+                    payer_timebank.unblock_credit(exchange.time_spent)
+                except Exception:
+                    pass
 
             exchange.status = 'CANCELLED'
             exchange.save()
@@ -1339,64 +1442,82 @@ class ConfirmCompletionView(APIView):
                     exchange.status = 'COMPLETED'
                     exchange.completed_at = timezone.now()
                     
-                    # Unblock and transfer time immediately when completed
-                    requester_timebank = TimeBank.objects.select_for_update().get(user=exchange.requester)
+                    offer = exchange.offer
+                    is_want = offer.type == 'want'
+                    is_group_offer = offer and offer.activity_type == 'group'
+                    
+                    # Get timebanks for both users
+                    requester_timebank, _ = TimeBank.objects.select_for_update().get_or_create(
+                        user=exchange.requester,
+                        defaults={'amount': 1, 'blocked_amount': 0, 'available_amount': 1, 'total_amount': 1}
+                    )
                     provider_timebank, _ = TimeBank.objects.select_for_update().get_or_create(
                         user=exchange.provider,
                         defaults={'amount': 1, 'blocked_amount': 0, 'available_amount': 1, 'total_amount': 1}
                     )
                     
-                    # Unfreeze requester's time first
-                    requester_timebank.unblock_credit(exchange.time_spent)
+                    # Determine payer and receiver based on offer type:
+                    # OFFER: requester (handshake initiator) pays -> provider (offer owner) receives
+                    # WANT: provider (want owner) pays -> requester (helper) receives
+                    if is_want:
+                        payer_timebank = provider_timebank
+                        receiver_timebank = requester_timebank
+                        payer_user = exchange.provider
+                        receiver_user = exchange.requester
+                    else:
+                        payer_timebank = requester_timebank
+                        receiver_timebank = provider_timebank
+                        payer_user = exchange.requester
+                        receiver_user = exchange.provider
+                    
+                    # Unfreeze payer's time first
+                    payer_timebank.unblock_credit(exchange.time_spent)
                     
                     # Transfer time - check available_amount after unblocking
-                    if requester_timebank.available_amount >= exchange.time_spent:
-                        requester_timebank.spend_credit(exchange.time_spent)
+                    if payer_timebank.available_amount >= exchange.time_spent:
+                        payer_timebank.spend_credit(exchange.time_spent)
                         
-                        offer = exchange.offer
-                        is_group_offer = offer and offer.activity_type == 'group'
-                        
-                        # For group offers, only pay provider once
+                        # For group offers, only pay receiver once
                         if is_group_offer:
                             if not offer.provider_paid:
-                                # First completion - provider receives payment
-                                provider_timebank.add_credit(exchange.time_spent)
+                                # First completion - receiver gets payment
+                                receiver_timebank.add_credit(exchange.time_spent)
                                 offer.provider_paid = True
                                 offer.save()
                                 
                                 # Send notifications
                                 send_notification(
-                                    exchange.requester,
+                                    payer_user,
                                     f"Exchange '{offer.title}' has been completed! {exchange.time_spent}H time credits have been transferred."
                                 )
                                 send_notification(
-                                    exchange.provider,
+                                    receiver_user,
                                     f"Exchange '{offer.title}' has been completed! You received {exchange.time_spent}H time credits."
                                 )
                             else:
-                                # Subsequent completions - credit is burned (provider already paid)
+                                # Subsequent completions - credit is burned (receiver already paid)
                                 send_notification(
-                                    exchange.requester,
+                                    payer_user,
                                     f"Group exchange '{offer.title}' has been completed! {exchange.time_spent}H time credits have been used."
                                 )
                                 send_notification(
-                                    exchange.provider,
-                                    f"Group exchange '{offer.title}' with {exchange.requester.first_name} has been completed!"
+                                    receiver_user,
+                                    f"Group exchange '{offer.title}' with {payer_user.first_name} has been completed!"
                                 )
                         else:
-                            # Normal 1-1 offer - standard transfer
-                            provider_timebank.add_credit(exchange.time_spent)
+                            # Normal 1-1 offer/want - standard transfer
+                            receiver_timebank.add_credit(exchange.time_spent)
                             
                             send_notification(
-                                exchange.requester,
+                                payer_user,
                                 f"Exchange '{offer.title}' has been completed! {exchange.time_spent}H time credits have been transferred."
                             )
                             send_notification(
-                                exchange.provider,
+                                receiver_user,
                                 f"Exchange '{offer.title}' has been completed! You received {exchange.time_spent}H time credits."
                             )
                             
-                            # Mark 1-1 offer as completed
+                            # Mark 1-1 offer/want as completed
                             if offer:
                                 offer.status = 'COMPLETED'
                                 offer.save()
@@ -1404,8 +1525,8 @@ class ConfirmCompletionView(APIView):
                         # Create transaction record if it doesn't exist
                         if not TimeBankTransaction.objects.filter(exchange=exchange).exists():
                             TimeBankTransaction.objects.create(
-                                from_user=exchange.requester,
-                                to_user=exchange.provider,
+                                from_user=payer_user,
+                                to_user=receiver_user,
                                 exchange=exchange,
                                 time_amount=exchange.time_spent,
                                 transaction_type='SPEND',
@@ -1532,45 +1653,43 @@ class TransactionsView(APIView):
             if tx.exchange:
                 seen_exchanges.add(tx.exchange.id)
             # Get related ratings/comments if exchange exists
-            ratings_data = []
-            comments_data = []
+            # Only show rating that OTHER party gave to current user
+            rating_data = None
             if tx.exchange:
-                ratings = tx.exchange.ratings.all()
-                for rating in ratings:
-                    ratings_data.append({
-                        "rater_id": rating.rater.id,
-                        "ratee_id": rating.ratee.id,
-                        "communication": rating.communication,
-                        "punctuality": rating.punctuality,
-                        "would_recommend": rating.would_recommend,
-                        "comment": rating.comment,
-                        "created_at": rating.created_at,
-                    })
-                
-                comments = Comment.objects.filter(exchange=tx.exchange)
-                for comment in comments:
-                    comments_data.append({
-                        "id": comment.id,
-                        "user": {
-                            "id": comment.user.id,
-                            "first_name": comment.user.first_name,
-                            "last_name": comment.user.last_name,
-                        },
-                        "content": comment.content,
-                        "rating": comment.rating,
-                        "created_at": comment.created_at,
-                    })
+                # Find rating where current user is the ratee (received rating)
+                rating_from_other = tx.exchange.ratings.filter(ratee=request.user).first()
+                if rating_from_other:
+                    rating_data = {
+                        "rater_id": rating_from_other.rater.id,
+                        "rater_name": f"{rating_from_other.rater.first_name} {rating_from_other.rater.last_name}",
+                        "communication": rating_from_other.communication,
+                        "punctuality": rating_from_other.punctuality,
+                        "would_recommend": rating_from_other.would_recommend,
+                        "comment": rating_from_other.comment,
+                        "created_at": rating_from_other.created_at,
+                    }
 
-            # Determine transaction type from user's perspective
-            # If user is the requester (from_user), it's a SPEND
-            # If user is the provider (to_user), it's an EARN
+            # Determine transaction type from user's perspective based on offer type
+            # OFFER type: requester pays (SPEND), provider earns (EARN)
+            # WANT type: provider pays (SPEND), requester earns (EARN)
             if tx.exchange:
-                if tx.exchange.requester.id == request.user.id:
-                    user_transaction_type = 'SPEND'
-                elif tx.exchange.provider.id == request.user.id:
-                    user_transaction_type = 'EARN'
+                offer_type = tx.exchange.offer.type if tx.exchange.offer else 'offer'
+                if offer_type == 'want':
+                    # Want: provider (want owner) pays, requester (helper) earns
+                    if tx.exchange.provider.id == request.user.id:
+                        user_transaction_type = 'SPEND'
+                    elif tx.exchange.requester.id == request.user.id:
+                        user_transaction_type = 'EARN'
+                    else:
+                        user_transaction_type = tx.transaction_type
                 else:
-                    user_transaction_type = tx.transaction_type
+                    # Offer: requester pays, provider earns
+                    if tx.exchange.requester.id == request.user.id:
+                        user_transaction_type = 'SPEND'
+                    elif tx.exchange.provider.id == request.user.id:
+                        user_transaction_type = 'EARN'
+                    else:
+                        user_transaction_type = tx.transaction_type
             else:
                 user_transaction_type = tx.transaction_type
 
@@ -1578,39 +1697,41 @@ class TransactionsView(APIView):
             from_user_profile = getattr(tx.from_user, 'profile', None)
             to_user_profile = getattr(tx.to_user, 'profile', None)
 
+            # Determine the other party for display
+            if tx.exchange:
+                if tx.exchange.provider.id == request.user.id:
+                    other_user = tx.exchange.requester
+                else:
+                    other_user = tx.exchange.provider
+                other_user_profile = getattr(other_user, 'profile', None)
+            else:
+                other_user = tx.to_user if tx.from_user.id == request.user.id else tx.from_user
+                other_user_profile = getattr(other_user, 'profile', None)
+
             transactions_data.append({
                 "id": tx.id,
-                "from_user": {
-                    "id": tx.from_user.id,
-                    "first_name": tx.from_user.first_name,
-                    "last_name": tx.from_user.last_name,
-                    "email": tx.from_user.email,
+                "other_user": {
+                    "id": other_user.id,
+                    "first_name": other_user.first_name,
+                    "last_name": other_user.last_name,
+                    "email": other_user.email,
                     "profile": {
-                        "avatar": request.build_absolute_uri(from_user_profile.avatar.url) if from_user_profile and from_user_profile.avatar else None,
-                    } if from_user_profile else None,
-                },
-                "to_user": {
-                    "id": tx.to_user.id,
-                    "first_name": tx.to_user.first_name,
-                    "last_name": tx.to_user.last_name,
-                    "email": tx.to_user.email,
-                    "profile": {
-                        "avatar": request.build_absolute_uri(to_user_profile.avatar.url) if to_user_profile and to_user_profile.avatar else None,
-                    } if to_user_profile else None,
+                        "avatar": request.build_absolute_uri(other_user_profile.avatar.url) if other_user_profile and other_user_profile.avatar else None,
+                    } if other_user_profile else None,
                 },
                 "exchange": {
                     "id": tx.exchange.id,
                     "offer": {
                         "id": tx.exchange.offer.id,
                         "title": tx.exchange.offer.title,
+                        "type": tx.exchange.offer.type,
                     },
                 } if tx.exchange else None,
                 "time_amount": tx.time_amount,
                 "transaction_type": user_transaction_type,
                 "description": tx.description,
                 "created_at": tx.created_at,
-                "ratings": ratings_data,
-                "comments": comments_data,
+                "rating": rating_data,
             })
 
         return Response(transactions_data)
@@ -1724,14 +1845,16 @@ class UserProfileDetailView(APIView):
             'from_user', 'to_user', 'exchange', 'exchange__offer'
         ).order_by('-created_at')
 
-        # Get comments about this user
-        user_comments = Comment.objects.filter(
-            target_type='user',
-            target_id=str(target_user.id)
-        ).select_related('user').order_by('-created_at')
+        # Get completed exchanges count for this user
+        completed_exchanges_count = Exchange.objects.filter(
+            Q(provider=target_user) | Q(requester=target_user),
+            status='COMPLETED'
+        ).count()
 
-        # Get average ratings for this user
-        user_ratings = ExchangeRating.objects.filter(ratee=target_user)
+        # Get ratings with comments for this user (from ExchangeRating model)
+        user_ratings = ExchangeRating.objects.filter(ratee=target_user).select_related(
+            'rater', 'rater__profile', 'exchange', 'exchange__offer'
+        )
         avg_communication = user_ratings.aggregate(Avg('communication'))['communication__avg'] or 0
         avg_punctuality = user_ratings.aggregate(Avg('punctuality'))['punctuality__avg'] or 0
         total_ratings_count = user_ratings.count()
@@ -1826,6 +1949,8 @@ class UserProfileDetailView(APIView):
                 "created_at": offer.created_at,
                 "type": offer.type,
                 "status": offer_status,
+                "is_flagged": offer.is_flagged,
+                "flagged_reason": offer.flagged_reason,
             })
 
         # Format wants with status
@@ -1865,28 +1990,38 @@ class UserProfileDetailView(APIView):
                 "created_at": want.created_at,
                 "type": want.type,
                 "status": want_status,
+                "is_flagged": want.is_flagged,
+                "flagged_reason": want.flagged_reason,
             })
 
-        # Format comments
+        # Format comments from ExchangeRating model (rating comments)
         comments_data = []
-        for comment in user_comments:
-            comment_user_profile = getattr(comment.user, 'profile', None)
-            
-            comments_data.append({
-                "id": comment.id,
-                "user": {
-                    "id": comment.user.id,
-                    "first_name": comment.user.first_name,
-                    "last_name": comment.user.last_name,
-                    "email": comment.user.email,
-                    "profile": {
-                        "avatar": request.build_absolute_uri(comment_user_profile.avatar.url) if comment_user_profile and comment_user_profile.avatar else None,
-                    } if comment_user_profile else None,
-                },
-                "content": comment.content,
-                "rating": comment.rating,
-                "created_at": comment.created_at,
-            })
+        for rating in user_ratings:
+            if rating.comment:  # Only include ratings that have comments
+                rater_profile = getattr(rating.rater, 'profile', None)
+                
+                comments_data.append({
+                    "id": f"rating_{rating.id}",
+                    "user": {
+                        "id": rating.rater.id,
+                        "first_name": rating.rater.first_name,
+                        "last_name": rating.rater.last_name,
+                        "email": rating.rater.email,
+                        "profile": {
+                            "avatar": request.build_absolute_uri(rater_profile.avatar.url) if rater_profile and rater_profile.avatar else None,
+                        } if rater_profile else None,
+                    },
+                    "content": rating.comment,
+                    "rating": round((rating.communication + rating.punctuality) / 2, 1),
+                    "exchange": {
+                        "id": rating.exchange.id,
+                        "offer_title": rating.exchange.offer.title if rating.exchange.offer else None,
+                    } if rating.exchange else None,
+                    "created_at": rating.created_at,
+                })
+        
+        # Sort all comments by created_at descending
+        comments_data.sort(key=lambda x: x['created_at'], reverse=True)
 
         # Format average ratings
         ratings_summary = {
@@ -1919,6 +2054,7 @@ class UserProfileDetailView(APIView):
             "recent_transactions": transactions_data,
             "comments": comments_data,
             "ratings_summary": ratings_summary,
+            "completed_exchanges_count": completed_exchanges_count,
         })
 
 
@@ -2144,8 +2280,216 @@ class AdminReportUpdateView(APIView):
 
 
 class AdminReportResolveView(APIView):
-    """Resolve report and take action (admin only)"""
+    """Resolve report and take action (admin only)
+    
+    New format:
+    {
+        "remove_content": true/false,  # Remove the reported content (offer/want/exchange)
+        "user_action": "ban_user" | "warn_user" | null,  # Action against user
+        "admin_notes": "..."
+    }
+    
+    Legacy format (still supported):
+    {
+        "action": "remove_content" | "ban_user" | "warn_user" | "dismiss",
+        "admin_notes": "..."
+    }
+    """
     permission_classes = [IsAuthenticated]
+
+    def _cancel_exchange_with_refund(self, exchange, admin_notes, notify=True):
+        """Cancel an exchange and refund credits based on offer type"""
+        if exchange.status in ['COMPLETED', 'CANCELLED']:
+            return False
+        
+        offer = exchange.offer
+        time_to_refund = exchange.time_spent or (offer.time_required if offer else 1)
+        
+        # Determine who has blocked credits based on offer type
+        # OFFER type: requester blocked credits
+        # WANT type: provider (want owner) blocked credits
+        if offer and offer.type == 'want':
+            # Want: provider (want owner) has blocked credits
+            payer = exchange.provider
+        else:
+            # Offer: requester has blocked credits
+            payer = exchange.requester
+        
+        # Unblock credits
+        if payer and exchange.status in ['PENDING', 'ACCEPTED']:
+            try:
+                payer_timebank = payer.timebank
+                payer_timebank.unblock_credit(time_to_refund)
+            except Exception:
+                pass
+        
+        exchange.status = 'CANCELLED'
+        exchange.save()
+        
+        if notify:
+            # Notify both participants
+            if exchange.provider:
+                send_notification(
+                    exchange.provider,
+                    f"Exchange #{exchange.id} for '{offer.title if offer else 'N/A'}' has been cancelled by admin. Reason: {admin_notes or 'Administrative action'}"
+                )
+            if exchange.requester:
+                send_notification(
+                    exchange.requester,
+                    f"Exchange #{exchange.id} for '{offer.title if offer else 'N/A'}' has been cancelled by admin. Any blocked credits have been returned. Reason: {admin_notes or 'Administrative action'}"
+                )
+        
+        return True
+
+    def _remove_content(self, report, admin_notes):
+        """Remove reported content (offer/want/exchange) - soft delete with flagging"""
+        removed_content = None
+        
+        if report.target_type in ['offer', 'want']:
+            try:
+                offer = Offer.objects.get(id=report.target_id)
+                removed_content = offer
+                
+                # Cancel all non-completed exchanges for this offer
+                exchanges = Exchange.objects.filter(
+                    offer=offer,
+                    status__in=['PENDING', 'ACCEPTED']
+                )
+                for exchange in exchanges:
+                    self._cancel_exchange_with_refund(exchange, admin_notes)
+                
+                # If it's a WANT, unblock the want owner's blocked credits
+                if offer.type == 'want':
+                    try:
+                        owner_timebank = offer.user.timebank
+                        owner_timebank.unblock_credit(offer.time_required)
+                    except Exception:
+                        pass
+                
+                # Soft delete: set to INACTIVE and flag
+                offer.status = 'INACTIVE'
+                offer.is_flagged = True
+                offer.flagged_reason = admin_notes or 'Violation of community guidelines'
+                offer.save()
+                
+                # Notify content owner
+                send_notification(
+                    offer.user,
+                    f"Your {offer.type} '{offer.title}' has been flagged and removed from the dashboard due to a report. All pending exchanges have been cancelled. Reason: {admin_notes or 'Violation of community guidelines'}"
+                )
+                
+            except Offer.DoesNotExist:
+                pass
+                
+        elif report.target_type == 'exchange':
+            try:
+                exchange = Exchange.objects.get(id=report.target_id)
+                removed_content = exchange
+                self._cancel_exchange_with_refund(exchange, admin_notes)
+                
+                # Also flag the related offer
+                if exchange.offer:
+                    offer = exchange.offer
+                    
+                    # Cancel all other exchanges for this offer
+                    other_exchanges = Exchange.objects.filter(
+                        offer=offer,
+                        status__in=['PENDING', 'ACCEPTED']
+                    ).exclude(id=exchange.id)
+                    for other_exchange in other_exchanges:
+                        self._cancel_exchange_with_refund(other_exchange, admin_notes)
+                    
+                    # If it's a WANT, unblock the want owner's blocked credits
+                    if offer.type == 'want':
+                        try:
+                            owner_timebank = offer.user.timebank
+                            owner_timebank.unblock_credit(offer.time_required)
+                        except Exception:
+                            pass
+                    
+                    # Soft delete: set to INACTIVE and flag
+                    offer.status = 'INACTIVE'
+                    offer.is_flagged = True
+                    offer.flagged_reason = admin_notes or 'Violation of community guidelines'
+                    offer.save()
+                    
+                    # Notify offer owner
+                    send_notification(
+                        offer.user,
+                        f"Your {offer.type} '{offer.title}' has been flagged and removed from the dashboard due to a reported exchange. All pending exchanges have been cancelled. Reason: {admin_notes or 'Violation of community guidelines'}"
+                    )
+            except Exchange.DoesNotExist:
+                pass
+        
+        return removed_content
+
+    def _ban_user(self, user, admin_notes):
+        """Ban a user and cancel all their active exchanges"""
+        if not user:
+            return None
+        
+        user.is_banned = True
+        user.save()
+        
+        # Cancel all active exchanges where user is provider or requester
+        active_exchanges = Exchange.objects.filter(
+            Q(provider=user) | Q(requester=user),
+            status__in=['PENDING', 'ACCEPTED']
+        )
+        
+        for exchange in active_exchanges:
+            self._cancel_exchange_with_refund(exchange, f"User banned: {admin_notes}", notify=True)
+        
+        # Send notification to banned user
+        send_notification(
+            user,
+            f"Your account has been suspended. You can still view content but cannot create offers, start exchanges, or interact with other users. Reason: {admin_notes or 'Violation of community guidelines'}"
+        )
+        
+        return user
+
+    def _warn_user(self, user, admin_notes):
+        """Send warning to user and increment warning count"""
+        if not user:
+            return None
+        
+        user.warning_count = (user.warning_count or 0) + 1
+        user.save()
+        
+        send_notification(
+            user,
+            f"⚠️ Admin Warning: {admin_notes or 'You have received a warning due to a report. Further violations may result in account suspension.'}"
+        )
+        
+        return user
+
+    def _get_target_user(self, report):
+        """Get the user associated with the report target"""
+        if report.reported_user:
+            return report.reported_user
+        
+        if report.target_type == 'user':
+            try:
+                return User.objects.get(id=report.target_id)
+            except User.DoesNotExist:
+                return None
+        
+        if report.target_type in ['offer', 'want']:
+            try:
+                offer = Offer.objects.get(id=report.target_id)
+                return offer.user
+            except Offer.DoesNotExist:
+                return None
+        
+        if report.target_type == 'exchange':
+            try:
+                exchange = Exchange.objects.get(id=report.target_id)
+                # Return the provider as the "owner" of the exchange
+                return exchange.provider
+            except Exchange.DoesNotExist:
+                return None
+        
+        return None
 
     def post(self, request, report_id):
         if not request.user.is_admin:
@@ -2156,154 +2500,92 @@ class AdminReportResolveView(APIView):
         except Report.DoesNotExist:
             return Response({"error": "Report not found"}, status=404)
 
-        action = request.data.get('action')  # 'remove_content', 'ban_user', 'warn_user', 'dismiss'
         admin_notes = request.data.get('admin_notes', '')
-
-        if not action:
-            return Response({"error": "action is required"}, status=400)
-
-        try:
-            if action == 'remove_content':
-                # Remove the reported content
-                if report.target_type in ['offer', 'want']:
-                    try:
-                        offer = Offer.objects.get(id=report.target_id)
-                        offer.status = 'CANCELLED'
-                        offer.save()
-                        # Notify content owner
-                        send_notification(
-                            offer.user,
-                            f"Your {report.target_type} '{offer.title}' has been removed due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
-                        )
-                    except Offer.DoesNotExist:
-                        pass
-                elif report.target_type == 'exchange':
-                    try:
-                        exchange = Exchange.objects.get(id=report.target_id)
-                        # Return frozen time to requester before cancelling
-                        if exchange.status in ['PENDING', 'ACCEPTED'] and exchange.requester:
-                            try:
-                                requester_timebank = exchange.requester.timebank
-                                requester_timebank.unblock_credit(exchange.time_spent)
-                            except Exception:
-                                pass
-                        exchange.status = 'CANCELLED'
-                        exchange.save()
-                        # Notify both participants
-                        if exchange.provider:
-                            send_notification(
-                                exchange.provider,
-                                f"Exchange #{exchange.id} has been cancelled due to a report. Reason: {admin_notes or 'Violation of community guidelines'}"
-                            )
-                        if exchange.requester:
-                            send_notification(
-                                exchange.requester,
-                                f"Exchange #{exchange.id} has been cancelled due to a report. Your frozen time credits have been returned. Reason: {admin_notes or 'Violation of community guidelines'}"
-                            )
-                    except Exchange.DoesNotExist:
-                        pass
-
-                # Send notification to reporter
-                send_notification(
-                    report.reporter,
-                    f"Action has been taken on your report #{report.id}. The reported content has been removed."
-                )
-
-                report.status = 'RESOLVED'
-                report.resolved_by = request.user
-                report.admin_notes = admin_notes or "Content removed"
-                report.save()
-
-            elif action == 'ban_user':
-                # Ban the reported user
-                banned_user = None
-                if report.reported_user:
-                    report.reported_user.is_banned = True
-                    report.reported_user.save()
-                    banned_user = report.reported_user
-                elif report.target_type == 'user':
-                    try:
-                        target_user = User.objects.get(id=report.target_id)
-                        target_user.is_banned = True
-                        target_user.save()
-                        banned_user = target_user
-                    except User.DoesNotExist:
-                        pass
-                else:
-                    # Get user from target (fallback)
-                    if report.target_type in ['offer', 'want']:
-                        try:
-                            offer = Offer.objects.get(id=report.target_id)
-                            offer.user.is_banned = True
-                            offer.user.save()
-                            banned_user = offer.user
-                        except Offer.DoesNotExist:
-                            pass
-
-                # Send notification to banned user
-                if banned_user:
-                    send_notification(
-                        banned_user,
-                        f"Your account has been banned. Reason: {admin_notes or 'Violation of community guidelines'}"
-                    )
-
-                # Send notification to reporter
-                send_notification(
-                    report.reporter,
-                    f"Action has been taken on your report #{report.id}. The reported user has been banned."
-                )
-
-                report.status = 'RESOLVED'
-                report.resolved_by = request.user
-                report.admin_notes = admin_notes or "User banned"
-                report.save()
-
-            elif action == 'warn_user':
-                # Send warning to reported user
-                warned_user = None
-                if report.reported_user:
-                    warned_user = report.reported_user
-                    # Increment warning count
-                    if not hasattr(warned_user, 'warning_count'):
-                        warned_user.warning_count = 0
-                    warned_user.warning_count = (warned_user.warning_count or 0) + 1
-                    warned_user.save()
-                    
-                    send_notification(
-                        warned_user,
-                        f"Admin Warning: {admin_notes or 'You have been warned due to a report.'}"
-                    )
-                report.status = 'RESOLVED'
-                report.resolved_by = request.user
-                report.admin_notes = admin_notes or "User warned"
-                report.save()
-
-                # Send notification to reporter
-                send_notification(
-                    report.reporter,
-                    f"Action has been taken on your report #{report.id}. The reported user has been warned."
-                )
-
-            elif action == 'dismiss':
-                # Dismiss the report
+        
+        # Check for new format
+        remove_content = request.data.get('remove_content', False)
+        user_action = request.data.get('user_action', None)
+        
+        # Check for legacy format
+        legacy_action = request.data.get('action', None)
+        
+        # Handle legacy format
+        if legacy_action and not (remove_content or user_action):
+            if legacy_action == 'remove_content':
+                remove_content = True
+            elif legacy_action == 'ban_user':
+                user_action = 'ban_user'
+            elif legacy_action == 'warn_user':
+                user_action = 'warn_user'
+            elif legacy_action == 'dismiss':
+                # Handle dismiss
                 report.status = 'DISMISSED'
                 report.resolved_by = request.user
                 report.admin_notes = admin_notes or "Report dismissed"
                 report.save()
-
-                # Send notification to reporter
+                
                 send_notification(
                     report.reporter,
-                    f"Your report #{report.id} has been reviewed and dismissed. {admin_notes or 'Thank you for your report.'}"
+                    f"Your report #{report.id} has been reviewed and dismissed. Thank you for your report."
                 )
+                
+                return Response({
+                    "message": "Report dismissed",
+                    "report_id": report.id,
+                    "status": report.status,
+                })
 
-            else:
-                return Response({"error": "Invalid action"}, status=400)
+        # Validate input
+        if not remove_content and not user_action:
+            return Response({"error": "At least one action (remove_content or user_action) is required"}, status=400)
+        
+        if user_action and user_action not in ['ban_user', 'warn_user']:
+            return Response({"error": "user_action must be 'ban_user' or 'warn_user'"}, status=400)
+
+        try:
+            actions_taken = []
+            target_user = self._get_target_user(report)
+            
+            # Handle remove_content
+            if remove_content:
+                removed = self._remove_content(report, admin_notes)
+                if removed:
+                    actions_taken.append("content_removed")
+                    send_notification(
+                        report.reporter,
+                        f"Action taken on your report #{report.id}: The reported content has been removed."
+                    )
+            
+            # Handle user_action
+            if user_action == 'ban_user':
+                banned = self._ban_user(target_user, admin_notes)
+                if banned:
+                    actions_taken.append("user_banned")
+                    send_notification(
+                        report.reporter,
+                        f"Action taken on your report #{report.id}: The reported user has been suspended."
+                    )
+            
+            elif user_action == 'warn_user':
+                warned = self._warn_user(target_user, admin_notes)
+                if warned:
+                    actions_taken.append("user_warned")
+                    send_notification(
+                        report.reporter,
+                        f"Action taken on your report #{report.id}: The reported user has been warned."
+                    )
+            
+            # Update report status
+            report.status = 'RESOLVED'
+            report.resolved_by = request.user
+            report.admin_notes = admin_notes or f"Actions: {', '.join(actions_taken)}"
+            report.save()
 
             return Response({
-                "message": f"Report {action} completed successfully",
+                "message": f"Report resolved successfully",
                 "report_id": report.id,
                 "status": report.status,
+                "actions_taken": actions_taken,
             })
 
         except Exception as e:
@@ -2404,9 +2686,69 @@ class AdminBanUserView(APIView):
 
         reason = request.data.get('reason', '')
         duration_days = request.data.get('duration_days', None)  # None = permanent
+        report_id = request.data.get('report_id', None)  # Optional: update report status
 
         target_user.is_banned = True
         target_user.save()
+        
+        # Cancel all active exchanges for this user
+        cancelled_count = 0
+        active_exchanges = Exchange.objects.filter(
+            Q(provider=target_user) | Q(requester=target_user),
+            status__in=['PENDING', 'ACCEPTED']
+        )
+        
+        for exchange in active_exchanges:
+            offer = exchange.offer
+            time_to_refund = exchange.time_spent or (offer.time_required if offer else 1)
+            
+            # Determine who has blocked credits
+            if offer and offer.type == 'want':
+                payer = exchange.provider
+            else:
+                payer = exchange.requester
+            
+            # Unblock credits
+            if payer and exchange.status in ['PENDING', 'ACCEPTED']:
+                try:
+                    payer_timebank = payer.timebank
+                    payer_timebank.unblock_credit(time_to_refund)
+                except Exception:
+                    pass
+            
+            exchange.status = 'CANCELLED'
+            exchange.save()
+            cancelled_count += 1
+            
+            # Notify the other party
+            other_user = exchange.requester if exchange.provider == target_user else exchange.provider
+            if other_user:
+                send_notification(
+                    other_user,
+                    f"Exchange #{exchange.id} has been cancelled because the other user's account was suspended."
+                )
+        
+        # Send notification to banned user
+        send_notification(
+            target_user,
+            f"Your account has been suspended. You can still view content but cannot create offers, start exchanges, or interact with other users. Reason: {reason or 'Violation of community guidelines'}"
+        )
+        
+        # Update report if provided
+        if report_id:
+            try:
+                report = Report.objects.get(id=report_id)
+                report.status = 'RESOLVED'
+                report.resolved_by = request.user
+                report.admin_notes = reason or "User banned"
+                report.save()
+                
+                send_notification(
+                    report.reporter,
+                    f"Action taken on your report #{report.id}: The reported user has been suspended."
+                )
+            except Report.DoesNotExist:
+                pass
 
         return Response({
             "message": f"User {target_user.email} has been banned",
@@ -2417,6 +2759,7 @@ class AdminBanUserView(APIView):
             },
             "reason": reason,
             "duration_days": duration_days,
+            "cancelled_exchanges": cancelled_count,
         })
 
 
@@ -2434,6 +2777,8 @@ class AdminWarnUserView(APIView):
             return Response({"error": "User not found"}, status=404)
 
         message = request.data.get('message', '')
+        report_id = request.data.get('report_id', None)  # Optional: update report status
+        
         if not message:
             return Response({"error": "message is required"}, status=400)
 
@@ -2444,8 +2789,24 @@ class AdminWarnUserView(APIView):
         # Create a notification for the user
         send_notification(
             target_user,
-            f"Admin Warning: {message}"
+            f"⚠️ Admin Warning: {message}"
         )
+        
+        # Update report if provided
+        if report_id:
+            try:
+                report = Report.objects.get(id=report_id)
+                report.status = 'RESOLVED'
+                report.resolved_by = request.user
+                report.admin_notes = message or "User warned"
+                report.save()
+                
+                send_notification(
+                    report.reporter,
+                    f"Action taken on your report #{report.id}: The reported user has been warned."
+                )
+            except Report.DoesNotExist:
+                pass
 
         return Response({
             "message": f"Warning sent to {target_user.email}",

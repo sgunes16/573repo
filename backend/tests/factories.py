@@ -89,12 +89,32 @@ class GroupOfferFactory(OfferFactory):
 
 
 class ExchangeFactory(DjangoModelFactory):
-    """Factory for creating Exchange instances"""
+    """Factory for creating Exchange instances (for Offer type)"""
     class Meta:
         model = Exchange
     
     offer = factory.SubFactory(OfferFactory)
+    # For Offer: offer owner is provider, responding user is requester
     provider = factory.LazyAttribute(lambda obj: obj.offer.user)
+    requester = factory.SubFactory(UserFactory)
+    status = 'PENDING'
+    time_spent = factory.LazyAttribute(lambda obj: obj.offer.time_required)
+
+
+class WantExchangeFactory(DjangoModelFactory):
+    """Factory for creating Exchange instances for Want type
+    
+    Roles are the same as Offer:
+    - Provider = want owner (but pays in Want)
+    - Requester = helper/responding user (receives payment in Want)
+    """
+    class Meta:
+        model = Exchange
+    
+    offer = factory.SubFactory(WantFactory)
+    # Provider is always offer/want owner
+    provider = factory.LazyAttribute(lambda obj: obj.offer.user)
+    # Requester is always the responding user
     requester = factory.SubFactory(UserFactory)
     status = 'PENDING'
     time_spent = factory.LazyAttribute(lambda obj: obj.offer.time_required)

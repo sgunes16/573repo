@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Checkbox,
   Flex,
   Grid,
   Heading,
@@ -34,6 +35,8 @@ import {
   Radio,
   Stack,
   Divider,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react'
 import { useEffect, useState } from 'react'
 import Navbar from '@/components/Navbar'
@@ -60,16 +63,15 @@ const AdminPage = () => {
   const [targetTypeFilter, setTargetTypeFilter] = useState<string>('all')
   
   const { isOpen: isResolveOpen, onOpen: onResolveOpen, onClose: onResolveClose } = useDisclosure()
-  const { isOpen: isBanOpen, onOpen: onBanOpen, onClose: onBanClose } = useDisclosure()
-  const { isOpen: isWarnOpen, onOpen: onWarnOpen, onClose: onWarnClose } = useDisclosure()
   const { isOpen: isExchangeDetailOpen, onOpen: onExchangeDetailOpen, onClose: onExchangeDetailClose } = useDisclosure()
   
-  const [resolveAction, setResolveAction] = useState<'remove_content' | 'ban_user' | 'warn_user' | 'dismiss'>('dismiss')
+  // New resolve modal state
+  const [removeContent, setRemoveContent] = useState(false)
+  const [userAction, setUserAction] = useState<'ban_user' | 'warn_user' | 'none'>('none')
   const [adminNotes, setAdminNotes] = useState('')
-  const [banReason, setBanReason] = useState('')
-  const [warnMessage, setWarnMessage] = useState('')
   const [exchangeDetail, setExchangeDetail] = useState<any>(null)
   const [isLoadingExchange, setIsLoadingExchange] = useState(false)
+  const [isResolving, setIsResolving] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -104,24 +106,36 @@ const AdminPage = () => {
 
   const handleResolve = async () => {
     if (!selectedReport) return
+    
+    // Validate - at least one action must be selected
+    if (!removeContent && userAction === 'none') {
+      toast({
+        title: 'Error',
+        description: 'Please select at least one action (Remove Content or User Action)',
+        status: 'error',
+        duration: 3000,
+      })
+      return
+    }
 
+    setIsResolving(true)
     try {
-      await adminService.resolveReport(typeof selectedReport.id === 'string' ? parseInt(selectedReport.id) : selectedReport.id, {
-        action: resolveAction,
+      const reportId = typeof selectedReport.id === 'string' ? parseInt(selectedReport.id) : selectedReport.id
+      
+      await adminService.resolveReport(reportId, {
+        remove_content: removeContent,
+        user_action: userAction === 'none' ? null : userAction,
         admin_notes: adminNotes || undefined,
       })
       
       toast({
         title: 'Success',
-        description: 'Report resolved',
+        description: 'Report resolved successfully',
         status: 'success',
         duration: 3000,
       })
       
-      onResolveClose()
-      setSelectedReport(null)
-      setAdminNotes('')
-      setResolveAction('dismiss')
+      resetResolveModal()
       fetchData()
     } catch (error: any) {
       toast({
@@ -130,89 +144,68 @@ const AdminPage = () => {
         status: 'error',
         duration: 3000,
       })
+    } finally {
+      setIsResolving(false)
     }
   }
-
-  const handleBanUser = async () => {
+  
+  const handleDismiss = async () => {
     if (!selectedReport) return
 
-    // Use reported_user if available, otherwise fallback to target_info
-    const userIdRaw = selectedReport.reported_user?.id || 
-                     (selectedReport.target_type === 'user' ? selectedReport.target_id : selectedReport.target_info?.id)
-
-    if (!userIdRaw) {
-      toast({
-        title: 'Error',
-        description: 'User not found',
-        status: 'error',
-        duration: 3000,
-      })
-      return
-    }
-
-    const userId = typeof userIdRaw === 'string' ? parseInt(userIdRaw) : userIdRaw
-
+    setIsResolving(true)
     try {
-      await adminService.banUser(userId, {
-        reason: banReason || undefined,
+      const reportId = typeof selectedReport.id === 'string' ? parseInt(selectedReport.id) : selectedReport.id
+      
+      await adminService.resolveReport(reportId, {
+        action: 'dismiss',
+        admin_notes: adminNotes || undefined,
       })
       
       toast({
         title: 'Success',
-        description: 'User has been banned',
+        description: 'Report dismissed',
         status: 'success',
         duration: 3000,
       })
       
-      onBanClose()
-      setSelectedReport(null)
-      setBanReason('')
+      resetResolveModal()
       fetchData()
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'An error occurred while banning the user',
+        description: error.response?.data?.error || 'An error occurred',
         status: 'error',
         duration: 3000,
       })
+    } finally {
+      setIsResolving(false)
     }
   }
+  
+  const resetResolveModal = () => {
+    onResolveClose()
+    setSelectedReport(null)
+    setAdminNotes('')
+    setRemoveContent(false)
+    setUserAction('none')
+  }
+  
+  const openResolveModal = (report: Report) => {
+    setSelectedReport(report)
+    setRemoveContent(false)
+    setUserAction('none')
+    setAdminNotes('')
+    onResolveOpen()
+  }
 
-  const handleWarnUser = async () => {
-    if (!selectedReport || !warnMessage.trim()) return
-
-    // Use reported_user if available, otherwise fallback to target_info
-    const userIdRaw = selectedReport.reported_user?.id || 
-                     (selectedReport.target_type === 'user' ? selectedReport.target_id : selectedReport.target_info?.id)
-
-    if (!userIdRaw) {
-      toast({
-        title: 'Error',
-        description: 'User not found',
-        status: 'error',
-        duration: 3000,
-      })
-      return
-    }
-
-    const userId = typeof userIdRaw === 'string' ? parseInt(userIdRaw) : userIdRaw
-
+  // Removed handleBanUser and handleWarnUser - now handled in resolve modal
+  
+  const handleViewExchange = async (exchangeId: number) => {
+    setIsLoadingExchange(true)
+    onExchangeDetailOpen()
     try {
-      await adminService.warnUser(userId, {
-        message: warnMessage,
-      })
-      
-      toast({
-        title: 'Success',
-        description: 'Warning sent',
-        status: 'success',
-        duration: 3000,
-      })
-      
-      onWarnClose()
-      setSelectedReport(null)
-      setWarnMessage('')
-      fetchData()
+      const detail = await adminService.getExchangeDetail(exchangeId)
+      setExchangeDetail(detail)
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -460,23 +453,19 @@ const AdminPage = () => {
                                   size="xs"
                                   colorScheme="green"
                                   leftIcon={<Icon as={MdCheckCircle} />}
-                                  onClick={() => {
-                                    setSelectedReport(report)
-                                    onResolveOpen()
-                                  }}
+                                  onClick={() => openResolveModal(report)}
                                 >
                                   Resolve
                                 </Button>
                                 <Button
                                   size="xs"
-                                  colorScheme="red"
+                                  colorScheme="gray"
                                   variant="outline"
                                   leftIcon={<Icon as={MdCancel} />}
                                   onClick={() => {
                                     setSelectedReport(report)
-                                    setResolveAction('dismiss')
                                     setAdminNotes('')
-                                    onResolveOpen()
+                                    handleDismiss()
                                   }}
                                 >
                                   Dismiss
@@ -496,106 +485,107 @@ const AdminPage = () => {
       </Box>
 
       {/* Resolve Modal */}
-      <Modal isOpen={isResolveOpen} onClose={onResolveClose} size="md">
+      <Modal isOpen={isResolveOpen} onClose={resetResolveModal} size="md">
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Resolve Report</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4} align="stretch">
+              {/* Report Info */}
+              {selectedReport && (
+                <Box p={3} bg="gray.50" borderRadius="md" fontSize="sm">
+                  <Text fontWeight="500">Report #{selectedReport.id}</Text>
+                  <Text color="gray.600">
+                    Type: {selectedReport.target_type} | Reason: {getReasonLabel(selectedReport.reason)}
+                  </Text>
+                  {selectedReport.target_info?.title && (
+                    <Text color="gray.600">Content: {selectedReport.target_info.title}</Text>
+                  )}
+                </Box>
+              )}
+              
+              {/* Remove Content Checkbox */}
               <FormControl>
-                <FormLabel>Action</FormLabel>
-                <RadioGroup value={resolveAction} onChange={(val) => setResolveAction(val as any)}>
-                  <Stack>
-                    <Radio value="remove_content">Remove Content</Radio>
-                    <Radio value="ban_user">Ban User</Radio>
-                    <Radio value="warn_user">Warn User</Radio>
-                    <Radio value="dismiss">Dismiss</Radio>
+                <Checkbox
+                  isChecked={removeContent}
+                  onChange={(e) => setRemoveContent(e.target.checked)}
+                  colorScheme="red"
+                  size="lg"
+                >
+                  <VStack align="start" spacing={0} ml={2}>
+                    <Text fontWeight="500">Remove Content</Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Delete the reported content and cancel all related exchanges
+                    </Text>
+                  </VStack>
+                </Checkbox>
+              </FormControl>
+              
+              <Divider />
+              
+              {/* User Action Radio Group */}
+              <FormControl>
+                <FormLabel>User Action (Optional)</FormLabel>
+                <RadioGroup value={userAction} onChange={(val) => setUserAction(val as any)}>
+                  <Stack spacing={3}>
+                    <Radio value="none" colorScheme="gray">
+                      <VStack align="start" spacing={0}>
+                        <Text>No action</Text>
+                        <Text fontSize="xs" color="gray.500">Only remove content if selected above</Text>
+                      </VStack>
+                    </Radio>
+                    <Radio value="warn_user" colorScheme="yellow">
+                      <VStack align="start" spacing={0}>
+                        <Text>Warn User</Text>
+                        <Text fontSize="xs" color="gray.500">Send warning notification and increment warning count</Text>
+                      </VStack>
+                    </Radio>
+                    <Radio value="ban_user" colorScheme="red">
+                      <VStack align="start" spacing={0}>
+                        <Text>Suspend User</Text>
+                        <Text fontSize="xs" color="gray.500">Suspend account and cancel all their active exchanges</Text>
+                      </VStack>
+                    </Radio>
                   </Stack>
                 </RadioGroup>
               </FormControl>
+              
+              <Divider />
+              
+              {/* Admin Notes */}
               <FormControl>
-                <FormLabel>Admin Notes</FormLabel>
+                <FormLabel>Admin Notes / Reason</FormLabel>
                 <Textarea
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
-                  placeholder="Write your notes here..."
+                  placeholder="Write the reason for this action (will be included in notifications)..."
                   rows={3}
                 />
               </FormControl>
+              
+              {/* Warning for destructive actions */}
+              {(removeContent || userAction === 'ban_user') && (
+                <Alert status="warning" borderRadius="md">
+                  <AlertIcon />
+                  <Text fontSize="sm">
+                    {userAction === 'ban_user' 
+                      ? 'This will suspend the user and cancel all their active exchanges.'
+                      : 'This will permanently delete the content and cancel related exchanges.'}
+                  </Text>
+                </Alert>
+              )}
             </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={2} onClick={onResolveClose}>Cancel</Button>
+            <Button variant="ghost" mr={2} onClick={resetResolveModal}>Cancel</Button>
             <Button
-              colorScheme={resolveAction === 'ban_user' ? 'red' : resolveAction === 'dismiss' ? 'gray' : 'green'}
-              onClick={() => {
-                if (resolveAction === 'ban_user') {
-                  onResolveClose()
-                  onBanOpen()
-                } else if (resolveAction === 'warn_user') {
-                  onResolveClose()
-                  onWarnOpen()
-                } else {
-                  handleResolve()
-                }
-              }}
+              colorScheme={userAction === 'ban_user' ? 'red' : 'green'}
+              onClick={handleResolve}
+              isLoading={isResolving}
+              isDisabled={!removeContent && userAction === 'none'}
             >
-              Confirm
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      {/* Ban User Modal */}
-      <Modal isOpen={isBanOpen} onClose={onBanClose} size="md">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Ban User</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
-              <FormControl>
-                <FormLabel>Reason</FormLabel>
-                <Textarea
-                  value={banReason}
-                  onChange={(e) => setBanReason(e.target.value)}
-                  placeholder="Write the ban reason..."
-                  rows={3}
-                />
-              </FormControl>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={2} onClick={onBanClose}>Cancel</Button>
-            <Button colorScheme="red" onClick={handleBanUser}>Ban</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      {/* Warn User Modal */}
-      <Modal isOpen={isWarnOpen} onClose={onWarnClose} size="md">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Warn User</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
-              <FormControl isRequired>
-                <FormLabel>Warning Message</FormLabel>
-                <Textarea
-                  value={warnMessage}
-                  onChange={(e) => setWarnMessage(e.target.value)}
-                  placeholder="Write the warning message..."
-                  rows={4}
-                />
-              </FormControl>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={2} onClick={onWarnClose}>Cancel</Button>
-            <Button colorScheme="yellow" onClick={handleWarnUser} isDisabled={!warnMessage.trim()}>
-              Send Warning
+              Resolve Report
             </Button>
           </ModalFooter>
         </ModalContent>

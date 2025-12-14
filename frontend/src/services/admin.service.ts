@@ -16,18 +16,24 @@ export interface UpdateReportData {
   admin_notes?: string
 }
 
+// New format for resolve report
 export interface ResolveReportData {
-  action: 'remove_content' | 'ban_user' | 'warn_user' | 'dismiss'
+  remove_content?: boolean
+  user_action?: 'ban_user' | 'warn_user' | null
   admin_notes?: string
+  // Legacy support
+  action?: 'remove_content' | 'ban_user' | 'warn_user' | 'dismiss'
 }
 
 export interface BanUserData {
   reason?: string
   duration_days?: number
+  report_id?: number  // Optional: update report status when banning
 }
 
 export interface WarnUserData {
   message: string
+  report_id?: number  // Optional: update report status when warning
 }
 
 export const adminService = {

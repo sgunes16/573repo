@@ -520,10 +520,22 @@ const OfferDetailPage = () => {
                     color="black"
                     leftIcon={<Icon as={MdHandshake} boxSize={4} />}
                     _hover={{ bg: 'yellow.500' }}
-                    onClick={() => navigate(`/handshake/offer/${offer.id}`)}
-                    isDisabled={offer.activity_type === 'group' && !offer.slots_available}
+                    onClick={() => {
+                      if (user?.is_banned) {
+                        toast({
+                          title: 'Account Suspended',
+                          description: 'You cannot start exchanges while your account is suspended.',
+                          status: 'error',
+                          duration: 5000,
+                        })
+                        return
+                      }
+                      navigate(`/handshake/offer/${offer.id}`)
+                    }}
+                    isDisabled={(offer.activity_type === 'group' && !offer.slots_available) || user?.is_banned}
+                    title={user?.is_banned ? 'Your account is suspended' : undefined}
                   >
-                    {offer.type === 'offer' ? 'Request' : 'Offer Help'}
+                    {user?.is_banned ? 'Suspended' : offer.type === 'offer' ? 'Request' : 'Offer Help'}
                   </Button>
                 </Box>
               )}

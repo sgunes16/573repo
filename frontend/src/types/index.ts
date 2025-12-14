@@ -159,6 +159,9 @@ export interface Offer {
   active_slots?: number
   completed_slots?: number
   provider_paid?: boolean
+  // Flagged by admin
+  is_flagged?: boolean
+  flagged_reason?: string
 }
 
 export interface CreateOfferResponse {
@@ -244,6 +247,7 @@ export enum ExchangeStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
+  REJECTED = 'REJECTED',
 }
 
 export interface ExchangeRating {
@@ -318,15 +322,24 @@ export interface Message {
   created_at: string
 }
 
-// Comment type
-export interface Comment {
+// Comment type (from ExchangeRating)
+export interface RatingComment {
   id: string
-  user_id: string
-  user: User
-  target_type: 'offer' | 'want' | 'user' | 'exchange'
-  target_id: string
+  user: {
+    id: string
+    first_name: string
+    last_name: string
+    email: string
+    profile?: {
+      avatar?: string
+    }
+  }
   content: string
-  rating?: number
+  rating: number
+  exchange?: {
+    id: string
+    offer_title?: string
+  }
   created_at: string
 }
 

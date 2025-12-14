@@ -101,6 +101,10 @@ const HandshakePage = () => {
             onRatingOpen()
           } else if (newStatus === 'ACCEPTED' && prevStatus === 'PENDING') {
             toast({ title: 'Exchange accepted!', status: 'success', duration: 2000 })
+          } else if (newStatus === 'CANCELLED') {
+            toast({ title: 'Exchange cancelled', description: 'The other party cancelled this exchange', status: 'warning', duration: 3000 })
+          } else if (newStatus === 'REJECTED') {
+            toast({ title: 'Exchange rejected', description: 'The provider rejected this exchange', status: 'info', duration: 3000 })
           }
         }
       } else if (message.type === 'exchange_state' && message.data) {
@@ -213,6 +217,10 @@ const HandshakePage = () => {
   const getProgressSteps = () => {
     if (!exchange) return []
     
+    // Check if cancelled or rejected
+    const isCancelled = exchange.status === 'CANCELLED'
+    const isRejected = exchange.status === 'REJECTED'
+    
     // Check if waiting for confirmation
     const myConfirmed = isRequester ? exchange.requester_confirmed : exchange.provider_confirmed
     const otherConfirmed = isRequester ? exchange.provider_confirmed : exchange.requester_confirmed
@@ -222,18 +230,18 @@ const HandshakePage = () => {
     // Group offers: no "Date Set" step
     if (isGroupOffer) {
       return [
-        { done: true, waiting: false }, // Request Sent
-        { done: exchange.status === 'ACCEPTED' || exchange.status === 'COMPLETED', waiting: false }, // Accepted
-        { done: exchange.status === 'COMPLETED', waiting: isWaitingForOther }, // Completed
+        { done: true, waiting: false, cancelled: isCancelled || isRejected }, // Request Sent
+        { done: exchange.status === 'ACCEPTED' || exchange.status === 'COMPLETED', waiting: false, cancelled: isCancelled || isRejected }, // Accepted
+        { done: exchange.status === 'COMPLETED', waiting: isWaitingForOther, cancelled: isCancelled || isRejected }, // Completed
       ]
     }
     
     // 1-to-1 offers: include "Date Set" step
     return [
-      { done: true, waiting: false }, // Request Sent
-      { done: !!exchange.proposed_date, waiting: false }, // Date Proposed
-      { done: exchange.status === 'ACCEPTED' || exchange.status === 'COMPLETED', waiting: false }, // Accepted
-      { done: exchange.status === 'COMPLETED', waiting: isWaitingForOther }, // Completed - waiting for other's confirmation
+      { done: true, waiting: false, cancelled: isCancelled || isRejected }, // Request Sent
+      { done: !!exchange.proposed_date, waiting: false, cancelled: isCancelled || isRejected }, // Date Proposed
+      { done: exchange.status === 'ACCEPTED' || exchange.status === 'COMPLETED', waiting: false, cancelled: isCancelled || isRejected }, // Accepted
+      { done: exchange.status === 'COMPLETED', waiting: isWaitingForOther, cancelled: isCancelled || isRejected }, // Completed - waiting for other's confirmation
     ]
   }
 
@@ -455,28 +463,31 @@ const HandshakePage = () => {
                   w="24px"
                   h="24px"
                   borderRadius="full"
-                  bg={step.done ? 'yellow.400' : step.waiting ? 'orange.300' : 'gray.200'}
+                  bg={step.cancelled ? 'red.400' : step.done ? 'yellow.400' : step.waiting ? 'orange.300' : 'gray.200'}
                   display="flex"
                   alignItems="center"
                   justifyContent="center"
                   transition="all 0.2s"
                 >
-                  {step.done && (
+                  {step.cancelled && idx === 0 && (
+                    <Text fontSize="xs" fontWeight="bold" color="white">✕</Text>
+                  )}
+                  {!step.cancelled && step.done && (
                     <Text fontSize="xs" fontWeight="bold" color="black">✓</Text>
                   )}
-                  {step.waiting && !step.done && (
+                  {!step.cancelled && step.waiting && !step.done && (
                     <Icon as={MdAccessTime} color="white" boxSize={3} />
                   )}
                 </Box>
-                <Text fontSize="9px" color={step.done ? 'gray.700' : step.waiting ? 'orange.500' : 'gray.400'} fontWeight={step.done || step.waiting ? '500' : '400'}>
-                  {stepLabels[idx]}
+                <Text fontSize="9px" color={step.cancelled ? 'red.500' : step.done ? 'gray.700' : step.waiting ? 'orange.500' : 'gray.400'} fontWeight={step.done || step.waiting || step.cancelled ? '500' : '400'}>
+                  {step.cancelled && idx === steps.length - 1 ? (exchange?.status === 'REJECTED' ? 'Rejected' : 'Cancelled') : stepLabels[idx]}
                 </Text>
               </VStack>
               {idx < steps.length - 1 && (
                 <Box 
                   flex={1} 
                   h="2px" 
-                  bg={steps[idx + 1].done ? 'yellow.400' : steps[idx + 1].waiting ? 'orange.200' : 'gray.200'} 
+                  bg={step.cancelled ? 'red.200' : steps[idx + 1].done ? 'yellow.400' : steps[idx + 1].waiting ? 'orange.200' : 'gray.200'} 
                   mx={1}
                   mb={4}
                   transition="all 0.2s"
@@ -602,6 +613,65 @@ const HandshakePage = () => {
                 </Button>
               )}
             </Box>
+
+            {/* Cancelled/Rejected Banner */}
+            {exchange.status === 'CANCELLED' && (
+              <Box 
+                p={4} 
+                bg="red.50" 
+                borderRadius="lg" 
+                border="1px solid" 
+                borderColor="red.200"
+                textAlign="center"
+              >
+                <Badge colorScheme="red" fontSize="sm" mb={2}>CANCELLED</Badge>
+                <Text fontSize="sm" color="red.700" fontWeight="500">
+                  This exchange has been cancelled
+                </Text>
+                <Text fontSize="xs" color="red.600" mt={1}>
+                  {isRequester 
+                    ? 'You cancelled this request. Time credits have been returned.'
+                    : 'The requester cancelled this exchange.'}
+                </Text>
+                <Button 
+                  size="sm" 
+                  colorScheme="gray" 
+                  mt={3}
+                  onClick={() => navigate('/dashboard')}
+                >
+                  Back to Dashboard
+                </Button>
+              </Box>
+            )}
+
+            {exchange.status === 'REJECTED' && (
+              <Box 
+                p={4} 
+                bg="orange.50" 
+                borderRadius="lg" 
+                border="1px solid" 
+                borderColor="orange.200"
+                textAlign="center"
+              >
+                <Badge colorScheme="orange" fontSize="sm" mb={2}>REJECTED</Badge>
+                <Text fontSize="sm" color="orange.700" fontWeight="500">
+                  This exchange has been rejected
+                </Text>
+                <Text fontSize="xs" color="orange.600" mt={1}>
+                  {isProvider 
+                    ? 'You rejected this request.'
+                    : 'The provider rejected your request. Time credits have been returned.'}
+                </Text>
+                <Button 
+                  size="sm" 
+                  colorScheme="gray" 
+                  mt={3}
+                  onClick={() => navigate('/dashboard')}
+                >
+                  Back to Dashboard
+                </Button>
+              </Box>
+            )}
 
             {/* Actions */}
             {exchange.status === 'PENDING' && isRequester && !exchange.proposed_date && offer.activity_type !== 'group' && (

@@ -465,18 +465,21 @@ class TestProposeDateTimeView:
         )
         
         from rest_api.auth.serializers import get_tokens_for_user
+        from datetime import date, timedelta
         tokens = get_tokens_for_user(requester)
         api_client.cookies['access_token'] = tokens['access']
         
+        future_date = (date.today() + timedelta(days=7)).isoformat()
+        
         response = api_client.post(
             f'/api/exchanges/{exchange.id}/propose-datetime',
-            {'date': '2025-01-15', 'time': '14:00'}
+            {'date': future_date, 'time': '14:00'}
         )
         
         assert response.status_code == status.HTTP_200_OK
         # API returns date object, convert to string for comparison
         proposed_date = response.data['proposed_date']
-        assert str(proposed_date) == '2025-01-15'
+        assert str(proposed_date) == future_date
     
     def test_propose_datetime_non_requester_fails(self, api_client):
         """Test non-requester cannot propose date/time"""
@@ -489,12 +492,15 @@ class TestProposeDateTimeView:
         )
         
         from rest_api.auth.serializers import get_tokens_for_user
+        from datetime import date, timedelta
         tokens = get_tokens_for_user(provider)  # Provider, not requester
         api_client.cookies['access_token'] = tokens['access']
         
+        future_date = (date.today() + timedelta(days=7)).isoformat()
+        
         response = api_client.post(
             f'/api/exchanges/{exchange.id}/propose-datetime',
-            {'date': '2025-01-15'}
+            {'date': future_date}
         )
         
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -519,6 +525,55 @@ class TestProposeDateTimeView:
         )
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_propose_datetime_past_date_fails(self, api_client):
+        """Test proposing a past date returns error"""
+        provider, _ = create_user_with_timebank()
+        requester, _ = create_user_with_timebank()
+        
+        offer = OfferFactory(user=provider)
+        exchange = ExchangeFactory(
+            offer=offer, provider=provider, requester=requester,
+            status='PENDING'
+        )
+        
+        from rest_api.auth.serializers import get_tokens_for_user
+        tokens = get_tokens_for_user(requester)
+        api_client.cookies['access_token'] = tokens['access']
+        
+        response = api_client.post(
+            f'/api/exchanges/{exchange.id}/propose-datetime',
+            {'date': '2020-01-01', 'time': '14:00'}  # Past date
+        )
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data.get('code') == 'PAST_DATE'
+        assert 'past' in response.data.get('error', '').lower()
+    
+    def test_propose_datetime_today_succeeds(self, api_client):
+        """Test proposing today's date succeeds"""
+        provider, _ = create_user_with_timebank()
+        requester, _ = create_user_with_timebank()
+        
+        offer = OfferFactory(user=provider)
+        exchange = ExchangeFactory(
+            offer=offer, provider=provider, requester=requester,
+            status='PENDING'
+        )
+        
+        from rest_api.auth.serializers import get_tokens_for_user
+        from datetime import date
+        tokens = get_tokens_for_user(requester)
+        api_client.cookies['access_token'] = tokens['access']
+        
+        today = date.today().isoformat()
+        
+        response = api_client.post(
+            f'/api/exchanges/{exchange.id}/propose-datetime',
+            {'date': today, 'time': '14:00'}
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
 
 
 class TestSubmitRatingView:

@@ -119,10 +119,11 @@ const TransactionsPage = () => {
           </Box>
         ) : (
           <VStack spacing={2} align="stretch">
-            {paginatedTransactions.map((tx) => {
-              const isEarn = tx.transaction_type === 'EARN' && tx.to_user.id === currentUser?.id
-              const otherUser = tx.from_user.id === currentUser?.id ? tx.to_user : tx.from_user
-              const relatedRatings = tx.ratings || []
+            {paginatedTransactions.map((tx: any) => {
+              const isEarn = tx.transaction_type === 'EARN'
+              const otherUser = tx.other_user
+              const rating = tx.rating
+              const offerType = tx.exchange?.offer?.type
 
               return (
                 <Box
@@ -150,6 +151,16 @@ const TransactionsPage = () => {
                       </Box>
                     </HStack>
                     <HStack spacing={2}>
+                      {offerType && (
+                        <Badge
+                          colorScheme={offerType === 'want' ? 'purple' : 'blue'}
+                          variant="subtle"
+                          fontSize="9px"
+                          textTransform="uppercase"
+                        >
+                          {offerType}
+                        </Badge>
+                      )}
                       <Badge
                         colorScheme={isEarn ? 'green' : 'red'}
                         px={2}
@@ -167,18 +178,21 @@ const TransactionsPage = () => {
                     </HStack>
                   </Flex>
 
-                  {relatedRatings.length > 0 && (
+                  {rating && (
                     <Box mt={3} pt={2} borderTop="1px solid" borderColor="gray.100">
                       <HStack spacing={1} mb={1}>
                         <Icon as={MdStar} color="yellow.400" boxSize={3} />
-                        <Text fontSize="xs" fontWeight="500">Rating</Text>
+                        <Text fontSize="xs" fontWeight="500">Rating from {rating.rater_name}</Text>
                       </HStack>
-                      {relatedRatings.map((rating: any, idx: number) => (
-                        <HStack key={idx} fontSize="xs" color="gray.600" spacing={3}>
-                          <Text>Communication: {rating.communication}/5</Text>
-                          <Text>Punctuality: {rating.punctuality}/5</Text>
-                        </HStack>
-                      ))}
+                      <HStack fontSize="xs" color="gray.600" spacing={3}>
+                        <Text>Communication: {rating.communication}/5</Text>
+                        <Text>Punctuality: {rating.punctuality}/5</Text>
+                      </HStack>
+                      {rating.comment && (
+                        <Text fontSize="xs" color="gray.500" mt={1} fontStyle="italic">
+                          "{rating.comment}"
+                        </Text>
+                      )}
                     </Box>
                   )}
                 </Box>

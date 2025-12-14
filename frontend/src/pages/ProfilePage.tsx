@@ -41,10 +41,11 @@ const COMMENTS_PER_PAGE = 5;
 import Navbar from "@/components/Navbar";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuthStore } from "@/store/useAuthStore";
-import { User, UserProfile, TimeBank, Comment, Exchange } from "@/types";
+import { User, UserProfile, TimeBank, Exchange, RatingComment } from "@/types";
 import { profileService } from "@/services/profile.service";
 import { exchangeService } from "@/services/exchange.service";
 import { authService } from "@/services/auth.service";
+import BannedBanner from "@/components/BannedBanner";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -56,7 +57,8 @@ const ProfilePage = () => {
   const [wants, setWants] = useState<any[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [timebank, setTimebank] = useState<TimeBank | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<RatingComment[]>([]);
+  const [completedExchangesCount, setCompletedExchangesCount] = useState<number>(0);
   const [myHandshakes, setMyHandshakes] = useState<Exchange[]>([]);
   const [incomingHandshakes, setIncomingHandshakes] = useState<Exchange[]>([]);
   const [pendingCountByOffer, setPendingCountByOffer] = useState<Record<string, number>>({});
@@ -92,6 +94,7 @@ const ProfilePage = () => {
           setWants(profileDetail.recent_wants);
           setComments(profileDetail.comments || []);
           setRatingsSummary(profileDetail.ratings_summary || null);
+          setCompletedExchangesCount(profileDetail.completed_exchanges_count || 0);
           
           try {
             const exchanges = await exchangeService.getMyExchanges();
@@ -129,6 +132,7 @@ const ProfilePage = () => {
           setWants(profileDetail.recent_wants);
           setComments(profileDetail.comments || []);
           setRatingsSummary(profileDetail.ratings_summary || null);
+          setCompletedExchangesCount(profileDetail.completed_exchanges_count || 0);
         }
       } catch (error) {
         console.error('Error fetching profile data:', error);
@@ -138,8 +142,6 @@ const ProfilePage = () => {
     };
     fetchData();
   }, [userId, currentUser?.id, isOwnProfile]);
-
-  const completedCount = offers.filter(o => String(o.status).toUpperCase() === 'COMPLETED').length;
 
   if (isLoading) {
     return (
@@ -164,6 +166,9 @@ const ProfilePage = () => {
       <Navbar showUserInfo={true} />
 
       <Box maxW="1100px" mx="auto" px={4} py={6}>
+        {/* Banned Banner */}
+        {isOwnProfile && <BannedBanner />}
+        
         <Grid templateColumns={{ base: "1fr", lg: "280px 1fr" }} gap={6} alignItems="start">
           {/* Sidebar */}
           <VStack spacing={4} align="stretch">
@@ -177,30 +182,35 @@ const ProfilePage = () => {
                 </VStack>
                 
                 {/* Stats */}
-                <SimpleGrid columns={isOwnProfile ? 4 : 3} w="full" gap={2} pt={2}>
+                <Flex 
+                  w="full" 
+                  pt={2}
+                  justify="space-around"
+                  align="center"
+                >
                   {isOwnProfile && (
-                    <Box textAlign="center">
+                    <Box textAlign="center" flex="1">
                       <Text fontSize="lg" fontWeight="700">{timebank?.amount ?? 0}H</Text>
                       <Text fontSize="xs" color="gray.500">Credits</Text>
                     </Box>
                   )}
-                  <Box textAlign="center">
+                  <Box textAlign="center" flex="1">
                     <Text fontSize="lg" fontWeight="700">{profile?.rating ?? 0}★</Text>
                     <Text fontSize="xs" color="gray.500">Rating</Text>
                   </Box>
-                  <Box textAlign="center">
-                    <Text fontSize="lg" fontWeight="700">{completedCount}</Text>
+                  <Box textAlign="center" flex="1">
+                    <Text fontSize="lg" fontWeight="700">{completedExchangesCount}</Text>
                     <Text fontSize="xs" color="gray.500">Done</Text>
                   </Box>
                   {viewingUser?.warning_count !== undefined && viewingUser.warning_count > 0 && (
-                    <Box textAlign="center">
+                    <Box textAlign="center" flex="1">
                       <Text fontSize="lg" fontWeight="700" color="yellow.600">
                         {viewingUser.warning_count}⚠️
                       </Text>
                       <Text fontSize="xs" color="gray.500">Warnings</Text>
                     </Box>
                   )}
-                </SimpleGrid>
+                </Flex>
 
                 {/* Rating Details */}
                 {ratingsSummary && ratingsSummary.total_count > 0 && (
@@ -232,7 +242,15 @@ const ProfilePage = () => {
                 )}
 
                 {isOwnProfile && (
-                  <Button leftIcon={<MdEdit />} variant="outline" size="sm" w="full" onClick={() => navigate("/profile/edit")}>
+                  <Button 
+                    leftIcon={<MdEdit />} 
+                    variant="outline" 
+                    size="sm" 
+                    w="full" 
+                    onClick={() => navigate("/profile/edit")}
+                    isDisabled={currentUser?.is_banned}
+                    title={currentUser?.is_banned ? "Your account is suspended" : undefined}
+                  >
                     Edit Profile
                   </Button>
                 )}
@@ -450,43 +468,62 @@ const renderOffersList = (
   return <PaginatedOffersList data={data} navigate={navigate} pendingCounts={pendingCounts} />
 }
 
-const OfferCard = ({ item, navigate, status, pendingCount }: { item: any; navigate: any; status?: string; pendingCount?: number }) => (
-  <Box
-    p={3}
-    borderRadius="md"
-    border="1px solid"
-    borderColor={status === 'in_progress' ? 'blue.200' : status === 'completed' ? 'green.200' : 'gray.100'}
-    bg={status === 'in_progress' ? 'blue.50' : status === 'completed' ? 'green.50' : 'white'}
-    cursor="pointer"
-    _hover={{ bg: status === 'in_progress' ? 'blue.100' : status === 'completed' ? 'green.100' : 'gray.50' }}
-    onClick={() => navigate(`/offer/${item.id}`)}
-  >
-    <Flex justify="space-between" align="flex-start" mb={1}>
-      <HStack spacing={2} flex={1} minW={0}>
-        <Text fontSize="sm" fontWeight="600" noOfLines={1}>{item.title}</Text>
-        {pendingCount && pendingCount > 0 && (
-          <Badge 
-            colorScheme="orange" 
-            fontSize="10px" 
-            borderRadius="full"
-            px={2}
-            flexShrink={0}
-          >
-            {pendingCount} request{pendingCount > 1 ? 's' : ''}
-          </Badge>
-        )}
+const OfferCard = ({ item, navigate, status, pendingCount }: { item: any; navigate: any; status?: string; pendingCount?: number }) => {
+  const isFlagged = item.is_flagged === true
+  
+  return (
+    <Box
+      p={3}
+      borderRadius="md"
+      border="1px solid"
+      borderColor={isFlagged ? 'red.300' : status === 'in_progress' ? 'blue.200' : status === 'completed' ? 'green.200' : 'gray.100'}
+      bg={isFlagged ? 'red.50' : status === 'in_progress' ? 'blue.50' : status === 'completed' ? 'green.50' : 'white'}
+      cursor="pointer"
+      _hover={{ bg: isFlagged ? 'red.100' : status === 'in_progress' ? 'blue.100' : status === 'completed' ? 'green.100' : 'gray.50' }}
+      onClick={() => navigate(`/offer/${item.id}`)}
+      opacity={isFlagged ? 0.8 : 1}
+    >
+      <Flex justify="space-between" align="flex-start" mb={1}>
+        <HStack spacing={2} flex={1} minW={0}>
+          <Text fontSize="sm" fontWeight="600" noOfLines={1}>{item.title}</Text>
+          {isFlagged && (
+            <Badge 
+              colorScheme="red" 
+              fontSize="10px" 
+              borderRadius="full"
+              px={2}
+              flexShrink={0}
+            >
+              Flagged
+            </Badge>
+          )}
+          {pendingCount && pendingCount > 0 && !isFlagged && (
+            <Badge 
+              colorScheme="orange" 
+              fontSize="10px" 
+              borderRadius="full"
+              px={2}
+              flexShrink={0}
+            >
+              {pendingCount} request{pendingCount > 1 ? 's' : ''}
+            </Badge>
+          )}
+        </HStack>
+        <Badge fontSize="10px" colorScheme={isFlagged ? 'red' : status === 'in_progress' ? 'blue' : status === 'completed' ? 'green' : 'gray'} flexShrink={0} ml={1}>
+          {isFlagged ? 'Removed' : status === 'in_progress' ? 'In Progress' : status === 'completed' ? 'Done' : item.type}
+        </Badge>
+      </Flex>
+      {isFlagged && item.flagged_reason && (
+        <Text fontSize="xs" color="red.600" noOfLines={1} mb={1}>Reason: {item.flagged_reason}</Text>
+      )}
+      <Text fontSize="xs" color="gray.500" noOfLines={1}>{item.description}</Text>
+      <HStack fontSize="xs" color="gray.500" mt={2}>
+        <Icon as={MdAccessTime} boxSize={3} />
+        <Text>{item.time_required}H</Text>
       </HStack>
-      <Badge fontSize="10px" colorScheme={status === 'in_progress' ? 'blue' : status === 'completed' ? 'green' : 'gray'} flexShrink={0} ml={1}>
-        {status === 'in_progress' ? 'In Progress' : status === 'completed' ? 'Done' : item.type}
-      </Badge>
-    </Flex>
-    <Text fontSize="xs" color="gray.500" noOfLines={1}>{item.description}</Text>
-    <HStack fontSize="xs" color="gray.500" mt={2}>
-      <Icon as={MdAccessTime} boxSize={3} />
-      <Text>{item.time_required}H</Text>
-    </HStack>
-  </Box>
-)
+    </Box>
+  )
+}
 
 // Paginated Handshakes List Component
 const PaginatedHandshakesList = ({
@@ -728,7 +765,7 @@ const PaginatedCommentsList = ({
   comments,
   navigate
 }: {
-  comments: Comment[]
+  comments: RatingComment[]
   navigate: any
 }) => {
   const [currentPage, setCurrentPage] = useState(1)
@@ -748,14 +785,17 @@ const PaginatedCommentsList = ({
               <Flex align="center" gap={2} mb={2}>
                 <UserAvatar 
                   size="xs" 
-                  user={comment.user} 
+                  user={comment.user as any} 
                   onClick={() => comment.user?.id && navigate(`/profile/${comment.user.id}`)} 
                   cursor="pointer" 
                 />
                 <Text fontSize="xs" fontWeight="500">{comment.user?.first_name} {comment.user?.last_name}</Text>
+                {comment.exchange?.offer_title && (
+                  <Text fontSize="xs" color="gray.400" ml={1}>on {comment.exchange.offer_title}</Text>
+                )}
                 {comment.rating && (
                   <HStack spacing={0.5} ml="auto">
-                    {[...Array(comment.rating)].map((_, idx) => (
+                    {[...Array(Math.round(comment.rating))].map((_, idx) => (
                       <Icon key={idx} as={MdStar} color="yellow.400" boxSize={3} />
                     ))}
                   </HStack>
