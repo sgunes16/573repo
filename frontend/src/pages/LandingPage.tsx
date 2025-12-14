@@ -1,4 +1,9 @@
 import {
+  Accordion,
+  AccordionButton,
+  AccordionIcon,
+  AccordionItem,
+  AccordionPanel,
   Avatar,
   Box,
   Button,
@@ -22,7 +27,7 @@ import {
 } from 'react-icons/md'
 import Navbar from '@/components/Navbar'
 
-const heroImage = 'http://localhost:3845/assets/b01aa748e752a3c10400d96dcc22b5ff015374d8.png'
+const heroImage = '/landing.jpg'
 
 const howItWorks = [
   {
@@ -63,6 +68,37 @@ const values = [
   {
     title: 'Local Impact',
     description: 'Contributions stay close to home and directly strengthen your neighborhood.',
+  },
+]
+
+const faqs = [
+  {
+    question: 'What is The Hive?',
+    answer: 'The Hive is a community platform where neighbors exchange skills and services using time as currency. One hour of help equals one time credit—whether you\'re teaching guitar or fixing a bike.',
+  },
+  {
+    question: 'How do I earn time credits?',
+    answer: 'You earn time credits by offering your skills and services to other community members. For every hour you spend helping someone, you receive one time credit that you can spend on services you need.',
+  },
+  {
+    question: 'Is there a fee to join The Hive?',
+    answer: 'No, The Hive is completely free to join! We believe in building community through reciprocity, not money. You start with 3 free time credits when you sign up.',
+  },
+  {
+    question: 'What kind of services can I offer?',
+    answer: 'Almost anything! Common services include tutoring, gardening, pet care, cooking lessons, tech help, language practice, music lessons, home repairs, and much more. If you have a skill, someone in your community probably needs it.',
+  },
+  {
+    question: 'How do I get started?',
+    answer: 'Simply sign up with your email, verify your account, and you\'re ready to go! You\'ll receive 3 free time credits to start exploring services in your community.',
+  },
+  {
+    question: 'What\'s the difference between an Offer and a Want?',
+    answer: 'An Offer is a service you can provide to others (e.g., "I can teach Spanish"). A Want is a service you\'re looking for (e.g., "I need help moving furniture").',
+  },
+  {
+    question: 'Can I use The Hive for free?',
+    answer: 'Yes, The Hive is completely free! There are no membership fees or hidden costs. Time is the only currency here.',
   },
 ]
 
@@ -163,6 +199,52 @@ const LandingPage = () => {
           </VStack>
         </Grid>
       </Container>
+
+      {/* FAQ Section */}
+      <Box bg="#F7FAFC" py={16}>
+        <Container maxW="1440px" px={{ base: 4, md: 8 }}>
+          <VStack spacing={10}>
+            <VStack spacing={3} textAlign="center">
+              <Text fontSize="md" letterSpacing="0.3em" color="#B7791F">
+                FAQ
+              </Text>
+              <Heading fontSize={{ base: '3xl', md: '4xl' }}>Frequently Asked Questions</Heading>
+              <Text fontSize={{ base: 'lg', md: 'xl' }} color="gray.700" maxW="960px">
+                Got questions? We've got answers. Here's everything you need to know about The Hive.
+              </Text>
+            </VStack>
+            <Accordion allowMultiple w="full" maxW="900px">
+              {faqs.map((faq, index) => (
+                <AccordionItem key={index} border="none" mb={3}>
+                  <AccordionButton
+                    bg="white"
+                    borderRadius="lg"
+                    p={5}
+                    _hover={{ bg: 'gray.50' }}
+                    _expanded={{ bg: '#ECC94B', borderBottomRadius: 0 }}
+                    boxShadow="sm"
+                  >
+                    <Box flex="1" textAlign="left" fontWeight="600" fontSize="lg">
+                      {faq.question}
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                  <AccordionPanel
+                    bg="white"
+                    borderBottomRadius="lg"
+                    p={5}
+                    fontSize="md"
+                    color="gray.700"
+                    boxShadow="sm"
+                  >
+                    {faq.answer}
+                  </AccordionPanel>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </VStack>
+        </Container>
+      </Box>
 
       {/* CTA */}
       <Box bg="#ECC94B" py={12} borderTopRadius="2xl">

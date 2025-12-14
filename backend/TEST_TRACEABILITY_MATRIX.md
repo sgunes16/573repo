@@ -4,11 +4,11 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total FRs in SRS** | 149 |
+| **Total FRs in SRS** | 158 |
 | **FRs with Tests** | 78 |
-| **Coverage** | **52%** |
+| **Coverage** | **49%** |
 | **Total Test Cases** | 238 |
-| **Features Fully Tested** | 5/18 |
+| **Features Fully Tested** | 7/19 |
 
 ---
 
@@ -316,6 +316,24 @@
 
 ---
 
+## Feature 1.19 - Achievement Tree / Gamification (FR-97 to FR-105) - 9 FRs
+
+| FR ID | Requirement | Priority | Test File | Test Coverage | Status |
+|-------|-------------|----------|-----------|---------------|--------|
+| FR-97 | Track user activities for achievements | High | - | - | ❌ NOT IMPLEMENTED |
+| FR-98 | Auto-earn achievements on criteria met | High | - | - | ❌ NOT IMPLEMENTED |
+| FR-99 | View achievement tree (earned & locked) | High | - | - | ❌ NOT IMPLEMENTED |
+| FR-100 | View progress % for locked achievements | Medium | - | - | ❌ NOT IMPLEMENTED |
+| FR-101 | Achievements visible on profiles | Medium | - | - | ❌ NOT IMPLEMENTED |
+| FR-102 | Notification on new achievement | Medium | - | - | ❌ NOT IMPLEMENTED |
+| FR-103 | Achievement categories (Exchange, Time, Community, Special) | High | - | - | ❌ NOT IMPLEMENTED |
+| FR-104 | Admin manage achievement definitions | Low | - | - | ❌ NOT IMPLEMENTED |
+| FR-105 | Feature selected achievements on profile | Low | - | - | ❌ NOT IMPLEMENTED |
+
+**Coverage: 0/9 (0%)** ❌ FEATURE NOT IMPLEMENTED
+
+---
+
 ## Summary by Feature
 
 | Feature | FRs | Tested | Coverage | Status |
@@ -337,7 +355,8 @@
 | 1.16 Report System | 4 | 4 | **100%** | ✅ |
 | 1.17 Password/Email | 4 | 4 | **100%** | ✅ |
 | 1.18 Forum | 13 | 0 | 0% | ❌ NOT IMPL |
-| **TOTAL** | **149** | **78** | **52%** | |
+| 1.19 Achievement Tree | 9 | 0 | 0% | ❌ NOT IMPL |
+| **TOTAL** | **158** | **78** | **49%** | |
 
 ---
 

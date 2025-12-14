@@ -884,6 +884,68 @@ This feature provides a community forum where users can create discussion topics
 | Scalability     | The forum shall support up to 10,000 topics and 100,000 replies without degradation.                                    | Medium    |
 | Moderation      | The system shall provide tools for efficient content moderation and spam prevention.                                    | High      |
 
+### 3.1.19 Feature 1.19 - Achievement Tree (Gamification)
+
+#### 3.1.19.1 Description
+
+This feature introduces a gamification system where users earn achievements (badges) based on their activity and contributions to the community. The achievement tree motivates users to engage more, complete exchanges, and build their reputation through visible progress indicators and unlockable milestones.
+
+#### 3.1.19.2 User Story
+
+> As a _registered user_, I want to _earn achievements and badges as I use the platform_ so that _I feel rewarded for my contributions and motivated to participate more_.
+
+#### 3.1.19.3 Acceptance Criteria
+
+- Given a user profile, the system shall display earned achievements/badges.
+
+- When a user completes specific milestones (e.g., first exchange, 10 hours given), they shall automatically earn the corresponding achievement.
+
+- Users shall be able to view their progress towards locked achievements.
+
+- Achievements shall be categorized by type (Exchange, Community, Time, Special).
+
+- The achievement tree shall be visually represented showing unlocked and locked badges.
+
+- Other users shall be able to see achievements on a member's profile.
+
+#### 3.1.19.4 Functional Requirements
+
+| ID     | Requirement                                                                                                     | Priority | Notes |
+|--------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
+| FR-97  | The system shall track user activities and progress towards achievements.                                        | High     |       |
+| FR-98  | A user shall automatically earn achievements when they meet the criteria.                                        | High     |       |
+| FR-99  | A user shall be able to view their achievement tree showing earned and locked badges.                            | High     |       |
+| FR-100 | A user shall be able to view progress percentage for locked achievements.                                        | Medium   |       |
+| FR-101 | Achievements shall be displayed on user profiles, visible to other members.                                      | Medium   |       |
+| FR-102 | The system shall send a notification when a user earns a new achievement.                                        | Medium   |       |
+| FR-103 | Achievements shall be categorized: Exchange (first exchange, 5 exchanges, etc.), Time (10h given, 50h given), Community (first forum post, helpful replies), Special (early adopter, verified profile). | High     |       |
+| FR-104 | An admin shall be able to create and manage achievement definitions.                                             | Low      |       |
+| FR-105 | A user shall be able to showcase selected achievements as "featured" on their profile.                           | Low      |       |
+
+#### 3.1.19.5 Achievement Examples
+
+| Achievement Name     | Category   | Criteria                                      | Badge Icon |
+|---------------------|------------|-----------------------------------------------|------------|
+| First Buzz          | Exchange   | Complete your first exchange                  | 🐝         |
+| Busy Bee            | Exchange   | Complete 5 exchanges                          | 🐝🐝       |
+| Hive Hero           | Exchange   | Complete 25 exchanges                         | 🏆         |
+| Time Giver          | Time       | Give 10 hours of service                      | ⏰         |
+| Time Master         | Time       | Give 50 hours of service                      | ⏰⏰       |
+| Community Voice     | Community  | Create first forum topic                      | 💬         |
+| Helping Hand        | Community  | Receive 10 positive ratings                   | 👍         |
+| Verified Member     | Special    | Complete email verification                   | ✅         |
+| Profile Pro         | Special    | Complete profile with bio, skills, and photo  | 📋         |
+| Early Adopter       | Special    | Joined during beta period                     | 🌟         |
+
+#### 3.1.19.6 Nonfunctional Requirements
+
+| Type            | Description                                                                                                            | Priority |
+|-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
+| Performance     | Achievement checks shall not add more than 100ms to any API response.                                                   | High      |
+| Usability       | Achievement progress and unlocks shall be clearly visualized with animations.                                           | Medium    |
+| Scalability     | The system shall support up to 100 different achievement types.                                                         | Medium    |
+| Engagement      | Achievements shall be designed to encourage positive platform behaviors.                                                 | High      |
+
 ---
 
 ## 4. Nonfunctional Requirements
@@ -971,6 +1033,9 @@ This feature provides a community forum where users can create discussion topics
 - **Forum Reply** - A response to an existing forum topic.
 - **Pinned Topic** - A forum topic fixed at the top of the list by admins for visibility.
 - **Closed Topic** - A forum topic that no longer accepts new replies.
+- **Achievement** - A badge or milestone earned by completing specific actions on the platform (e.g., first exchange, 10 hours given).
+- **Achievement Tree** - A visual representation of all available achievements, showing progress and unlocked badges.
+- **Badge** - A visual icon representing an earned achievement, displayed on user profiles.
 
 ---
 
