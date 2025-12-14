@@ -1,4 +1,10 @@
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
   Badge,
   Box,
   Button,
@@ -16,10 +22,11 @@ import {
   Skeleton,
   Tag,
   Text,
+  useToast,
   VStack,
   useDisclosure,
 } from '@chakra-ui/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import UserAvatar from '@/components/UserAvatar'
@@ -33,6 +40,7 @@ import {
   MdAccessTime,
   MdArrowBack,
   MdCalendarToday,
+  MdDelete,
   MdEdit,
   MdGroup,
   MdHandshake,
@@ -46,16 +54,48 @@ import {
 const OfferDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const toast = useToast()
   const { user } = useAuthStore()
   const [offer, setOffer] = useState<Offer | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [locationAddress, setLocationAddress] = useState<string>('')
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [exchanges, setExchanges] = useState<Exchange[]>([])
   const [myExchange, setMyExchange] = useState<Exchange | null>(null)
   const { isOpen: isReportOpen, onOpen: onReportOpen, onClose: onReportClose } = useDisclosure()
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
+  const cancelRef = useRef<HTMLButtonElement>(null)
 
   const isOwner = user?.id === offer?.user_id || user?.id === offer?.user?.id
+
+  const handleDelete = async () => {
+    if (!offer?.id) return
+    
+    setIsDeleting(true)
+    try {
+      const result = await offerService.deleteOffer(offer.id)
+      toast({
+        title: 'Deleted successfully',
+        description: result.message,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+      onDeleteClose()
+      navigate('/dashboard')
+    } catch (error: any) {
+      toast({
+        title: 'Failed to delete',
+        description: error.message || 'An error occurred while deleting',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   useEffect(() => {
     const fetchOffer = async () => {
@@ -351,19 +391,33 @@ const OfferDetailPage = () => {
 
               {isOwner ? (
                 <>
-                  <Button
-                    w="100%"
-                    size="sm"
-                    colorScheme="purple"
-                    variant="outline"
-                    leftIcon={<Icon as={MdEdit} boxSize={4} />}
-                    onClick={() => navigate(`/create-offer?edit=${offer.id}`)}
-                    mb={3}
-                    isDisabled={offer.can_edit === false}
-                    title={offer.can_edit === false ? 'Cannot edit - has active or completed exchanges' : undefined}
-                  >
-                    {offer.can_edit === false ? 'Edit Locked' : 'Edit'}
-                  </Button>
+                  <HStack spacing={2} mb={3}>
+                    <Button
+                      flex={1}
+                      size="sm"
+                      colorScheme="purple"
+                      variant="outline"
+                      leftIcon={<Icon as={MdEdit} boxSize={4} />}
+                      onClick={() => navigate(`/create-offer?edit=${offer.id}`)}
+                      isDisabled={offer.can_edit === false}
+                      title={offer.can_edit === false ? 'Cannot edit - only offers with no exchanges or cancelled exchanges can be edited' : undefined}
+                    >
+                      {offer.can_edit === false ? 'Locked' : 'Edit'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      colorScheme="red"
+                      variant="outline"
+                      leftIcon={<Icon as={MdDelete} boxSize={4} />}
+                      onClick={onDeleteOpen}
+                      isDisabled={exchanges.some(ex => ['PENDING', 'ACCEPTED', 'COMPLETED'].includes(ex.status))}
+                      title={exchanges.some(ex => ['PENDING', 'ACCEPTED', 'COMPLETED'].includes(ex.status)) 
+                        ? 'Cannot delete - only offers with no exchanges or cancelled exchanges can be deleted' 
+                        : 'Delete this offer'}
+                    >
+                      Delete
+                    </Button>
+                  </HStack>
                   
                   {exchanges.length > 0 && (
                     <Box>
@@ -502,6 +556,45 @@ const OfferDetailPage = () => {
           targetId={parseInt(offer.id)}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isDeleteOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onDeleteClose}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Delete {offer?.type === 'offer' ? 'Offer' : 'Want'}
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              Are you sure you want to delete <strong>"{offer?.title}"</strong>?
+              <Text mt={2} fontSize="sm" color="gray.600">
+                This action cannot be undone. All associated images and data will be permanently removed.
+              </Text>
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onDeleteClose} size="sm">
+                Cancel
+              </Button>
+              <Button 
+                colorScheme="red" 
+                onClick={handleDelete} 
+                ml={3} 
+                size="sm"
+                isLoading={isDeleting}
+                loadingText="Deleting..."
+              >
+                Delete
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   )
 }

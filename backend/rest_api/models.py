@@ -29,7 +29,7 @@ PERSON_COUNT_CHOICES = [
 ]
 LOCATION_TYPE_CHOICES = [
     ('myLocation', 'My Location'),
-    ('otherLocation', 'Remote'),
+    ('remote', 'Remote'),
 ]
 
 

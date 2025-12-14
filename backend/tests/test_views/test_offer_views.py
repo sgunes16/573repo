@@ -305,3 +305,147 @@ class TestSetPrimaryImageView:
         response = api_client.post(f'/api/offers/{offer.id}/images/1/primary')
         
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+class TestDeleteOfferView:
+    """Tests for deleting offers/wants (FR-5a, FR-5c, FR-5d, FR-11a, FR-11c, FR-11d)"""
+    
+    def test_delete_own_offer_success(self, authenticated_client):
+        """FR-5a/FR-11a: User can delete their own offer"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        
+        offer = OfferFactory(user=user, title='My Offer to Delete')
+        offer_id = offer.id
+        
+        response = client.delete(f'/api/offers/{offer_id}')
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert 'deleted successfully' in response.data['message']
+        
+        # Verify offer is deleted from database
+        assert not Offer.objects.filter(id=offer_id).exists()
+    
+    def test_delete_own_want_success(self, authenticated_client):
+        """FR-11a: User can delete their own want"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        
+        want = WantFactory(user=user, title='My Want to Delete')
+        want_id = want.id
+        
+        response = client.delete(f'/api/offers/{want_id}')
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert 'deleted successfully' in response.data['message']
+        assert not Offer.objects.filter(id=want_id).exists()
+    
+    def test_delete_others_offer_fails(self, authenticated_client):
+        """Test user cannot delete other user's offer"""
+        client, _ = authenticated_client
+        
+        other_user, _ = create_user_with_timebank()
+        offer = OfferFactory(user=other_user, title='Not My Offer')
+        
+        response = client.delete(f'/api/offers/{offer.id}')
+        
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert 'Not authorized' in response.data['error']
+        
+        # Verify offer still exists
+        assert Offer.objects.filter(id=offer.id).exists()
+    
+    def test_delete_offer_with_pending_exchange_fails(self, authenticated_client):
+        """FR-5c/FR-11c: Cannot delete offer with PENDING exchanges"""
+        from tests.factories import ExchangeFactory
+        
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        
+        offer = OfferFactory(user=user)
+        requester, _ = create_user_with_timebank()
+        ExchangeFactory(offer=offer, provider=user, requester=requester, status='PENDING')
+        
+        response = client.delete(f'/api/offers/{offer.id}')
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'cancelled' in response.data['error'].lower()
+        
+        # Verify offer still exists
+        assert Offer.objects.filter(id=offer.id).exists()
+    
+    def test_delete_offer_with_accepted_exchange_fails(self, authenticated_client):
+        """FR-5c/FR-11c: Cannot delete offer with ACCEPTED exchanges"""
+        from tests.factories import ExchangeFactory
+        
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        
+        offer = OfferFactory(user=user)
+        requester, _ = create_user_with_timebank()
+        ExchangeFactory(offer=offer, provider=user, requester=requester, status='ACCEPTED')
+        
+        response = client.delete(f'/api/offers/{offer.id}')
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'cancelled' in response.data['error'].lower()
+    
+    def test_delete_offer_with_completed_exchange_fails(self, authenticated_client):
+        """Cannot delete offer with COMPLETED exchanges"""
+        from tests.factories import ExchangeFactory
+        
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        
+        offer = OfferFactory(user=user)
+        requester, _ = create_user_with_timebank()
+        ExchangeFactory(offer=offer, provider=user, requester=requester, status='COMPLETED')
+        
+        response = client.delete(f'/api/offers/{offer.id}')
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'cancelled' in response.data['error'].lower()
+        
+        # Verify offer still exists
+        assert Offer.objects.filter(id=offer.id).exists()
+    
+    def test_delete_offer_with_cancelled_exchange_success(self, authenticated_client):
+        """Can delete offer with only CANCELLED exchanges"""
+        from tests.factories import ExchangeFactory
+        
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        
+        offer = OfferFactory(user=user)
+        requester, _ = create_user_with_timebank()
+        ExchangeFactory(offer=offer, provider=user, requester=requester, status='CANCELLED')
+        
+        response = client.delete(f'/api/offers/{offer.id}')
+        
+        assert response.status_code == status.HTTP_200_OK
+    
+    def test_delete_nonexistent_offer_returns_404(self, authenticated_client):
+        """Test deleting non-existent offer returns 404"""
+        client, _ = authenticated_client
+        
+        response = client.delete('/api/offers/99999')
+        
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+    
+    def test_delete_offer_requires_authentication(self, api_client, offer):
+        """Test deleting offer requires authentication"""
+        response = api_client.delete(f'/api/offers/{offer.id}')
+        
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    
+    def test_delete_group_offer_success(self, authenticated_client):
+        """Test deleting a group offer"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        
+        group_offer = GroupOfferFactory(user=user, title='Group to Delete')
+        
+        response = client.delete(f'/api/offers/{group_offer.id}')
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert not Offer.objects.filter(id=group_offer.id).exists()

@@ -33,6 +33,9 @@ Hive is a non-profit project designed for a community where users can submit off
 - Transaction: A record of a service exchange between two users
 - Profile: A user's profile information
 - TimeBankTransaction: A record of a time bank transaction
+- Fuzzy Location: An approximate location shown for privacy, hiding exact coordinates
+- Forum: A community discussion area for topics and conversations
+- Forum Topic: A discussion thread on a specific subject
 
 ### 1.4 References
 
@@ -154,8 +157,12 @@ This feature allows registered users to create and publish offers. Users can add
 | FR-3 | A registered user shall be able to upload images associated with the offer.                                    | Medium   |       |
 | FR-4 | The system shall save offers and display them in the public feed.                                              | High     |       |
 | FR-5 | Users shall only be able to edit or delete their own offers.                                                   | High     |       |
+| FR-5a | A registered user shall be able to delete their own offer.                                                    | High     |       |
+| FR-5b | The system shall require confirmation before deleting an offer.                                               | Medium   |       |
+| FR-5c | The system shall prevent deletion of offers with PENDING, ACCEPTED, or COMPLETED exchanges (only CANCELLED or no exchanges allowed). | High     |       |
+| FR-5d | Upon offer deletion, the system shall remove associated images and data.                                      | High     |       |
 | FR-6 | The system shall validate that required fields are not empty before submission.                                | High     |       |
-| FR-6a | The system shall prevent editing of offers with PENDING, ACCEPTED, or COMPLETED exchanges.                    | High     |       |
+| FR-6a | The system shall prevent editing of offers with PENDING, ACCEPTED, or COMPLETED exchanges (only CANCELLED or no exchanges allowed). | High     |       |
 | FR-6b | The system shall display edit lock status to the user when an offer cannot be edited.                         | Medium   |       |
 
 #### 3.1.1.5 Nonfunctional Requirements
@@ -198,8 +205,12 @@ This feature allows registered users to create and publish wants. Users can add 
 | FR-9  | A registered user shall be able to upload images associated with the want.                                      | Medium   |       |
 | FR-10 | The system shall save wants and display them in the public feed.                                                | High     |       |
 | FR-11 | Users shall only be able to edit or delete their own wants.                                                     | High     |       |
+| FR-11a | A registered user shall be able to delete their own want.                                                      | High     |       |
+| FR-11b | The system shall require confirmation before deleting a want.                                                  | Medium   |       |
+| FR-11c | The system shall prevent deletion of wants with PENDING, ACCEPTED, or COMPLETED exchanges (only CANCELLED or no exchanges allowed). | High     |       |
+| FR-11d | Upon want deletion, the system shall remove associated images and data.                                        | High     |       |
 | FR-12 | The system shall validate that required fields are not empty before submission.                                 | High     |       |
-| FR-12a | The system shall prevent editing of wants with PENDING, ACCEPTED, or COMPLETED exchanges.                      | High     |       |
+| FR-12a | The system shall prevent editing of wants with PENDING, ACCEPTED, or COMPLETED exchanges (only CANCELLED or no exchanges allowed). | High     |       |
 | FR-12b | The system shall display edit lock status to the user when a want cannot be edited.                            | Medium   |       |
 
 #### 3.1.2.5 Nonfunctional Requirements
@@ -239,18 +250,22 @@ This feature allows users to view offers and wants. Users can view offers and wa
 
 | ID    | Requirement                                                                                                                           | Priority | Notes |
 |-------|---------------------------------------------------------------------------------------------------------------------------------------|----------|-------|
-| FR-13 | A user shall be able to view the public feed.                                                                                         | High     |       |
+| FR-13 | Both authenticated and anonymous users shall be able to view the public feed.                                                         | High     |       |
 | FR-14 | A user shall be able to search for offers and wants by title, description, tags, or location.                                        | Medium   |       |
+| FR-14a | The system shall support semantic search using tags to find related offers and wants.                                          | Medium   |       |
+| FR-14b | The system shall index offer/want titles, descriptions, and tags for efficient search.                                               | Medium   |       |
 | FR-15 | A user shall be able to filter offers and wants by tags, location, or category.                                                      | Medium   |       |
 | FR-16 | A user shall be able to sort offers and wants by creation date, title, or location.                                                  | Medium   |       |
-| FR-17 | A user shall be able to view the details of an offer or want by clicking on it.                                                      | High     |       |
+| FR-17 | Both authenticated and anonymous users shall be able to view the details of an offer or want by clicking on it.                      | High     |       |
+| FR-17a | Anonymous users shall be redirected to login when attempting to interact with offers (request exchange, message, etc.).              | High     |       |
 
 #### 3.1.3.5 Nonfunctional Requirements
 
 | Type            | Description                                                                                                            | Priority |
 |-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
 | Performance     | Offers and wants shall be displayed in the feed within 2 seconds under normal load.                                   | High      |
-| Security        | Only authenticated users shall be able to view offers and wants.                                                      | High      |
+| Performance     | Search queries shall return results within 1 second for up to 10,000 offers/wants.                                    | High      |
+| Security        | Anonymous users can view offers and wants but cannot interact (create, edit, request exchange).                       | High      |
 | Usability       | The view-offers-wants page shall be responsive and accessible on desktop and mobile devices.                          | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
@@ -431,25 +446,29 @@ This feature allows users to view their time bank. Users can view their time ban
 | Usability       | The time bank shall be responsive and accessible on desktop and mobile devices.                                        | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
-### 3.1.9 Feature 1.9 - Map View
+### 3.1.9 Feature 1.9 - Map View and Location Privacy
 
 #### 3.1.9.1 Description
 
-This feature allows users to view the map. Users can list the map and see the users on the map. The system stores the map for retrieval, editing, and display on the public feed.
+This feature allows users to view offers and wants on an interactive map. Users can see nearby offers/wants, filter by distance radius, and discover services in their area. The system implements **fuzzy location** to protect user privacy by displaying approximate locations instead of exact coordinates. Exact locations are only revealed after an exchange is accepted.
 
 #### 3.1.9.2 User Story
 
-> As a _user_, I want to _list the map and see the users on the map_ so that _I can see who is available to help me_.
+> As a _user_, I want to _view offers and wants on a map with approximate locations_ so that _I can find nearby services while protecting my privacy_.
 
 #### 3.1.9.3 Acceptance Criteria
 
-- Given a user, when they list the map and see the users on the map, then the users are displayed on the map.
+- Given a user, when they view the map, then offers/wants are displayed with markers at fuzzy/approximate locations.
 
-- Given no users are available, the system shall display a message indicating that there are no users to display.
+- Users shall be able to filter offers/wants by distance radius (1km to 20km) from their current location.
 
-- Users shall be able to view the details of a user by clicking on it.
+- Remote/online offers shall always be visible regardless of distance filter.
 
-- Users shall be able to track the progress of the map by clicking on the map.
+- The exact coordinates shall be hidden until an exchange is accepted between users.
+
+- Users shall see neighborhood-level location names instead of exact addresses on public views.
+
+- Users shall be able to click on a marker to view offer/want details.
 
 #### 3.1.9.4 Functional Requirements
 
@@ -458,18 +477,27 @@ This feature allows users to view the map. Users can list the map and see the us
 | FR-39 | A user shall be able to list the map and see the offers/wants on the map.                                       | High     |       |
 | FR-40 | A user shall be able to view the details of an offer/want by clicking on it on the map.                         | High     |       |
 | FR-41 | A user shall be able to set a geo-location for their offer/want.                                                | High     |       |
-| FR-41a | A user shall be able to filter offers/wants by distance radius from their location.                            | Medium   |       |
+| FR-41a | A user shall be able to filter offers/wants by distance radius (1-20km) from their location.                   | High     |       |
 | FR-41b | A user shall be able to choose between remote (online) or in-person location type for offers/wants.            | High     |       |
 | FR-41c | The system shall display nearby offers/wants count on the map.                                                 | Low      |       |
+| FR-41d | The system shall display fuzzy/approximate locations for offers and wants on the public feed and map.          | High     | Privacy |
+| FR-41e | The system shall offset exact coordinates by a random amount within a configurable radius (500m-1km).          | High     | Privacy |
+| FR-41f | The system shall display neighborhood-level location names instead of exact addresses.                         | Medium   | Privacy |
+| FR-41g | The system shall reveal exact location only after an exchange is accepted.                                     | High     | Privacy |
+| FR-41h | Remote offers shall be excluded from location-based filtering but always visible.                              | High     |       |
+| FR-41i | The system shall use a maximum 20km radius for backend location-based offer filtering.                         | Medium   |       |
+| FR-41j | The system shall request user location permission and show warning if not granted.                             | Medium   |       |
 
 #### 3.1.9.5 Nonfunctional Requirements
 
 | Type            | Description                                                                                                            | Priority |
 |-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
-| Performance     | Users shall be displayed on the map within 2 seconds under normal load.                                                 | High      |
-| Security        | Only authenticated users shall be able to list the map and see the users on the map.                                   | High      |
+| Performance     | Location filtering shall complete within 500ms for up to 1000 offers.                                                   | High      |
+| Performance     | Map markers shall be displayed within 2 seconds under normal load.                                                      | High      |
+| Security        | Exact user locations shall never be exposed in API responses to unauthorized users.                                     | High      |
+| Privacy         | The fuzzy location algorithm shall prevent reverse-engineering of exact location from multiple queries.                 | High      |
 | Usability       | The map shall be responsive and accessible on desktop and mobile devices.                                              | Medium    |
-| Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
+| Usability       | Users shall be clearly informed that their location is shown approximately.                                             | Medium    |
 
 ### 3.1.10 Feature 1.10 - User Profile
 
@@ -640,40 +668,50 @@ This feature allows admins to flag and report users. Admins can flag and report 
 | Usability       | The flagged and reported users shall be responsive and accessible on desktop and mobile devices.                      | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
-### 3.1.14 Feature 1.14 - Login and Registration
+### 3.1.14 Feature 1.14 - Authentication and Account Management
 
 #### 3.1.14.1 Description
 
-This feature allows users to login and register to the platform. Users can login and register to the platform and see the login and registration page. The system stores the login and registration for retrieval, editing, and display on the public feed.
+This feature allows users to login, register, manage their authentication credentials, and control their account. Users can login, register, change their password, logout, and permanently delete their account. The system provides secure authentication and account management functionality.
 
 #### 3.1.14.2 User Story
 
-> As a _user_, I want to _login and register to the platform_ so that _I can use the platform_.
+> As a _user_, I want to _manage my account and authentication_ so that _I can securely access and control my account_.
 
 #### 3.1.14.3 Acceptance Criteria
 
-- Given a user, when they login and register to the platform, then the login and registration page is displayed in the login and registration page.
+- Given a user, when they login with valid credentials, then they shall be authenticated and redirected to the dashboard.
 
-- Given no login and registration page are available, the system shall display a message indicating that there are no login and registration page to display.
+- Given a user wants to change their password, then they shall provide current password and new password.
 
-- Users shall be able to view the details of a login and registration page by clicking on it.
+- Given a user wants to delete their account, then they shall confirm the action and all their data shall be removed.
+
+- Users shall be able to logout from all devices.
 
 #### 3.1.14.4 Functional Requirements
 
 | ID    | Requirement                                                                                                     | Priority | Notes |
 |-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
-| FR-66 | A user shall be able to login to the platform.                                                                 | High     |       |
-| FR-67 | A user shall be able to register to the platform.                                                               | High     |       |
-| FR-68 | A user shall be able to view the login and registration page by clicking on the login and registration page.    | High     |       |
-| FR-69 | A user shall be able to view the details of a login and registration page by clicking on it.                     | High     |       |
+| FR-66 | A user shall be able to login to the platform with email and password.                                          | High     |       |
+| FR-67 | A user shall be able to register to the platform with first name, last name, email, and password.               | High     |       |
+| FR-68 | A user shall be able to logout from the platform.                                                               | High     |       |
+| FR-69 | A registered user shall be able to change their password by providing current and new password.                 | High     |       |
+| FR-69a | The system shall validate the current password before allowing password change.                                | High     |       |
+| FR-69b | The system shall apply the same password validation rules to the new password.                                 | High     |       |
+| FR-69c | A registered user shall be able to permanently delete their account.                                           | High     |       |
+| FR-69d | The system shall require confirmation before deleting an account.                                              | High     |       |
+| FR-69e | Upon account deletion, the system shall remove or anonymize all user data, offers, wants, and exchanges.       | High     | GDPR  |
+| FR-69f | The system shall notify the user via email when their account is deleted.                                      | Medium   |       |
+| FR-69g | A user shall be able to logout from all devices (invalidate all sessions).                                     | Medium   |       |
 
 #### 3.1.14.5 Nonfunctional Requirements
 
 | Type            | Description                                                                                                            | Priority |
 |-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
-| Performance     | Login and registration page shall be displayed in the login and registration page within 2 seconds under normal load. | High      |
-| Security        | Only authenticated users shall be able to login and register to the platform.                                          | High      |
-| Usability       | The login and registration page shall be responsive and accessible on desktop and mobile devices.                      | Medium    |
+| Performance     | Authentication operations shall complete within 2 seconds under normal load.                                            | High      |
+| Security        | Passwords shall be securely hashed and never stored in plain text.                                                      | High      |
+| Security        | Account deletion shall be irreversible and complete within 30 days per GDPR requirements.                               | High      |
+| Usability       | The authentication pages shall be responsive and accessible on desktop and mobile devices.                              | Medium    |
 | Maintainability | The system shall prevent data loss in case of concurrent edits.                                                        | High      |
 
 ### 3.1.15 Feature 1.15 - Notification System
@@ -792,6 +830,60 @@ This feature enforces password security requirements during registration and req
 | Security        | Verification tokens shall expire after 24 hours.                                                                       | High      |
 | Usability       | Password requirements shall be displayed in real-time as the user types.                                               | Medium    |
 
+### 3.1.18 Feature 1.18 - Community Forum
+
+#### 3.1.18.1 Description
+
+This feature provides a community forum where users can create discussion topics, ask questions, share experiences, and engage with other community members. The forum promotes community building, knowledge sharing, and helps users find services or offer advice beyond direct exchanges.
+
+#### 3.1.18.2 User Story
+
+> As a _registered user_, I want to _participate in community discussions_ so that _I can connect with other members, ask questions, and share my experiences_.
+
+#### 3.1.18.3 Acceptance Criteria
+
+- Given a registered user, when they access the forum, then they can view all discussion topics.
+
+- Users shall be able to create new discussion topics with a title and content.
+
+- Users shall be able to reply to existing topics.
+
+- Users shall be able to like/upvote helpful posts.
+
+- Users shall be able to search and filter forum topics by category or keyword.
+
+- Forum posts shall display author information and timestamps.
+
+- Admins shall be able to moderate forum content (pin, close, delete topics).
+
+#### 3.1.18.4 Functional Requirements
+
+| ID    | Requirement                                                                                                     | Priority | Notes |
+|-------|-----------------------------------------------------------------------------------------------------------------|----------|-------|
+| FR-84 | A registered user shall be able to view all forum topics.                                                       | High     |       |
+| FR-85 | A registered user shall be able to create a new forum topic with title and content.                             | High     |       |
+| FR-86 | A registered user shall be able to reply to forum topics.                                                       | High     |       |
+| FR-87 | A registered user shall be able to like/upvote forum posts and replies.                                         | Medium   |       |
+| FR-88 | A user shall be able to search forum topics by keyword.                                                         | Medium   |       |
+| FR-89 | A user shall be able to filter forum topics by category (General, Help, Tips, Feedback, etc.).                  | Medium   |       |
+| FR-90 | Forum posts shall display author name, avatar, and creation timestamp.                                          | High     |       |
+| FR-91 | A registered user shall be able to edit or delete their own forum posts.                                        | Medium   |       |
+| FR-92 | An admin shall be able to pin important topics to the top.                                                      | Low      |       |
+| FR-93 | An admin shall be able to close topics to prevent further replies.                                              | Medium   |       |
+| FR-94 | An admin shall be able to delete inappropriate forum posts or topics.                                           | High     |       |
+| FR-95 | The system shall notify users when someone replies to their topic.                                              | Medium   |       |
+| FR-96 | A user shall be able to follow topics to receive notifications on new replies.                                  | Low      |       |
+
+#### 3.1.18.5 Nonfunctional Requirements
+
+| Type            | Description                                                                                                            | Priority |
+|-----------------|------------------------------------------------------------------------------------------------------------------------|-----------|
+| Performance     | Forum page shall load within 2 seconds with up to 100 topics displayed.                                                 | High      |
+| Security        | Only authenticated users shall be able to create or reply to forum topics.                                              | High      |
+| Usability       | The forum interface shall be intuitive with clear navigation and post formatting options.                               | Medium    |
+| Scalability     | The forum shall support up to 10,000 topics and 100,000 replies without degradation.                                    | Medium    |
+| Moderation      | The system shall provide tools for efficient content moderation and spam prevention.                                    | High      |
+
 ---
 
 ## 4. Nonfunctional Requirements
@@ -873,6 +965,12 @@ This feature enforces password security requirements during registration and req
 - **Group Offer** - An offer that allows multiple participants (slots) to join simultaneously.
 - **Slot** - A participant position in a group offer; each slot corresponds to one exchange.
 - **Credit Burning** - When time credits are deducted from a requester but not transferred to the provider (in group offers after first completion).
+- **Fuzzy Location** - An approximate/obfuscated location displayed to protect user privacy, hiding exact coordinates while showing general area.
+- **Forum** - A community discussion platform where users can create topics, reply, and engage with other members.
+- **Forum Topic** - A discussion thread initiated by a user on a specific subject.
+- **Forum Reply** - A response to an existing forum topic.
+- **Pinned Topic** - A forum topic fixed at the top of the list by admins for visibility.
+- **Closed Topic** - A forum topic that no longer accepts new replies.
 
 ---
 

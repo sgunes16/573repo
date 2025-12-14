@@ -435,7 +435,14 @@ class OfferDetailView(APIView):
         })
     
     def put(self, request, offer_id):
-        """Update an existing offer"""
+        """Update an existing offer
+        
+        Can only edit if:
+        - No exchanges exist, OR
+        - All exchanges are CANCELLED
+        
+        Cannot edit if any exchange is PENDING, ACCEPTED, or COMPLETED
+        """
         try:
             offer = Offer.objects.get(id=offer_id)
             
@@ -443,7 +450,7 @@ class OfferDetailView(APIView):
             if offer.user != request.user:
                 return Response({"error": "Not authorized to update this offer"}, status=403)
             
-            # Check if offer has active or completed exchanges
+            # Check if offer has any non-CANCELLED exchanges (cannot edit)
             has_blocking_exchange = Exchange.objects.filter(
                 offer=offer,
                 status__in=['PENDING', 'ACCEPTED', 'COMPLETED']
@@ -451,7 +458,7 @@ class OfferDetailView(APIView):
             
             if has_blocking_exchange:
                 return Response({
-                    "error": "Cannot edit this offer. There are active or completed exchanges associated with it."
+                    "error": "Cannot edit this offer. Only offers with no exchanges or only cancelled exchanges can be edited."
                 }, status=400)
             
             # Update fields
@@ -506,6 +513,54 @@ class OfferDetailView(APIView):
             return Response({
                 "message": "Offer updated successfully",
                 "offer_id": offer.id
+            })
+            
+        except Offer.DoesNotExist:
+            return Response({"error": "Offer not found"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+    def delete(self, request, offer_id):
+        """Delete an offer/want (owner only)
+        
+        Can only delete if:
+        - No exchanges exist, OR
+        - All exchanges are CANCELLED
+        
+        Cannot delete if any exchange is PENDING, ACCEPTED, or COMPLETED
+        """
+        try:
+            offer = Offer.objects.get(id=offer_id)
+            
+            # Only owner can delete
+            if offer.user != request.user:
+                return Response({"error": "Not authorized to delete this offer"}, status=403)
+            
+            # Check if offer has any non-CANCELLED exchanges (cannot delete)
+            has_blocking_exchange = Exchange.objects.filter(
+                offer=offer,
+                status__in=['PENDING', 'ACCEPTED', 'COMPLETED']
+            ).exists()
+            
+            if has_blocking_exchange:
+                return Response({
+                    "error": "Cannot delete this offer. Only offers with no exchanges or only cancelled exchanges can be deleted."
+                }, status=400)
+            
+            offer_type = offer.type
+            offer_title = offer.title
+            
+            # Delete associated images from storage
+            for image in offer.offer_images.all():
+                if image.image:
+                    image.image.delete(save=False)
+                image.delete()
+            
+            # Delete the offer
+            offer.delete()
+            
+            return Response({
+                "message": f"{offer_type.capitalize()} '{offer_title}' has been deleted successfully"
             })
             
         except Offer.DoesNotExist:

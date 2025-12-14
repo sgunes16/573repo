@@ -64,4 +64,9 @@ export const offerService = {
   async setPrimaryImage(offerId: string | number, imageId: number): Promise<void> {
     await apiService.post(`/offers/${offerId}/images/${imageId}/primary`)
   },
+
+  async deleteOffer(offerId: string | number): Promise<{ message: string }> {
+    const response = await apiService.delete<{ message: string }>(`/offers/${offerId}`)
+    return response
+  },
 }
