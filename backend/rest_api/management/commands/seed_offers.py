@@ -605,8 +605,8 @@ class Command(BaseCommand):
                 provider = User.objects.get(email=provider_email)
                 requester = User.objects.get(email=requester_email)
                 
-                # Find an offer from provider
-                offer = Offer.objects.filter(user=provider, type='offer').first()
+                # Find a 1to1 offer from provider (skip group offers to avoid complex payments)
+                offer = Offer.objects.filter(user=provider, type='offer', activity_type='1to1').first()
                 if not offer:
                     continue
                 
