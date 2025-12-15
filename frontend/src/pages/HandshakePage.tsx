@@ -86,8 +86,7 @@ const HandshakePage = () => {
           return {
             ...prev,
             status: message.data.status,
-            proposed_date: message.data.proposed_date,
-            proposed_time: message.data.proposed_time,
+            proposed_at: message.data.proposed_at,
             requester_confirmed: message.data.requester_confirmed,
             provider_confirmed: message.data.provider_confirmed,
             completed_at: message.data.completed_at,
@@ -113,8 +112,7 @@ const HandshakePage = () => {
           return {
             ...prev,
             status: message.data.status,
-            proposed_date: message.data.proposed_date,
-            proposed_time: message.data.proposed_time,
+            proposed_at: message.data.proposed_at,
             requester_confirmed: message.data.requester_confirmed,
             provider_confirmed: message.data.provider_confirmed,
             completed_at: message.data.completed_at,
@@ -239,7 +237,7 @@ const HandshakePage = () => {
     // 1-to-1 offers: include "Date Set" step
     return [
       { done: true, waiting: false, cancelled: isCancelled || isRejected }, // Request Sent
-      { done: !!exchange.proposed_date, waiting: false, cancelled: isCancelled || isRejected }, // Date Proposed
+      { done: !!exchange.proposed_at, waiting: false, cancelled: isCancelled || isRejected }, // Date Proposed
       { done: exchange.status === 'ACCEPTED' || exchange.status === 'COMPLETED', waiting: false, cancelled: isCancelled || isRejected }, // Accepted
       { done: exchange.status === 'COMPLETED', waiting: isWaitingForOther, cancelled: isCancelled || isRejected }, // Completed - waiting for other's confirmation
     ]
@@ -396,7 +394,14 @@ const HandshakePage = () => {
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'TBD'
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const date = new Date(dateStr)
+    const dateFormatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const timeFormatted = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    // Only show time if it's not midnight (00:00)
+    const hours = date.getHours()
+    const minutes = date.getMinutes()
+    if (hours === 0 && minutes === 0) return dateFormatted
+    return `${dateFormatted}, ${timeFormatted}`
   }
 
   const hasRated = () => {
@@ -526,18 +531,18 @@ const HandshakePage = () => {
 
               <VStack align="stretch" spacing={1} fontSize="xs">
                 {/* Orijinal Offer Tarihi */}
-                {offer.date && (
+                {offer.scheduled_at && (
                   <Flex justify="space-between">
                     <HStack><Icon as={MdCalendarToday} boxSize={3} /><Text>Offer Date</Text></HStack>
-                    <Text fontWeight="500" color="gray.600">{formatDate(offer.date)} {offer.time || ''}</Text>
+                    <Text fontWeight="500" color="gray.600">{formatDate(offer.scheduled_at)}</Text>
                   </Flex>
                 )}
                 {/* Proposed Date - only show for 1-to-1 offers */}
                 {offer.activity_type !== 'group' && (
                   <Flex justify="space-between">
-                    <HStack><Icon as={MdCalendarToday} boxSize={3} color={exchange.proposed_date ? 'green.500' : 'gray.400'} /><Text>Proposed Date</Text></HStack>
-                    {exchange.proposed_date ? (
-                      <Text fontWeight="600" color="green.600">{formatDate(exchange.proposed_date)} {exchange.proposed_time || ''}</Text>
+                    <HStack><Icon as={MdCalendarToday} boxSize={3} color={exchange.proposed_at ? 'green.500' : 'gray.400'} /><Text>Proposed Date</Text></HStack>
+                    {exchange.proposed_at ? (
+                      <Text fontWeight="600" color="green.600">{formatDate(exchange.proposed_at)}</Text>
                     ) : (
                       <Text fontWeight="500" color="orange.500">Not set yet</Text>
                     )}
@@ -580,7 +585,7 @@ const HandshakePage = () => {
               )}
             </Box>
 
-            {/* Participants */}
+            {/* Participants - For "want" type, swap the labels since the provider is actually requesting help */}
             <Box p={3} borderRadius="lg" border="1px solid" borderColor="gray.100">
               <Text fontWeight="500" fontSize="xs" color="gray.500" mb={2}>Participants</Text>
               <VStack spacing={2} align="stretch">
@@ -589,14 +594,18 @@ const HandshakePage = () => {
                     <UserAvatar size="xs" user={provider} />
                     <Text fontSize="xs" fontWeight="500">{provider.first_name} {provider.last_name}</Text>
                   </HStack>
-                  <Badge colorScheme="green" fontSize="9px">Provider</Badge>
+                  <Badge colorScheme={offer.type === 'want' ? 'blue' : 'green'} fontSize="9px">
+                    {offer.type === 'want' ? 'Requester' : 'Provider'}
+                  </Badge>
                 </Flex>
                 <Flex align="center" justify="space-between">
                   <HStack spacing={2}>
                     <UserAvatar size="xs" user={requester} />
                     <Text fontSize="xs" fontWeight="500">{requester.first_name} {requester.last_name}</Text>
                   </HStack>
-                  <Badge colorScheme="blue" fontSize="9px">Requester</Badge>
+                  <Badge colorScheme={offer.type === 'want' ? 'green' : 'blue'} fontSize="9px">
+                    {offer.type === 'want' ? 'Provider' : 'Requester'}
+                  </Badge>
                 </Flex>
               </VStack>
               {exchange && (
@@ -674,7 +683,7 @@ const HandshakePage = () => {
             )}
 
             {/* Actions */}
-            {exchange.status === 'PENDING' && isRequester && !exchange.proposed_date && offer.activity_type !== 'group' && (
+            {exchange.status === 'PENDING' && isRequester && !exchange.proposed_at && offer.activity_type !== 'group' && (
               <VStack spacing={2} align="stretch">
                 <Button colorScheme="yellow" size="sm" onClick={onProposeOpen}>Propose Date</Button>
                 <Button colorScheme="red" variant="outline" size="sm" onClick={handleCancel} isLoading={isSubmitting}>Cancel Request</Button>
@@ -686,19 +695,19 @@ const HandshakePage = () => {
               <Button colorScheme="red" variant="outline" size="sm" onClick={handleCancel} isLoading={isSubmitting}>Cancel Request</Button>
             )}
 
-            {exchange.status === 'PENDING' && isRequester && exchange.proposed_date && offer.activity_type !== 'group' && (
+            {exchange.status === 'PENDING' && isRequester && exchange.proposed_at && offer.activity_type !== 'group' && (
               <Button colorScheme="red" variant="outline" size="sm" onClick={handleCancel} isLoading={isSubmitting}>Cancel Request</Button>
             )}
             
-            {/* For 1-to-1: Provider can accept/reject only if proposed_date is set */}
-            {exchange.status === 'PENDING' && isProvider && exchange.proposed_date && offer.activity_type !== 'group' && (
+            {/* For 1-to-1: Provider can accept/reject only if proposed_at is set */}
+            {exchange.status === 'PENDING' && isProvider && exchange.proposed_at && offer.activity_type !== 'group' && (
               <HStack spacing={2}>
                 <Button colorScheme="green" size="sm" flex={1} onClick={handleAccept} isLoading={isSubmitting}>Accept</Button>
                 <Button colorScheme="red" variant="outline" size="sm" flex={1} onClick={handleReject} isLoading={isSubmitting}>Reject</Button>
               </HStack>
             )}
 
-            {/* For Group offers: Provider can accept/reject without proposed_date */}
+            {/* For Group offers: Provider can accept/reject without proposed_at */}
             {exchange.status === 'PENDING' && isProvider && offer.activity_type === 'group' && (
               <HStack spacing={2}>
                 <Button colorScheme="green" size="sm" flex={1} onClick={handleAccept} isLoading={isSubmitting}>Accept</Button>

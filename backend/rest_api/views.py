@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Report, Notification, Chat, Message
-from datetime import datetime, date, time
+from datetime import datetime, date as date_module, time as time_module
 from django.conf import settings
 from django.utils import timezone
 from django.db import transaction, models
@@ -49,8 +49,7 @@ def send_exchange_update_ws(exchange):
         exchange_data = {
             'id': str(exchange.id),
             'status': exchange.status,
-            'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
-            'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
+            'proposed_at': exchange.proposed_at.isoformat() if exchange.proposed_at else None,
             'requester_confirmed': exchange.requester_confirmed,
             'provider_confirmed': exchange.provider_confirmed,
             'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
@@ -338,12 +337,11 @@ class OffersView(APIView):
                     }
                     for img in offer.offer_images.all()
                 ],
-                "date": offer.date,
-                "time": str(offer.time) if offer.time else None,
-                "from_date": offer.from_date,
-                "to_date": offer.to_date,
-                "created_at": offer.created_at,
-                "updated_at": offer.updated_at,
+                "scheduled_at": offer.scheduled_at.isoformat() if offer.scheduled_at else None,
+                "from_date": offer.from_date.isoformat() if offer.from_date else None,
+                "to_date": offer.to_date.isoformat() if offer.to_date else None,
+                "created_at": offer.created_at.isoformat(),
+                "updated_at": offer.updated_at.isoformat(),
             }
             for offer in available_offers
         ])
@@ -420,12 +418,11 @@ class OfferDetailView(APIView):
                 }
                 for img in offer.offer_images.all()
             ],
-            "date": offer.date,
-            "time": str(offer.time) if offer.time else None,
-            "from_date": offer.from_date,
-            "to_date": offer.to_date,
-            "created_at": offer.created_at,
-            "updated_at": offer.updated_at,
+            "scheduled_at": offer.scheduled_at.isoformat() if offer.scheduled_at else None,
+            "from_date": offer.from_date.isoformat() if offer.from_date else None,
+            "to_date": offer.to_date.isoformat() if offer.to_date else None,
+            "created_at": offer.created_at.isoformat(),
+            "updated_at": offer.updated_at.isoformat(),
             "can_edit": can_edit,
             "filled_slots": filled_slots,
             "total_slots": total_slots,
@@ -514,33 +511,58 @@ class OfferDetailView(APIView):
                 if 'latitude' in location_data and 'longitude' in location_data:
                     offer.geo_location = [location_data.get('latitude', 0), location_data.get('longitude', 0)]
             
-            # Handle date/time
-            if 'date' in request.data:
-                date_str = request.data['date']
-                if date_str:
+            # Handle scheduled_at (supports both 'scheduled_at' and legacy 'date'+'time' fields)
+            scheduled_at_str = request.data.get('scheduled_at') or request.data.get('date')
+            time_str = request.data.get('time')
+            
+            if scheduled_at_str is not None or 'scheduled_at' in request.data or 'date' in request.data:
+                if scheduled_at_str:
                     try:
-                        parsed_date = date.fromisoformat(date_str)
-                        # Validate date is not in the past
-                        if parsed_date < date.today():
-                            return Response({
-                                "error": "Date cannot be in the past. Please select today or a future date.",
-                                "code": "PAST_DATE"
-                            }, status=400)
-                        offer.date = parsed_date
+                        # Try parsing as full ISO datetime first (contains 'T' separator)
+                        if 'T' in scheduled_at_str:
+                            scheduled_at = datetime.fromisoformat(scheduled_at_str.replace('Z', '+00:00'))
+                            if not scheduled_at.tzinfo:
+                                scheduled_at = timezone.make_aware(scheduled_at, timezone.get_current_timezone())
+                            
+                            # Validate scheduled_at is not in the past
+                            if scheduled_at.date() < timezone.localdate():
+                                return Response({
+                                    "error": "Date cannot be in the past. Please select today or a future date.",
+                                    "code": "PAST_DATE"
+                                }, status=400)
+                            offer.scheduled_at = scheduled_at
+                        else:
+                            # Date only string - need to combine with time_str
+                            raise ValueError("Date only, need to combine with time")
                     except (ValueError, TypeError):
-                        pass
+                        try:
+                            # Parse as date only and combine with time_str
+                            date_obj = date_module.fromisoformat(scheduled_at_str.split('T')[0])
+                            if date_obj < timezone.localdate():
+                                return Response({
+                                    "error": "Date cannot be in the past. Please select today or a future date.",
+                                    "code": "PAST_DATE"
+                                }, status=400)
+                            
+                            time_obj = None
+                            if time_str:
+                                try:
+                                    time_obj = datetime.strptime(time_str, '%H:%M').time()
+                                except (ValueError, TypeError):
+                                    try:
+                                        time_obj = datetime.strptime(time_str, '%H:%M:%S').time()
+                                    except (ValueError, TypeError):
+                                        pass
+                            
+                            if time_obj:
+                                naive_dt = datetime.combine(date_obj, time_obj)
+                            else:
+                                naive_dt = datetime.combine(date_obj, datetime.min.time())
+                            offer.scheduled_at = timezone.make_aware(naive_dt, timezone.get_current_timezone())
+                        except (ValueError, TypeError):
+                            pass
                 else:
-                    offer.date = None
-                    
-            if 'time' in request.data:
-                time_str = request.data['time']
-                if time_str:
-                    try:
-                        offer.time = time.fromisoformat(time_str)
-                    except (ValueError, TypeError):
-                        pass
-                else:
-                    offer.time = None
+                    offer.scheduled_at = None
             
             offer.save()
             
@@ -645,19 +667,18 @@ class CreateOfferView(APIView):
             
             from_date_str = request.data.get('from_date')
             to_date_str = request.data.get('to_date')
-            date_str = request.data.get('date')
-            time_str = request.data.get('time')
+            scheduled_at_str = request.data.get('scheduled_at') or request.data.get('date')  # Support both new and old field names
+            time_str = request.data.get('time')  # Optional time component
             
             from_date = None
             to_date = None
-            date_obj = None
-            time_obj = None
+            scheduled_at = None
             
             if from_date_str:
                 try:
                     from_date = datetime.fromisoformat(from_date_str.replace('Z', '+00:00'))
-                    # Validate from_date is not in the past
-                    if from_date.date() < date.today():
+                    # Validate from_date is not in the past (timezone-aware)
+                    if from_date.date() < timezone.localdate():
                         return Response({
                             "error": "Start date cannot be in the past. Please select today or a future date.",
                             "code": "PAST_DATE"
@@ -671,26 +692,44 @@ class CreateOfferView(APIView):
                 except (ValueError, TypeError):
                     to_date = None
             
-            if date_str:
+            if scheduled_at_str:
                 try:
-                    date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()
-                    # Validate date is not in the past
-                    if date_obj < date.today():
-                        return Response({
-                            "error": "Date cannot be in the past. Please select today or a future date.",
-                            "code": "PAST_DATE"
-                        }, status=400)
-                except (ValueError, TypeError):
-                    date_obj = None
-            
-            if time_str:
-                try:
-                    time_obj = datetime.strptime(time_str, '%H:%M').time()
+                    # Try parsing as full ISO datetime first (contains 'T' separator)
+                    if 'T' in scheduled_at_str:
+                        scheduled_at = datetime.fromisoformat(scheduled_at_str.replace('Z', '+00:00'))
+                        if not scheduled_at.tzinfo:
+                            scheduled_at = timezone.make_aware(scheduled_at, timezone.get_current_timezone())
+                    else:
+                        # Date only string (YYYY-MM-DD format) - need to combine with time_str
+                        raise ValueError("Date only, need to combine with time")
                 except (ValueError, TypeError):
                     try:
-                        time_obj = datetime.strptime(time_str, '%H:%M:%S').time()
-                    except (ValueError, TypeError):
+                        # Parse as date only and combine with time_str
+                        date_obj = date_module.fromisoformat(scheduled_at_str.split('T')[0])
                         time_obj = None
+                        if time_str:
+                            try:
+                                time_obj = datetime.strptime(time_str, '%H:%M').time()
+                            except (ValueError, TypeError):
+                                try:
+                                    time_obj = datetime.strptime(time_str, '%H:%M:%S').time()
+                                except (ValueError, TypeError):
+                                    pass
+                        
+                        if time_obj:
+                            naive_dt = datetime.combine(date_obj, time_obj)
+                        else:
+                            naive_dt = datetime.combine(date_obj, datetime.min.time())
+                        scheduled_at = timezone.make_aware(naive_dt, timezone.get_current_timezone())
+                    except (ValueError, TypeError):
+                        scheduled_at = None
+                
+                # Validate scheduled_at is not in the past
+                if scheduled_at and scheduled_at.date() < timezone.localdate():
+                    return Response({
+                        "error": "Date cannot be in the past. Please select today or a future date.",
+                        "code": "PAST_DATE"
+                    }, status=400)
             
             location_data = request.data.get('location', {})
             
@@ -708,8 +747,7 @@ class CreateOfferView(APIView):
                 person_count=int(request.data.get('person_count', 1)),
                 location_type=request.data.get('location_type', 'myLocation'),
                 status=request.data.get('status', 'ACTIVE'),
-                date=date_obj,
-                time=time_obj,
+                scheduled_at=scheduled_at,
                 from_date=from_date,
                 to_date=to_date,
             )
@@ -944,7 +982,7 @@ class ExchangeDetailView(APIView):
                     "punctuality": rating.punctuality,
                     "would_recommend": rating.would_recommend,
                     "comment": rating.comment,
-                    "created_at": rating.created_at,
+                    "created_at": rating.created_at.isoformat(),
                 })
 
             return Response({
@@ -957,8 +995,7 @@ class ExchangeDetailView(APIView):
                     "type": exchange.offer.type,
                     "location": exchange.offer.location,
                     "geo_location": exchange.offer.geo_location,
-                    "date": exchange.offer.date,
-                    "time": str(exchange.offer.time) if exchange.offer.time else None,
+                    "scheduled_at": exchange.offer.scheduled_at.isoformat() if exchange.offer.scheduled_at else None,
                     "activity_type": exchange.offer.activity_type,
                     "person_count": exchange.offer.person_count,
                     "location_type": exchange.offer.location_type,
@@ -988,12 +1025,11 @@ class ExchangeDetailView(APIView):
                 },
                 "status": exchange.status,
                 "time_spent": exchange.time_spent,
-                "proposed_date": exchange.proposed_date,
-                "proposed_time": str(exchange.proposed_time) if exchange.proposed_time else None,
+                "proposed_at": exchange.proposed_at.isoformat() if exchange.proposed_at else None,
                 "requester_confirmed": exchange.requester_confirmed,
                 "provider_confirmed": exchange.provider_confirmed,
-                "created_at": exchange.created_at,
-                "completed_at": exchange.completed_at,
+                "created_at": exchange.created_at.isoformat(),
+                "completed_at": exchange.completed_at.isoformat() if exchange.completed_at else None,
                 "ratings": ratings_data,
             })
 
@@ -1030,9 +1066,8 @@ class MyExchangesView(APIView):
                     "last_name": exchange.requester.last_name,
                 },
                 "status": exchange.status,
-                "proposed_date": exchange.proposed_date,
-                "proposed_time": str(exchange.proposed_time) if exchange.proposed_time else None,
-                "created_at": exchange.created_at,
+                "proposed_at": exchange.proposed_at.isoformat() if exchange.proposed_at else None,
+                "created_at": exchange.created_at.isoformat(),
             })
 
         return Response(exchanges_data)
@@ -1070,9 +1105,8 @@ class ExchangesByOfferView(APIView):
                         } if hasattr(exchange.requester, 'profile') else None
                     },
                     "status": exchange.status,
-                    "proposed_date": exchange.proposed_date,
-                    "proposed_time": str(exchange.proposed_time) if exchange.proposed_time else None,
-                    "created_at": exchange.created_at,
+                    "proposed_at": exchange.proposed_at.isoformat() if exchange.proposed_at else None,
+                    "created_at": exchange.created_at.isoformat(),
                 })
 
             return Response(exchanges_data)
@@ -1123,8 +1157,7 @@ class ExchangeByOfferView(APIView):
                     "type": exchange.offer.type,
                     "location": exchange.offer.location,
                     "geo_location": exchange.offer.geo_location,
-                    "date": exchange.offer.date,
-                    "time": str(exchange.offer.time) if exchange.offer.time else None,
+                    "scheduled_at": exchange.offer.scheduled_at.isoformat() if exchange.offer.scheduled_at else None,
                     "activity_type": exchange.offer.activity_type,
                     "person_count": exchange.offer.person_count,
                     "location_type": exchange.offer.location_type,
@@ -1154,12 +1187,11 @@ class ExchangeByOfferView(APIView):
                 },
                 "status": exchange.status,
                 "time_spent": exchange.time_spent,
-                "proposed_date": exchange.proposed_date,
-                "proposed_time": str(exchange.proposed_time) if exchange.proposed_time else None,
+                "proposed_at": exchange.proposed_at.isoformat() if exchange.proposed_at else None,
                 "requester_confirmed": exchange.requester_confirmed,
                 "provider_confirmed": exchange.provider_confirmed,
-                "created_at": exchange.created_at,
-                "completed_at": exchange.completed_at,
+                "created_at": exchange.created_at.isoformat(),
+                "completed_at": exchange.completed_at.isoformat() if exchange.completed_at else None,
                 "ratings": ratings_data,
             })
 
@@ -1193,8 +1225,8 @@ class ProposeDateTimeView(APIView):
             except (ValueError, TypeError):
                 return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
 
-            # Validate proposed date is not in the past
-            if proposed_date < date.today():
+            # Validate proposed date is not in the past (timezone-aware)
+            if proposed_date < timezone.localdate():
                 return Response({
                     "error": "Cannot propose a date in the past. Please select today or a future date.",
                     "code": "PAST_DATE"
@@ -1210,14 +1242,21 @@ class ProposeDateTimeView(APIView):
                     except (ValueError, TypeError):
                         return Response({"error": "Invalid time format. Use HH:MM"}, status=400)
 
-            exchange.proposed_date = proposed_date
-            exchange.proposed_time = proposed_time
+            # Create timezone-aware proposed_at datetime
+            if proposed_time:
+                naive_dt = datetime.combine(proposed_date, proposed_time)
+            else:
+                naive_dt = datetime.combine(proposed_date, datetime.min.time())
+            proposed_at = timezone.make_aware(naive_dt, timezone.get_current_timezone())
+
+            exchange.proposed_at = proposed_at
             exchange.save()
             
             # Send notification to provider
+            proposed_str = proposed_at.strftime('%Y-%m-%d %H:%M') if proposed_at else ''
             send_notification(
                 exchange.provider,
-                f"{exchange.requester.first_name} {exchange.requester.last_name} proposed a date/time for '{exchange.offer.title}': {proposed_date} {proposed_time or ''}"
+                f"{exchange.requester.first_name} {exchange.requester.last_name} proposed a date/time for '{exchange.offer.title}': {proposed_str}"
             )
             
             # Send websocket update
@@ -1225,8 +1264,7 @@ class ProposeDateTimeView(APIView):
 
             return Response({
                 "message": "Date and time proposed successfully",
-                "proposed_date": exchange.proposed_date,
-                "proposed_time": str(exchange.proposed_time) if exchange.proposed_time else None,
+                "proposed_at": exchange.proposed_at.isoformat() if exchange.proposed_at else None,
             })
 
         except Exchange.DoesNotExist:
@@ -1910,8 +1948,8 @@ class UserProfileDetailView(APIView):
             })
 
         # Format offers with status
-        from datetime import date
-        today = date.today()
+        today = timezone.localdate()
+        now = timezone.now()
         
         offers_data = []
         for offer in recent_offers:
@@ -1924,13 +1962,13 @@ class UserProfileDetailView(APIView):
             has_future_accepted = Exchange.objects.filter(
                 offer=offer,
                 status='ACCEPTED',
-                proposed_date__gt=today
+                proposed_at__gt=now
             ).exists()
             
             has_in_progress = Exchange.objects.filter(
                 offer=offer,
                 status='ACCEPTED',
-                proposed_date__gte=today
+                proposed_at__gte=now
             ).exists()
             
             if has_completed:
@@ -1965,13 +2003,13 @@ class UserProfileDetailView(APIView):
             has_future_accepted = Exchange.objects.filter(
                 offer=want,
                 status='ACCEPTED',
-                proposed_date__gt=today
+                proposed_at__gt=now
             ).exists()
             
             has_in_progress = Exchange.objects.filter(
                 offer=want,
                 status='ACCEPTED',
-                proposed_date__gte=today
+                proposed_at__gte=now
             ).exists()
             
             if has_completed:
@@ -2913,8 +2951,7 @@ class AdminExchangeDetailView(APIView):
                     "type": exchange.offer.type if exchange.offer else None,
                     "location": exchange.offer.location if exchange.offer else None,
                     "geo_location": exchange.offer.geo_location if exchange.offer else None,
-                    "date": exchange.offer.date if exchange.offer else None,
-                    "time": str(exchange.offer.time) if exchange.offer and exchange.offer.time else None,
+                    "scheduled_at": exchange.offer.scheduled_at.isoformat() if exchange.offer and exchange.offer.scheduled_at else None,
                     "activity_type": exchange.offer.activity_type if exchange.offer else None,
                     "person_count": exchange.offer.person_count if exchange.offer else None,
                     "location_type": exchange.offer.location_type if exchange.offer else None,
@@ -2950,8 +2987,7 @@ class AdminExchangeDetailView(APIView):
                 } if exchange.requester else None,
                 "status": exchange.status,
                 "time_spent": exchange.time_spent,
-                "proposed_date": exchange.proposed_date.isoformat() if exchange.proposed_date else None,
-                "proposed_time": str(exchange.proposed_time) if exchange.proposed_time else None,
+                "proposed_at": exchange.proposed_at.isoformat() if exchange.proposed_at else None,
                 "requester_confirmed": exchange.requester_confirmed,
                 "provider_confirmed": exchange.provider_confirmed,
                 "created_at": exchange.created_at.isoformat(),

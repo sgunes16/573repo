@@ -144,8 +144,8 @@ export interface Offer {
   offer_type: string
   person_count: number
   location_type: string
-  date?: string
-  time?: string
+  // Timezone-aware datetime (ISO 8601 format)
+  scheduled_at?: string
   from_date?: string
   to_date?: string
   status: OfferStatus
@@ -221,8 +221,8 @@ export interface Exchange {
     type: 'offer' | 'want'
     location?: string
     geo_location?: number[]
-    date?: string
-    time?: string
+    // Timezone-aware datetime (ISO 8601 format)
+    scheduled_at?: string
     activity_type?: string
     person_count?: number
     location_type?: string
@@ -232,8 +232,8 @@ export interface Exchange {
   requester: User
   status: ExchangeStatus
   time_spent: number
-  proposed_date?: string
-  proposed_time?: string
+  // Timezone-aware datetime (ISO 8601 format)
+  proposed_at?: string
   requester_confirmed: boolean
   provider_confirmed: boolean
   created_at: string

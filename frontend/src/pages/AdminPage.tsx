@@ -619,16 +619,10 @@ const AdminPage = () => {
                       <Text fontWeight="bold">ID:</Text>
                       <Text>{exchangeDetail.id}</Text>
                     </HStack>
-                    {exchangeDetail.proposed_date && (
+                    {exchangeDetail.proposed_at && (
                       <HStack>
-                        <Text fontWeight="bold">Proposed Date:</Text>
-                        <Text>{new Date(exchangeDetail.proposed_date).toLocaleDateString()}</Text>
-                      </HStack>
-                    )}
-                    {exchangeDetail.proposed_time && (
-                      <HStack>
-                        <Text fontWeight="bold">Proposed Time:</Text>
-                        <Text>{exchangeDetail.proposed_time}</Text>
+                        <Text fontWeight="bold">Proposed Date/Time:</Text>
+                        <Text>{new Date(exchangeDetail.proposed_at).toLocaleString()}</Text>
                       </HStack>
                     )}
                     <HStack>

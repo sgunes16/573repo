@@ -477,9 +477,10 @@ class TestProposeDateTimeView:
         )
         
         assert response.status_code == status.HTTP_200_OK
-        # API returns date object, convert to string for comparison
-        proposed_date = response.data['proposed_date']
-        assert str(proposed_date) == future_date
+        # API returns ISO datetime string
+        proposed_at = response.data['proposed_at']
+        assert proposed_at is not None
+        assert future_date in proposed_at  # Date should be part of the ISO string
     
     def test_propose_datetime_non_requester_fails(self, api_client):
         """Test non-requester cannot propose date/time"""

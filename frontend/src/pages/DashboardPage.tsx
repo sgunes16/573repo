@@ -430,6 +430,7 @@ const MapPanel = ({ offers, radiusKm }: { offers: Offer[]; radiusKm: number }) =
                   maxW="280px"
                   border="1px solid"
                   borderColor="gray.200"
+                  zIndex={1000}
                 >
                   <PopoverArrow />
                   <PopoverBody p={4}>
@@ -454,7 +455,7 @@ const MapPanel = ({ offers, radiusKm }: { offers: Offer[]; radiusKm: number }) =
                         </VStack>
                       </HStack>
                       
-                      <Box borderTop="1px solid" borderColor="gray.100" pt={2}>
+                      <Box borderTop="1px solid" borderColor="gray.100" pt={2} >
                         <Text fontWeight="semibold" fontSize="sm" mb={1}>
                           {offer.title}
                         </Text>

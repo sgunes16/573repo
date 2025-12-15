@@ -83,8 +83,9 @@ class TestCompleteExchangeFlow:
         )
         
         assert response.status_code == status.HTTP_200_OK
-        # API returns date object
-        assert str(response.data['proposed_date']) == future_date
+        # API returns ISO datetime string
+        assert response.data['proposed_at'] is not None
+        assert future_date in response.data['proposed_at']
         
         # === Step 4: Provider accepts the exchange ===
         api_client.cookies['access_token'] = provider_tokens['access']

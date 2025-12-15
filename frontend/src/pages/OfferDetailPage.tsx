@@ -152,11 +152,21 @@ const OfferDetailPage = () => {
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Not specified'
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    const date = new Date(dateStr)
+    const dateFormatted = date.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
     })
+    const timeFormatted = date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    // Only show time if it's not midnight (00:00)
+    const hours = date.getHours()
+    const minutes = date.getMinutes()
+    if (hours === 0 && minutes === 0) return dateFormatted
+    return `${dateFormatted}, ${timeFormatted}`
   }
 
   if (isLoading) {
@@ -316,7 +326,7 @@ const OfferDetailPage = () => {
                   <Icon as={MdCalendarToday} color="gray.400" boxSize={4} />
                   <Box>
                     <Text color="gray.500" fontSize="xs">Date</Text>
-                    <Text fontWeight="500">{formatDate(offer.date)}</Text>
+                    <Text fontWeight="500">{formatDate(offer.scheduled_at)}</Text>
                   </Box>
                 </HStack>
                 <HStack>
@@ -485,9 +495,9 @@ const OfferDetailPage = () => {
                         {myExchange.status}
                       </Badge>
                     </Flex>
-                    {myExchange.proposed_date && (
+                    {myExchange.proposed_at && (
                       <Text fontSize="xs" color="gray.600">
-                        {new Date(myExchange.proposed_date).toLocaleDateString()}
+                        {new Date(myExchange.proposed_at).toLocaleDateString()}
                       </Text>
                     )}
                   </Box>

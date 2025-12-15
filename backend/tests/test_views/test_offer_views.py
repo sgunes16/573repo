@@ -569,12 +569,13 @@ class TestPastDateValidation:
         client, user = authenticated_client
         TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
         
-        from datetime import date, timedelta
-        future_date = date.today() + timedelta(days=7)
-        offer = OfferFactory(user=user, date=future_date)
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        future_dt = timezone.now() + timedelta(days=7)
+        offer = OfferFactory(user=user, scheduled_at=future_dt)
         
         response = client.put(f'/api/offers/{offer.id}', {
-            'date': '2020-01-01',  # Past date
+            'scheduled_at': '2020-01-01T10:00:00Z',  # Past date
         })
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST

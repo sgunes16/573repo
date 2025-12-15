@@ -102,13 +102,14 @@ const CreateOfferPage = () => {
         setLocationType((offer.location_type as typeof location_type[number]) || 'myLocation')
         setOfferType(offer.type as 'offer' | 'want')
         
-        // Handle date/time
-        if (offer.date) {
-          const dateStr = typeof offer.date === 'string' ? offer.date.split('T')[0] : offer.date
+        // Handle scheduled_at (timezone-aware datetime)
+        if (offer.scheduled_at) {
+          const scheduledDate = new Date(offer.scheduled_at)
+          // Extract date in YYYY-MM-DD format
+          const dateStr = scheduledDate.toISOString().split('T')[0]
           setDate(dateStr)
-        }
-        if (offer.time) {
-          const timeStr = typeof offer.time === 'string' ? offer.time.substring(0, 5) : ''
+          // Extract time in HH:MM format
+          const timeStr = scheduledDate.toTimeString().substring(0, 5)
           setTime(timeStr)
         }
         
