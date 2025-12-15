@@ -10,7 +10,7 @@ from tests.factories import (
     OfferFactory, WantFactory, GroupOfferFactory,
     ExchangeFactory, AcceptedExchangeFactory, CompletedExchangeFactory,
     ExchangeRatingFactory, NotificationFactory, ChatFactory, MessageFactory,
-    TimeBankTransactionFactory, ReportFactory,
+    TimeBankTransactionFactory, ReportFactory, ForumPostFactory, ForumCommentFactory,
     create_user_with_timebank, create_full_user
 )
 from rest_api.auth.views import password_hash
@@ -199,6 +199,19 @@ def transaction():
 def report():
     """Create a report"""
     return ReportFactory()
+
+
+# Forum fixtures
+@pytest.fixture
+def forum_post():
+    """Create a forum post"""
+    return ForumPostFactory()
+
+
+@pytest.fixture
+def forum_comment():
+    """Create a forum comment"""
+    return ForumCommentFactory()
 
 
 # Utility fixtures

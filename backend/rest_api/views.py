@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import status
 from rest_api.models import User, Offer, UserProfile, TimeBank, OfferImage, Exchange, ExchangeRating, TimeBankTransaction, Report, Notification, Chat, Message
 from datetime import datetime, date as date_module, time as time_module
 from django.conf import settings
@@ -3101,3 +3102,305 @@ class MarkAllNotificationsReadView(APIView):
     def post(self, request):
         Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({"message": "All notifications marked as read"})
+
+
+# ==================== Forum Views ====================
+
+class ForumPostListView(APIView):
+    """List all forum posts or create a new post"""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        """List all forum posts (FR-84, FR-89)"""
+        from .models import ForumPost
+        
+        posts = ForumPost.objects.all()
+        
+        # Filter by category (FR-89)
+        category = request.query_params.get('category')
+        if category:
+            posts = posts.filter(category=category)
+        
+        posts_data = []
+        for post in posts:
+            # Get user profile for avatar
+            try:
+                profile = post.user.profile
+                avatar_url = profile.avatar.url if profile.avatar else None
+            except:
+                avatar_url = None
+            
+            posts_data.append({
+                "id": post.id,
+                "title": post.title,
+                "content": post.content,
+                "category": post.category,
+                "created_at": post.created_at.isoformat(),
+                "updated_at": post.updated_at.isoformat(),
+                "comment_count": post.comments.count(),
+                # FR-90: Display author name, avatar, timestamp
+                "user": {
+                    "id": post.user.id,
+                    "first_name": post.user.first_name,
+                    "last_name": post.user.last_name,
+                    "email": post.user.email,
+                    "avatar": avatar_url,
+                }
+            })
+        
+        return Response(posts_data)
+
+    def post(self, request):
+        """Create a new forum post (FR-85) - Verified users only"""
+        if not request.user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Check if user is verified
+        if not request.user.is_verified:
+            return Response(
+                {"error": "Email verification required to create posts", "code": "NOT_VERIFIED"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if user is banned
+        if request.user.is_banned:
+            return Response(
+                {"error": "Your account is suspended", "code": "USER_BANNED"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        from .models import ForumPost
+        
+        title = request.data.get('title', '').strip()
+        content = request.data.get('content', '').strip()
+        category = request.data.get('category', 'general')
+        
+        if not title:
+            return Response(
+                {"error": "Title is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not content:
+            return Response(
+                {"error": "Content is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        post = ForumPost.objects.create(
+            user=request.user,
+            title=title,
+            content=content,
+            category=category
+        )
+        
+        # Get user profile for avatar
+        try:
+            profile = post.user.profile
+            avatar_url = profile.avatar.url if profile.avatar else None
+        except:
+            avatar_url = None
+        
+        return Response({
+            "id": post.id,
+            "title": post.title,
+            "content": post.content,
+            "category": post.category,
+            "created_at": post.created_at.isoformat(),
+            "updated_at": post.updated_at.isoformat(),
+            "comment_count": 0,
+            "user": {
+                "id": post.user.id,
+                "first_name": post.user.first_name,
+                "last_name": post.user.last_name,
+                "email": post.user.email,
+                "avatar": avatar_url,
+            }
+        }, status=status.HTTP_201_CREATED)
+
+
+class ForumPostDetailView(APIView):
+    """Get, update, or delete a forum post"""
+    permission_classes = [AllowAny]
+
+    def get(self, request, post_id):
+        """Get a single forum post with comments (FR-84, FR-90)"""
+        from .models import ForumPost
+        
+        try:
+            post = ForumPost.objects.get(id=post_id)
+        except ForumPost.DoesNotExist:
+            return Response(
+                {"error": "Post not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get user profile for avatar
+        try:
+            profile = post.user.profile
+            avatar_url = profile.avatar.url if profile.avatar else None
+        except:
+            avatar_url = None
+        
+        # Get comments with user info (FR-90)
+        comments_data = []
+        for comment in post.comments.all():
+            try:
+                comment_profile = comment.user.profile
+                comment_avatar_url = comment_profile.avatar.url if comment_profile.avatar else None
+            except:
+                comment_avatar_url = None
+            
+            comments_data.append({
+                "id": comment.id,
+                "content": comment.content,
+                "created_at": comment.created_at.isoformat(),
+                "user": {
+                    "id": comment.user.id,
+                    "first_name": comment.user.first_name,
+                    "last_name": comment.user.last_name,
+                    "email": comment.user.email,
+                    "avatar": comment_avatar_url,
+                }
+            })
+        
+        return Response({
+            "id": post.id,
+            "title": post.title,
+            "content": post.content,
+            "category": post.category,
+            "created_at": post.created_at.isoformat(),
+            "updated_at": post.updated_at.isoformat(),
+            "comment_count": len(comments_data),
+            "user": {
+                "id": post.user.id,
+                "first_name": post.user.first_name,
+                "last_name": post.user.last_name,
+                "email": post.user.email,
+                "avatar": avatar_url,
+            },
+            "comments": comments_data
+        })
+
+    def delete(self, request, post_id):
+        """Delete a forum post (FR-91: owner, FR-94: admin)"""
+        if not request.user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        from .models import ForumPost
+        
+        try:
+            post = ForumPost.objects.get(id=post_id)
+        except ForumPost.DoesNotExist:
+            return Response(
+                {"error": "Post not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check ownership or admin status
+        if post.user.id != request.user.id and not request.user.is_admin:
+            return Response(
+                {"error": "You can only delete your own posts"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        post.delete()
+        return Response({"message": "Post deleted successfully"})
+
+
+class ForumCommentCreateView(APIView):
+    """Create a comment on a forum post"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, post_id):
+        """Add a comment to a forum post (FR-86) - Verified users only"""
+        # Check if user is verified
+        if not request.user.is_verified:
+            return Response(
+                {"error": "Email verification required to comment", "code": "NOT_VERIFIED"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if user is banned
+        if request.user.is_banned:
+            return Response(
+                {"error": "Your account is suspended", "code": "USER_BANNED"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        from .models import ForumPost, ForumComment
+        
+        try:
+            post = ForumPost.objects.get(id=post_id)
+        except ForumPost.DoesNotExist:
+            return Response(
+                {"error": "Post not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        content = request.data.get('content', '').strip()
+        
+        if not content:
+            return Response(
+                {"error": "Content is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        comment = ForumComment.objects.create(
+            post=post,
+            user=request.user,
+            content=content
+        )
+        
+        # Get user profile for avatar
+        try:
+            profile = comment.user.profile
+            avatar_url = profile.avatar.url if profile.avatar else None
+        except:
+            avatar_url = None
+        
+        return Response({
+            "id": comment.id,
+            "content": comment.content,
+            "created_at": comment.created_at.isoformat(),
+            "user": {
+                "id": comment.user.id,
+                "first_name": comment.user.first_name,
+                "last_name": comment.user.last_name,
+                "email": comment.user.email,
+                "avatar": avatar_url,
+            }
+        }, status=status.HTTP_201_CREATED)
+
+
+class ForumCommentDeleteView(APIView):
+    """Delete a forum comment"""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, comment_id):
+        """Delete a comment (FR-91: owner, FR-94: admin)"""
+        from .models import ForumComment
+        
+        try:
+            comment = ForumComment.objects.get(id=comment_id)
+        except ForumComment.DoesNotExist:
+            return Response(
+                {"error": "Comment not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check ownership or admin status
+        if comment.user.id != request.user.id and not request.user.is_admin:
+            return Response(
+                {"error": "You can only delete your own comments"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        comment.delete()
+        return Response({"message": "Comment deleted successfully"})

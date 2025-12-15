@@ -403,3 +403,33 @@ export interface CreateReportData {
   reason: ReportReason
   description?: string
 }
+
+// Forum types
+export type ForumCategory = 'general' | 'help' | 'tips' | 'feedback'
+
+export interface ForumUser {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  avatar?: string | null
+}
+
+export interface ForumComment {
+  id: string
+  content: string
+  created_at: string
+  user: ForumUser
+}
+
+export interface ForumPost {
+  id: string
+  title: string
+  content: string
+  category: ForumCategory
+  created_at: string
+  updated_at: string
+  comment_count: number
+  user: ForumUser
+  comments?: ForumComment[]
+}

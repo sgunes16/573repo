@@ -31,6 +31,7 @@ import {
   MdNotifications,
   MdWarning,
   MdEmail,
+  MdForum,
 } from "react-icons/md";
 import { TimeBank, UserProfile } from "@/types";
 import { useEffect, useState } from "react";
@@ -343,6 +344,12 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
                   <HStack spacing={2}>
                     <Icon as={MdNotifications} boxSize={4} color="gray.500" />
                     <Text>Notifications</Text>
+                  </HStack>
+                </MenuItem>
+                <MenuItem onClick={() => navigate("/forum")} _hover={{ bg: 'gray.50' }}>
+                  <HStack spacing={2}>
+                    <Icon as={MdForum} boxSize={4} color="gray.500" />
+                    <Text>Forum</Text>
                   </HStack>
                 </MenuItem>
                 {user?.is_admin && (

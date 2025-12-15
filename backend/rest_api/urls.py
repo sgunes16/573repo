@@ -8,7 +8,8 @@ from .views import (
     TransactionsView, LatestTransactionsView,
     CreateReportView, AdminReportsListView, AdminReportUpdateView, AdminReportResolveView,
     AdminKPIView, AdminBanUserView, AdminWarnUserView, AdminDeleteOfferView, AdminExchangeDetailView,
-    NotificationsView, MarkNotificationReadView, MarkAllNotificationsReadView
+    NotificationsView, MarkNotificationReadView, MarkAllNotificationsReadView,
+    ForumPostListView, ForumPostDetailView, ForumCommentCreateView, ForumCommentDeleteView
 )
 from .auth.views import LoginView, RegisterView, LogoutView
 
@@ -61,4 +62,10 @@ urlpatterns = [
     path("admin/users/<int:user_id>/warn", AdminWarnUserView.as_view(), name="admin-warn-user"),
     path("admin/offers/<int:offer_id>", AdminDeleteOfferView.as_view(), name="admin-delete-offer"),
     path("admin/exchanges/<int:exchange_id>", AdminExchangeDetailView.as_view(), name="admin-exchange-detail"),
+    
+    # Forum endpoints
+    path("forum/posts", ForumPostListView.as_view(), name="forum-posts"),
+    path("forum/posts/<int:post_id>", ForumPostDetailView.as_view(), name="forum-post-detail"),
+    path("forum/posts/<int:post_id>/comments", ForumCommentCreateView.as_view(), name="forum-post-comments"),
+    path("forum/comments/<int:comment_id>", ForumCommentDeleteView.as_view(), name="forum-comment-delete"),
 ]

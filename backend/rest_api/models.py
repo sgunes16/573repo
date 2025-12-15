@@ -369,3 +369,42 @@ class EmailVerificationToken(models.Model):
     def is_expired(self):
         from django.utils import timezone
         return timezone.now() > self.expires_at
+
+
+# Forum feature models
+FORUM_CATEGORY_CHOICES = [
+    ('general', 'General'),
+    ('help', 'Help'),
+    ('tips', 'Tips'),
+    ('feedback', 'Feedback'),
+]
+
+
+class ForumPost(models.Model):
+    """Forum post/topic model"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='forum_posts')
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    category = models.CharField(max_length=20, choices=FORUM_CATEGORY_CHOICES, default='general')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+
+class ForumComment(models.Model):
+    """Forum comment model - flat comments (no nesting)"""
+    post = models.ForeignKey(ForumPost, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='forum_comments')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Comment by {self.user.email} on {self.post.title}"

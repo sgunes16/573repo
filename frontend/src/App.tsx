@@ -18,6 +18,8 @@ import NotificationsPage from './pages/NotificationsPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import VerifyEmailSentPage from './pages/VerifyEmailSentPage'
 import NotFoundPage from './pages/NotFoundPage'
+import ForumPage from './pages/ForumPage'
+import ForumPostPage from './pages/ForumPostPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminProtectedRoute from './components/AdminProtectedRoute'
 import { useAuthStore } from './store/useAuthStore'
@@ -64,6 +66,8 @@ function App() {
       {/* Public Routes - Accessible without login */}
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/offer/:id" element={<OfferDetailPage />} />
+      <Route path="/forum" element={<ForumPage />} />
+      <Route path="/forum/:postId" element={<ForumPostPage />} />
 
       {/* Protected Routes */}
       <Route

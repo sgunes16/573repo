@@ -5,9 +5,9 @@
 | Metric | Value |
 |--------|-------|
 | **Total FRs in SRS** | 174 |
-| **FRs with Tests** | 99 |
-| **Coverage** | **57%** |
-| **Total Test Cases** | 292 |
+| **FRs with Tests** | 106 |
+| **Coverage** | **61%** |
+| **Total Test Cases** | 316 |
 | **Features Fully Tested** | 7/19 |
 
 ---
@@ -315,21 +315,21 @@
 
 | FR ID | Requirement | Priority | Test File | Test Coverage | Status |
 |-------|-------------|----------|-----------|---------------|--------|
-| FR-84 | View all forum topics | High | - | - | ❌ NOT IMPLEMENTED |
-| FR-85 | Create forum topic | High | - | - | ❌ NOT IMPLEMENTED |
-| FR-86 | Reply to forum topics | High | - | - | ❌ NOT IMPLEMENTED |
+| FR-84 | View all forum topics | High | `test_forum_views.py` | `test_list_posts_public`, `test_list_posts_empty`, `test_get_post_with_comments` | ✅ |
+| FR-85 | Create forum topic | High | `test_forum_views.py` | `test_create_post_verified_user`, `test_create_post_unverified_fails`, `test_create_post_unauthenticated_fails`, `test_create_post_empty_title_fails`, `test_create_post_empty_content_fails`, `test_banned_user_cannot_post` | ✅ |
+| FR-86 | Reply to forum topics | High | `test_forum_views.py` | `test_add_comment_verified_user`, `test_add_comment_unverified_fails`, `test_add_comment_empty_content_fails`, `test_banned_user_cannot_comment` | ✅ |
 | FR-87 | Like/upvote posts | Medium | - | - | ❌ NOT IMPLEMENTED |
 | FR-88 | Search by keyword | Medium | - | - | ❌ NOT IMPLEMENTED |
-| FR-89 | Filter by category | Medium | - | - | ❌ NOT IMPLEMENTED |
-| FR-90 | Display author info | High | - | - | ❌ NOT IMPLEMENTED |
-| FR-91 | Edit/delete own posts | Medium | - | - | ❌ NOT IMPLEMENTED |
+| FR-89 | Filter by category | Medium | `test_forum_views.py` | `test_filter_by_category` | ✅ |
+| FR-90 | Display author info | High | `test_forum_views.py` | `test_post_displays_author_info` | ✅ |
+| FR-91 | Edit/delete own posts | Medium | `test_forum_views.py` | `test_delete_own_post`, `test_delete_others_post_fails`, `test_delete_own_comment`, `test_delete_others_comment_fails` | ✅ |
 | FR-92 | Pin topics (admin) | Low | - | - | ❌ NOT IMPLEMENTED |
 | FR-93 | Close topics (admin) | Medium | - | - | ❌ NOT IMPLEMENTED |
-| FR-94 | Delete posts (admin) | High | - | - | ❌ NOT IMPLEMENTED |
+| FR-94 | Delete posts (admin) | High | `test_forum_views.py` | `test_admin_can_delete_any_post`, `test_admin_can_delete_any_comment` | ✅ |
 | FR-95 | Notify on replies | Medium | - | - | ❌ NOT IMPLEMENTED |
 | FR-96 | Follow topics | Low | - | - | ❌ NOT IMPLEMENTED |
 
-**Coverage: 0/13 (0%)** ❌ FEATURE NOT IMPLEMENTED
+**Coverage: 7/13 (54%)** ⚠️ Basic forum implemented, advanced features (like, search, pin, close, notify, follow) not implemented
 
 ---
 
@@ -371,9 +371,9 @@
 | 1.15 Notifications | 6 | 6 | **100%** | ✅ |
 | 1.16 Report System | 4 | 4 | **100%** | ✅ |
 | 1.17 Password/Email | 4 | 4 | **100%** | ✅ |
-| 1.18 Forum | 13 | 0 | 0% | ❌ NOT IMPL |
+| 1.18 Forum | 13 | 7 | 54% | ⚠️ |
 | 1.19 Achievement Tree | 9 | 0 | 0% | ❌ NOT IMPL |
-| **TOTAL** | **174** | **99** | **57%** | |
+| **TOTAL** | **174** | **106** | **61%** | |
 
 ---
 
@@ -408,4 +408,5 @@
 | `test_exchange_flow.py` | 34 | Integration flows (exchange, want payment, offer edit/delete) |
 | `test_timebank_flow.py` | 15 | TimeBank integration |
 | `test_utils.py` | 8 | Utility functions |
-| **TOTAL** | **292** | |
+| `test_forum_views.py` | 24 | Forum posts and comments |
+| **TOTAL** | **316** | |

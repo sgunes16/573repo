@@ -6,7 +6,7 @@ from factory.django import DjangoModelFactory
 from rest_api.models import (
     User, UserProfile, TimeBank, Offer, Exchange, 
     ExchangeRating, Notification, Chat, Message,
-    TimeBankTransaction, Report
+    TimeBankTransaction, Report, ForumPost, ForumComment
 )
 from rest_api.auth.views import password_hash
 
@@ -223,4 +223,25 @@ def create_full_user(email=None, password='testpassword123', initial_credits=5):
     user, timebank = create_user_with_timebank(email, password, initial_credits)
     profile = UserProfileFactory(user=user)
     return user, profile, timebank
+
+
+class ForumPostFactory(DjangoModelFactory):
+    """Factory for creating ForumPost instances"""
+    class Meta:
+        model = ForumPost
+    
+    user = factory.SubFactory(UserFactory)
+    title = factory.Faker('sentence', nb_words=6)
+    content = factory.Faker('text', max_nb_chars=500)
+    category = 'general'
+
+
+class ForumCommentFactory(DjangoModelFactory):
+    """Factory for creating ForumComment instances"""
+    class Meta:
+        model = ForumComment
+    
+    post = factory.SubFactory(ForumPostFactory)
+    user = factory.SubFactory(UserFactory)
+    content = factory.Faker('text', max_nb_chars=200)
 
