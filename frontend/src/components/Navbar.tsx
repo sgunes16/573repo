@@ -103,12 +103,8 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
         }
       }
     },
-    onOpen: () => {
-      console.log('[Navbar] Notification WebSocket connected');
-    },
-    onClose: () => {
-      console.log('[Navbar] Notification WebSocket disconnected');
-    },
+    onOpen: () => {},
+    onClose: () => {},
     reconnect: true,
   });
 

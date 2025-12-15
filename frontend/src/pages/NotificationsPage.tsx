@@ -57,12 +57,8 @@ const NotificationsPage = () => {
         })
       }
     },
-    onOpen: () => {
-      console.log('[NotificationsPage] WebSocket connected')
-    },
-    onClose: () => {
-      console.log('[NotificationsPage] WebSocket disconnected')
-    },
+    onOpen: () => {},
+    onClose: () => {},
     reconnect: true,
   })
 

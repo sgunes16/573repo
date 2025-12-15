@@ -99,11 +99,9 @@ export const useWebSocket = (options: UseWebSocketOptions) => {
         wsUrl = `${wsUrl}${separator}token=${encodeURIComponent(token)}`
       }
 
-      console.log(`[WebSocket] Connecting to ${wsUrl.split('?')[0]}...`)
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
-        console.log('[WebSocket] Connected')
         setIsConnected(true)
         onOpenRef.current?.()
       }
@@ -119,13 +117,11 @@ export const useWebSocket = (options: UseWebSocketOptions) => {
       }
 
       ws.onclose = (event) => {
-        console.log(`[WebSocket] Disconnected (code: ${event.code})`)
         setIsConnected(false)
         onCloseRef.current?.()
 
         // Only reconnect if it wasn't a clean close and reconnect is enabled
         if (shouldReconnectRef.current && reconnect && event.code !== 1000) {
-          console.log(`[WebSocket] Reconnecting in ${reconnectInterval}ms...`)
           reconnectTimeoutRef.current = setTimeout(() => {
             connect()
           }, reconnectInterval)

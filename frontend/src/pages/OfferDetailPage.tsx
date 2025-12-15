@@ -137,8 +137,8 @@ const OfferDetailPage = () => {
             if (existingExchange) {
               setMyExchange(existingExchange)
             }
-          } catch (error) {
-            console.log('No existing exchange for this offer')
+          } catch {
+            // No existing exchange for this offer
           }
         }
       } catch (error) {

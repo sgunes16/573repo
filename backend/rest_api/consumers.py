@@ -16,7 +16,6 @@ class AuthenticatedWebsocketConsumer(AsyncWebsocketConsumer):
             
             # Try to get token from query string first
             query_string = self.scope.get('query_string', b'').decode('utf-8')
-            print(f"[WS Auth] Query string: {query_string[:100] if query_string else 'empty'}...")
             
             if query_string:
                 from urllib.parse import parse_qs
@@ -24,29 +23,19 @@ class AuthenticatedWebsocketConsumer(AsyncWebsocketConsumer):
                 token_list = params.get('token', [])
                 if token_list:
                     access_token = token_list[0]
-                    print(f"[WS Auth] Found token in query params, length: {len(access_token)}")
             
             # Fallback to cookies
             if not access_token:
                 cookies = self.scope.get('cookies', {})
-                print(f"[WS Auth] Available cookies: {list(cookies.keys())}")
                 access_token = cookies.get('access_token')
-                if access_token:
-                    print(f"[WS Auth] Found token in cookies, length: {len(access_token)}")
             
             if not access_token:
-                print("[WS Auth] ERROR: No access token found in query params or cookies")
                 return None
             
             # Authenticate using JWT
             user = await self.get_user_from_token(access_token)
-            if user:
-                print(f"[WS Auth] SUCCESS: Authenticated user: {user.email}")
-            else:
-                print("[WS Auth] ERROR: Token validation failed")
             return user
-        except Exception as e:
-            print(f"[WS Auth] ERROR: Authentication error: {e}")
+        except Exception:
             return None
     
     @database_sync_to_async
@@ -60,25 +49,21 @@ class AuthenticatedWebsocketConsumer(AsyncWebsocketConsumer):
             
             try:
                 UntypedToken(token)
-            except (InvalidToken, TokenError) as e:
-                print(f"[WS Auth] Token validation error: {e}")
+            except (InvalidToken, TokenError):
                 return None
             
             decoded_data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_data.get('user_id')
             
             if not user_id:
-                print("[WS Auth] No user_id in token")
                 return None
             
             try:
                 user = User.objects.get(id=user_id)
                 return user
             except User.DoesNotExist:
-                print(f"[WS Auth] User not found: {user_id}")
                 return None
-        except Exception as e:
-            print(f"[WS Auth] Token decode error: {e}")
+        except Exception:
             return None
 
 
@@ -87,12 +72,9 @@ class ChatConsumer(AuthenticatedWebsocketConsumer):
         self.exchange_id = self.scope['url_route']['kwargs']['exchange_id']
         self.room_group_name = f'chat_{self.exchange_id}'
         
-        print(f"[ChatConsumer] Connecting to chat for exchange {self.exchange_id}")
-        
         # Authenticate user
         user = await self.authenticate_user()
         if not user:
-            print(f"[ChatConsumer] Authentication failed, closing connection")
             await self.close()
             return
         
@@ -105,7 +87,6 @@ class ChatConsumer(AuthenticatedWebsocketConsumer):
         )
         
         await self.accept()
-        print(f"[ChatConsumer] Connection accepted for {user.email}")
         
         # Send existing messages
         await self.send_existing_messages()
@@ -168,8 +149,7 @@ class ChatConsumer(AuthenticatedWebsocketConsumer):
                     }
                 }
             )
-        except Exception as e:
-            print(f"Error receiving message: {e}")
+        except Exception:
             await self.send(text_data=json.dumps({
                 'error': 'Failed to send message'
             }))
@@ -255,8 +235,8 @@ class ChatConsumer(AuthenticatedWebsocketConsumer):
                     }
                 }
             )
-        except Exception as e:
-            print(f"Error sending chat notification via WebSocket: {e}")
+        except Exception:
+            pass  # Notification delivery is best-effort
     
     async def send_existing_messages(self):
         """Send existing messages to client"""
@@ -315,8 +295,7 @@ class ChatConsumer(AuthenticatedWebsocketConsumer):
                 })
             
             return result
-        except Exception as e:
-            print(f"Error getting messages: {e}")
+        except Exception:
             return []
 
 
@@ -327,12 +306,9 @@ class ExchangeConsumer(AuthenticatedWebsocketConsumer):
         self.exchange_id = self.scope['url_route']['kwargs']['exchange_id']
         self.room_group_name = f'exchange_{self.exchange_id}'
         
-        print(f"[ExchangeConsumer] Connecting to exchange {self.exchange_id}")
-        
         # Authenticate user
         user = await self.authenticate_user()
         if not user:
-            print(f"[ExchangeConsumer] Authentication failed, closing connection")
             await self.close()
             return
         
@@ -341,7 +317,6 @@ class ExchangeConsumer(AuthenticatedWebsocketConsumer):
         # Check if user is part of exchange
         exchange = await self.get_exchange()
         if not exchange or not await self.is_user_in_exchange(exchange):
-            print(f"[ExchangeConsumer] User not in exchange, closing connection")
             await self.close()
             return
         
@@ -352,7 +327,6 @@ class ExchangeConsumer(AuthenticatedWebsocketConsumer):
         )
         
         await self.accept()
-        print(f"[ExchangeConsumer] Connection accepted for {user.email}")
         
         # Send current exchange state
         await self.send_exchange_state()
@@ -415,8 +389,7 @@ class ExchangeConsumer(AuthenticatedWebsocketConsumer):
                 'provider_confirmed': exchange.provider_confirmed,
                 'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,
             }
-        except Exception as e:
-            print(f"Error getting exchange data: {e}")
+        except Exception:
             return None
 
 
@@ -442,7 +415,6 @@ class NotificationConsumer(AuthenticatedWebsocketConsumer):
         )
         
         await self.accept()
-        print(f"[NotificationConsumer] Connected for user {user.email}")
     
     async def disconnect(self, close_code):
         # Leave room group

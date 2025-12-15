@@ -17,6 +17,7 @@ import AdminPage from './pages/AdminPage'
 import NotificationsPage from './pages/NotificationsPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import VerifyEmailSentPage from './pages/VerifyEmailSentPage'
+import NotFoundPage from './pages/NotFoundPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminProtectedRoute from './components/AdminProtectedRoute'
 import { useAuthStore } from './store/useAuthStore'
@@ -148,6 +149,9 @@ function App() {
           </AdminProtectedRoute>
         }
       />
+
+      {/* 404 - Not Found */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }

@@ -54,12 +54,8 @@ const Chat: React.FC<ChatProps> = ({ exchangeId }) => {
         setMessages((prev) => [...prev, message.data])
       }
     },
-    onOpen: () => {
-      console.log('Chat WebSocket connected')
-    },
-    onClose: () => {
-      console.log('Chat WebSocket disconnected')
-    },
+    onOpen: () => {},
+    onClose: () => {},
     onError: (error) => {
       console.error('Chat WebSocket error:', error)
     },
