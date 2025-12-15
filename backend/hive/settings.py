@@ -183,8 +183,19 @@ AWS_QUERYSTRING_AUTH = False
 AWS_S3_CUSTOM_DOMAIN = None  # Don't use custom domain, use URL_PROTOCOL + endpoint
 
 # Django 4.2+ uses STORAGES dict instead of DEFAULT_FILE_STORAGE
-# In production, files are served via Nginx proxy at /hive-media/
-_custom_domain = f"{FRONTEND_URL.replace('https://', '').replace('http://', '')}/hive-media" if IS_PRODUCTION else None
+# Files are served via Nginx proxy at /hive-media/ (both dev and prod with Docker)
+# Check if running in Docker (MINIO_ENDPOINT contains 'minio:' internal hostname)
+IS_DOCKER = 'minio:' in MINIO_ENDPOINT
+
+# Use nginx proxy for media URLs when in Docker or production
+if IS_PRODUCTION or IS_DOCKER:
+    _frontend_host = FRONTEND_URL.replace('https://', '').replace('http://', '')
+    _custom_domain = f"{_frontend_host}/hive-media"
+    # Determine URL protocol from FRONTEND_URL
+    _url_protocol = 'https:' if FRONTEND_URL.startswith('https://') else 'http:'
+else:
+    _custom_domain = None
+    _url_protocol = 'https:'  # default
 
 STORAGES = {
     "default": {
@@ -193,6 +204,7 @@ STORAGES = {
             "bucket_name": MINIO_BUCKET_NAME,
             "endpoint_url": AWS_S3_ENDPOINT_URL,
             "custom_domain": _custom_domain,
+            "url_protocol": _url_protocol,
         },
     },
     "staticfiles": {
@@ -200,8 +212,8 @@ STORAGES = {
     },
 }
 
-# Update MEDIA_URL for MinIO - use Nginx proxy path in production
-if IS_PRODUCTION:
+# Update MEDIA_URL for MinIO - use Nginx proxy path in Docker/production
+if IS_PRODUCTION or IS_DOCKER:
     MEDIA_URL = f"{FRONTEND_URL}/hive-media/"
 else:
     MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{MINIO_BUCKET_NAME}/"

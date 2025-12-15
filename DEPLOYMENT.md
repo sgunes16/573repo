@@ -16,10 +16,44 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py seed_offers
 ```
 
+**Minimum `.env` for Local Docker:**
+```env
+# Django Settings
+SECRET_KEY=django-insecure-dev-key-change-in-prod
+DEBUG=True
+DEPLOY_TYPE=dev
+FRONTEND_URL=http://localhost
+
+# Database Settings
+DB_NAME=hive_db
+DB_USER=postgres
+DB_PASSWORD=postgres123
+DB_HOST=localhost
+DB_PORT=5432
+
+# MinIO Settings
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin123
+MINIO_BUCKET_NAME=hive-media
+
+# Mapbox (shared dev token - works on localhost)
+VITE_MAPBOX_TOKEN=<public-token>
+
+# Optional: Email (leave empty for local dev)
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=onboarding@resend.dev
+
+# Optional: Auto Bootstrap
+RUN_SEED_OFFERS=true
+```
+
+> 💡 **Tip:** The Mapbox token above is a shared development token that works on `localhost`. For production, create your own token (see [THIRD_PARTY_SETUP.md](./THIRD_PARTY_SETUP.md)).
+
 **Access:** 
 - Application: http://localhost
 - Backend API: http://localhost/api
 - Admin: http://localhost/admin
+- MinIO Console: http://localhost:9001 (minioadmin/minioadmin123)
 
 ### Option 2: Hybrid (Infra in Docker + Local Dev)
 

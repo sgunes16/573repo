@@ -13,7 +13,17 @@ Required for map features on the dashboard.
 - 📍 Address autocomplete when creating offers
 - 🔄 Reverse geocoding (coordinates → address)
 
-### Setup Steps
+### Quick Start (Local Development)
+
+For local development, you can use default token. 
+```env
+# .env (root) or frontend/.env
+VITE_MAPBOX_TOKEN=<public-token>
+```
+
+> ⚠️ **Note:** This token is should used for local development only. For production, create your own token with URL restrictions.
+
+### Production Setup
 
 1. **Create Mapbox Account**
    - Go to [mapbox.com](https://www.mapbox.com/) and sign up
@@ -39,15 +49,16 @@ Required for map features on the dashboard.
 
 4. **Restart Frontend**
    ```bash
-   docker-compose restart frontend
+   docker compose restart frontend
    ```
 
 ### Security Notes
 | ⚠️ Warning | Description |
 |-----------|-------------|
-| No Default Token | Never use the "Default public token" |
-| URL Restrictions | Always add URL restrictions to prevent abuse |
+| No Default Token | Never use the "Default public token" in production |
+| URL Restrictions | Always add URL restrictions for production tokens |
 | Production | Restrict to your exact domain only |
+| Local Dev Token | The shared dev token works only on `localhost` |
 
 ### Without Mapbox
 - ❌ Map won't display on dashboard

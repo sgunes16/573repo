@@ -273,6 +273,15 @@ class Command(BaseCommand):
         if admin_created:
             self.user_passwords['admin@hive.com'] = admin_password
             self.stdout.write(f'✅ Created admin: {admin.email}')
+            UserProfile.objects.get_or_create(
+                user=admin,
+                defaults={
+                    'bio': 'Platform administrator',
+                    'location': 'Istanbul',
+                    'skills': ['Administration', 'Support'],
+                    'is_onboarded': True,
+                }
+            )
             TimeBank.objects.get_or_create(
                 user=admin,
                 defaults={'amount': 100, 'available_amount': 100, 'total_amount': 100}
