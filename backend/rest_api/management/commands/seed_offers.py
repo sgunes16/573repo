@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand
 from rest_api.models import User, UserProfile, Offer, Exchange, TimeBankTransaction, TimeBank, ExchangeRating
 import hashlib
+import secrets
+import string
 from datetime import datetime, timedelta
 from django.utils import timezone
 
@@ -9,11 +11,20 @@ def password_hash(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
+def generate_password(length=12):
+    """Generate a random password"""
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
 class Command(BaseCommand):
     help = 'Seed database with community-focused users, profiles, offers and wants'
 
     def handle(self, *args, **kwargs):
         self.stdout.write('🌱 Starting to seed database...\n')
+        
+        # Store generated passwords for logging
+        self.user_passwords = {}
 
         # Istanbul neighborhood coordinates
         LOCATIONS = {
@@ -204,17 +215,21 @@ class Command(BaseCommand):
         # Create Users and Profiles
         created_users = []
         for user_data in mock_users_data:
+            # Generate random password for new users
+            user_password = generate_password()
+            
             user, created = User.objects.get_or_create(
                 email=user_data['email'],
                 defaults={
                     'first_name': user_data['first_name'],
                     'last_name': user_data['last_name'],
-                    'password': password_hash('password123'),
+                    'password': password_hash(user_password),
                     'is_verified': user_data.get('is_verified', True),
                 }
             )
             
             if created:
+                self.user_passwords[user.email] = user_password
                 self.stdout.write(f'✅ Created user: {user.email}')
             else:
                 self.stdout.write(f'⏭️  User already exists: {user.email}')
@@ -243,17 +258,19 @@ class Command(BaseCommand):
 
         # Create Admin User
         self.stdout.write('\n👑 Creating admin user...')
+        admin_password = generate_password()
         admin, admin_created = User.objects.get_or_create(
             email='admin@hive.com',
             defaults={
                 'first_name': 'Admin',
                 'last_name': 'User',
-                'password': password_hash('password123'),
+                'password': password_hash(admin_password),
                 'is_admin': True,
                 'is_verified': True,
             }
         )
         if admin_created:
+            self.user_passwords['admin@hive.com'] = admin_password
             self.stdout.write(f'✅ Created admin: {admin.email}')
             TimeBank.objects.get_or_create(
                 user=admin,
@@ -651,6 +668,17 @@ class Command(BaseCommand):
         self.stdout.write(f'📊 Total offers: {Offer.objects.filter(type="offer").count()}')
         self.stdout.write(f'📊 Total wants: {Offer.objects.filter(type="want").count()}')
         self.stdout.write(f'📊 Total exchanges: {Exchange.objects.count()}')
-        self.stdout.write(f'\n🔐 Login credentials:')
-        self.stdout.write(f'   Admin: admin@hive.com / password123')
-        self.stdout.write(f'   Users: [email]@example.com / password123')
+        
+        # Show generated credentials
+        if self.user_passwords:
+            self.stdout.write('\n' + '=' * 60)
+            self.stdout.write('🔐 GENERATED LOGIN CREDENTIALS (Save these!)')
+            self.stdout.write('=' * 60)
+            for email, password in self.user_passwords.items():
+                role = '👑 ADMIN' if email == 'admin@hive.com' else '👤 USER '
+                self.stdout.write(f'{role} | {email:<35} | {password}')
+            self.stdout.write('=' * 60)
+            self.stdout.write('⚠️  These passwords are randomly generated and shown only once!')
+            self.stdout.write('=' * 60)
+        else:
+            self.stdout.write('\nℹ️  No new users created (all already exist)')

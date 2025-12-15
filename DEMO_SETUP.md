@@ -21,7 +21,7 @@ docker-compose -f docker-compose.prod.yml exec backend python manage.py seed_off
 
 ### Demo Users
 
-All demo users have password: `password123`
+**⚠️ Passwords are randomly generated** when you run `seed_offers`. Check the terminal output for credentials!
 
 | Email | Name | Location | Role |
 |-------|------|----------|------|
@@ -36,6 +36,19 @@ All demo users have password: `password123`
 | `deniz.yildiz@example.com` | Deniz Yıldız | Beşiktaş | User |
 | `seda.kara@example.com` | Seda Kara | Maltepe | User |
 | `emre.bulut@example.com` | Emre Bulut | Üsküdar | User |
+
+**Example output after seeding:**
+```
+============================================================
+🔐 GENERATED LOGIN CREDENTIALS (Save these!)
+============================================================
+👑 ADMIN | admin@hive.com                    | xK9mP2nQ4rT7
+👤 USER  | ahmet.yilmaz@example.com          | aB3cD5eF7gH9
+...
+============================================================
+⚠️  These passwords are randomly generated and shown only once!
+============================================================
+```
 
 ### Demo Content
 
