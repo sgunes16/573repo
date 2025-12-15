@@ -32,6 +32,7 @@ import Navbar from '@/components/Navbar'
 import Chat from '@/components/Chat'
 import UserAvatar from '@/components/UserAvatar'
 import ReportModal from '@/components/ReportModal'
+import LocationDisplay from '@/components/LocationDisplay'
 import { exchangeService } from '@/services/exchange.service'
 import { mapboxService } from '@/services/mapbox.service'
 import { useAuthStore } from '@/store/useAuthStore'
@@ -548,11 +549,14 @@ const HandshakePage = () => {
                     )}
                   </Flex>
                 )}
-                <Flex justify="space-between">
+                <Flex justify="space-between" align="center">
                   <HStack><Icon as={MdLocationPin} boxSize={3} /><Text>Location</Text></HStack>
-                  <Text fontWeight="500" noOfLines={1} maxW="140px">
-                    {offer.location_type === 'remote' ? 'Remote' : locationAddress || 'TBD'}
-                  </Text>
+                  <LocationDisplay 
+                    address={offer.location_type === 'remote' ? 'Remote' : locationAddress || 'TBD'}
+                    size="short"
+                    maxLength={20}
+                    fontWeight="500"
+                  />
                 </Flex>
                 <Flex justify="space-between">
                   <HStack><Icon as={MdAccessTime} boxSize={3} /><Text>Duration</Text></HStack>

@@ -64,22 +64,30 @@ import { mapboxService } from '@/services/mapbox.service'
 // @ts-ignore
 const MAPBOX_TOKEN = (import.meta as any).env.VITE_MAPBOX_TOKEN
 
-const truncateLocation = (location?: string, maxLength = 30): string => {
+const truncateLocation = (location?: string): string => {
   if (!location) return 'No location'
+  if (location === 'Remote' || location === 'Remote / Online') return 'Remote'
   
-  // Extract neighborhood and district from full address
-  // Format: "Street, Neighborhood, District, City, Country"
+  // Parse address: "Mahalle, Sokak No, PostaKodu İlçe/İl, Ülke"
+  // Example: "Fatih, Yakacık Caddesi 185, 34870 Kartal/İstanbul, Türkiye"
   const parts = location.split(',').map(p => p.trim())
   
-  // Try to get neighborhood and district (usually 2nd and 3rd parts)
-  if (parts.length >= 2) {
-    const shortLocation = `${parts[0]}, ${parts[1]}`
-    if (shortLocation.length <= maxLength) return shortLocation
-    return shortLocation.substring(0, maxLength) + '...'
+  if (parts.length >= 3) {
+    const neighborhood = parts[0] // Mahalle
+    // İlçe genelde 3. parçada: "34870 Kartal/İstanbul" -> "Kartal"
+    const districtPart = parts[2]
+    const districtMatch = districtPart.match(/\d*\s*([^/]+)/)
+    const district = districtMatch ? districtMatch[1].trim() : parts[1]
+    return `${neighborhood}, ${district}`
   }
   
-  if (location.length <= maxLength) return location
-  return location.substring(0, maxLength) + '...'
+  if (parts.length === 2) {
+    return `${parts[0]}, ${parts[1]}`
+  }
+  
+  // Fallback: just return first part or truncate
+  if (parts[0].length <= 25) return parts[0]
+  return parts[0].substring(0, 22) + '...'
 }
 
 const OfferCardSkeleton = () => (
@@ -107,7 +115,7 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
   const { user } = useAuthStore()
   const rating = offer.user?.profile?.rating ?? 0
   const userName = offer.user?.first_name || 'User'
-  const displayLocation = truncateLocation(locationAddress || offer.location || '', 30)
+  const displayLocation = truncateLocation(locationAddress || offer.location || '')
 
   const handleOfferClick = () => {
     if (!user) {

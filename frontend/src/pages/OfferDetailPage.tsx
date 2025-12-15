@@ -31,6 +31,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import UserAvatar from '@/components/UserAvatar'
 import ReportModal from '@/components/ReportModal'
+import LocationDisplay from '@/components/LocationDisplay'
 import { offerService } from '@/services/offer.service'
 import { exchangeService } from '@/services/exchange.service'
 import { mapboxService } from '@/services/mapbox.service'
@@ -355,9 +356,11 @@ const OfferDetailPage = () => {
                   <Icon as={MdLocationOn} color="gray.400" boxSize={4} />
                   <Box>
                     <Text color="gray.500" fontSize="xs">Location</Text>
-                    <Text fontWeight="500" noOfLines={1}>
-                      {offer.location_type === 'remote' ? 'Remote' : locationAddress || 'TBD'}
-                    </Text>
+                    <LocationDisplay 
+                      address={offer.location_type === 'remote' ? 'Remote' : locationAddress || 'TBD'}
+                      size="medium"
+                      fontWeight="500"
+                    />
                   </Box>
                 </HStack>
               </Grid>
