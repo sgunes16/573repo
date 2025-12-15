@@ -2674,16 +2674,18 @@ class AdminKPIView(APIView):
         # Total users
         total_users = User.objects.filter(is_deleted=False).count()
 
-        # Active offers
+        # Active offers (excluding suspended users' offers)
         active_offers = Offer.objects.filter(
             status='ACTIVE',
-            type='offer'
+            type='offer',
+            user__is_banned=False
         ).count()
 
-        # Active wants
+        # Active wants (excluding suspended users' wants)
         active_wants = Offer.objects.filter(
             status='ACTIVE',
-            type='want'
+            type='want',
+            user__is_banned=False
         ).count()
 
         # Completed exchanges

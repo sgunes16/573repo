@@ -251,13 +251,13 @@ const AdminPage = () => {
 
         {/* KPI Cards */}
         {isLoading ? (
-          <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }} gap={4} mb={6}>
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} height="120px" borderRadius="lg" />
+          <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)', lg: 'repeat(5, 1fr)' }} gap={4} mb={6}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} height="100px" borderRadius="lg" />
             ))}
           </Grid>
         ) : kpiData ? (
-          <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }} gap={4} mb={6}>
+          <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)', lg: 'repeat(5, 1fr)' }} gap={4} mb={6}>
             <Box p={4} bg="blue.50" borderRadius="lg" border="1px solid" borderColor="blue.100">
               <HStack spacing={2} mb={2}>
                 <Icon as={MdPeople} color="blue.500" boxSize={5} />
@@ -282,28 +282,20 @@ const AdminPage = () => {
               <Text fontSize="2xl" fontWeight="bold" color="purple.700">{kpiData.active_wants}</Text>
             </Box>
 
+            <Box p={4} bg="orange.50" borderRadius="lg" border="1px solid" borderColor="orange.100">
+              <HStack spacing={2} mb={2}>
+                <Icon as={MdAccessTime} color="orange.500" boxSize={5} />
+                <Text fontSize="sm" color="gray.600">Total Time Credits</Text>
+              </HStack>
+              <Text fontSize="2xl" fontWeight="bold" color="orange.700">{kpiData.total_time_credits}H</Text>
+            </Box>
+
             <Box p={4} bg="yellow.50" borderRadius="lg" border="1px solid" borderColor="yellow.100">
               <HStack spacing={2} mb={2}>
                 <Icon as={MdReport} color="yellow.600" boxSize={5} />
                 <Text fontSize="sm" color="gray.600">Pending Reports</Text>
               </HStack>
               <Text fontSize="2xl" fontWeight="bold" color="yellow.700">{kpiData.pending_reports}</Text>
-            </Box>
-
-            <Box p={4} bg="teal.50" borderRadius="lg" border="1px solid" borderColor="teal.100">
-              <HStack spacing={2} mb={2}>
-                <Icon as={MdHandshake} color="teal.500" boxSize={5} />
-                <Text fontSize="sm" color="gray.600">Completed Exchanges</Text>
-              </HStack>
-              <Text fontSize="2xl" fontWeight="bold" color="teal.700">{kpiData.completed_exchanges}</Text>
-            </Box>
-
-            <Box p={4} bg="orange.50" borderRadius="lg" border="1px solid" borderColor="orange.100">
-              <HStack spacing={2} mb={2}>
-                <Icon as={MdAccessTime} color="orange.500" boxSize={5} />
-                <Text fontSize="sm" color="gray.600">Total Time Credits</Text>
-              </HStack>
-              <Text fontSize="2xl" fontWeight="bold" color="orange.700">{kpiData.total_time_credits}</Text>
             </Box>
           </Grid>
         ) : null}
