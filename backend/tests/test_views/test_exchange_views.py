@@ -719,3 +719,62 @@ class TestExchangeDetailView:
         
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+
+class TestBannedUserExchanges:
+    """Tests for banned user restrictions on exchanges"""
+    
+    def test_banned_user_cannot_create_exchange(self, authenticated_client):
+        """Test that banned user cannot initiate exchanges"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.is_banned = True
+        user.save()
+        
+        provider, _ = create_user_with_timebank()
+        offer = OfferFactory(user=provider, time_required=1)
+        
+        response = client.post('/api/exchanges', {'offer_id': offer.id})
+        
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data.get('code') == 'USER_BANNED'
+    
+    def test_cannot_create_exchange_for_banned_user_offer(self, authenticated_client):
+        """Test that exchanges cannot be initiated for banned user's offers"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.save()
+        
+        # Create banned provider with offer
+        banned_provider, _ = create_user_with_timebank()
+        banned_provider.is_banned = True
+        banned_provider.save()
+        offer = OfferFactory(user=banned_provider, time_required=1)
+        
+        response = client.post('/api/exchanges', {'offer_id': offer.id})
+        
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data.get('code') == 'OFFER_OWNER_BANNED'
+    
+    def test_cannot_create_exchange_for_banned_want_owner(self, authenticated_client):
+        """Test that exchanges cannot be initiated for banned user's wants"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.save()
+        
+        # Create banned want owner
+        banned_owner, banned_tb = create_user_with_timebank()
+        banned_owner.is_banned = True
+        banned_owner.save()
+        
+        # Create want (need to have blocked credits for want)
+        from tests.factories import WantFactory
+        want = WantFactory(user=banned_owner, time_required=1)
+        
+        response = client.post('/api/exchanges', {'offer_id': want.id})
+        
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data.get('code') == 'OFFER_OWNER_BANNED'
+

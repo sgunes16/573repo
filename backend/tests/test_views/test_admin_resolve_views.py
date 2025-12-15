@@ -63,7 +63,8 @@ class TestRemoveContentAction:
         api_client.force_authenticate(user=admin_user)
         
         # Create offer with pending exchange
-        offer = OfferFactory(user=regular_user, type='offer')
+        # offer.time_required defaults to 1, so blocked_amount should match
+        offer = OfferFactory(user=regular_user, type='offer', time_required=2)
         requester = UserFactory()
         requester_tb = TimeBank.objects.create(
             user=requester, amount=10, blocked_amount=2, available_amount=8, total_amount=10
@@ -72,8 +73,7 @@ class TestRemoveContentAction:
             offer=offer,
             provider=regular_user,
             requester=requester,
-            status='PENDING',
-            time_spent=2
+            status='PENDING'
         )
         exchange_id = exchange.id
         
@@ -288,13 +288,14 @@ class TestBanUserAction:
         api_client.force_authenticate(user=admin_user)
         
         # Create want exchange (provider has blocked credits)
-        want = WantFactory(user=regular_user)
+        # want.time_required = 2 to match blocked_amount
+        want = WantFactory(user=regular_user, time_required=2)
         helper = UserFactory()
         TimeBank.objects.create(
             user=helper, amount=10, blocked_amount=0, available_amount=10, total_amount=10
         )
         
-        # Block credits for want owner
+        # Block credits for want owner (should match want.time_required)
         user_tb = regular_user.timebank
         user_tb.blocked_amount = 2
         user_tb.available_amount = 8
@@ -302,7 +303,8 @@ class TestBanUserAction:
         
         exchange = Exchange.objects.create(
             offer=want, provider=regular_user, requester=helper,
-            status='ACCEPTED', time_spent=2
+            status='ACCEPTED'
+            # time_spent is only set on completion, not for ACCEPTED
         )
         
         report = Report.objects.create(

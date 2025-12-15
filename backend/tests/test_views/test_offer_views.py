@@ -580,3 +580,66 @@ class TestPastDateValidation:
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data.get('code') == 'PAST_DATE'
+
+
+class TestBannedUserOffers:
+    """Tests for banned user restrictions on offers"""
+    
+    def test_banned_user_cannot_create_offer(self, authenticated_client):
+        """Test that banned user cannot create offers"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.is_banned = True
+        user.save()
+        
+        response = client.post('/api/create-offer', {
+            'title': 'Test Offer',
+            'description': 'Test description',
+            'type': 'offer',
+            'time_required': 1,
+            'activity_type': '1to1',
+        })
+        
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data.get('code') == 'USER_BANNED'
+    
+    def test_banned_user_offers_not_shown_in_dashboard(self, authenticated_client):
+        """Test that banned user's offers are not shown in dashboard"""
+        client, _ = authenticated_client
+        
+        # Create normal user with offer
+        normal_user = create_user_with_timebank()[0]
+        normal_offer = OfferFactory(user=normal_user, status='ACTIVE')
+        
+        # Create banned user with offer
+        banned_user = create_user_with_timebank()[0]
+        banned_user.is_banned = True
+        banned_user.save()
+        banned_offer = OfferFactory(user=banned_user, status='ACTIVE')
+        
+        response = client.get('/api/offers')
+        
+        assert response.status_code == status.HTTP_200_OK
+        offer_ids = [offer['id'] for offer in response.data]
+        assert normal_offer.id in offer_ids
+        assert banned_offer.id not in offer_ids
+    
+    def test_banned_user_cannot_create_want(self, authenticated_client):
+        """Test that banned user cannot create wants"""
+        client, user = authenticated_client
+        TimeBank.objects.create(user=user, amount=5, available_amount=5, blocked_amount=0, total_amount=5)
+        user.is_verified = True
+        user.is_banned = True
+        user.save()
+        
+        response = client.post('/api/create-offer', {
+            'title': 'Test Want',
+            'description': 'Test description',
+            'type': 'want',
+            'time_required': 1,
+            'activity_type': '1to1',
+        })
+        
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data.get('code') == 'USER_BANNED'

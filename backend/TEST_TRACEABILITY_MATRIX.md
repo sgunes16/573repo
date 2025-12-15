@@ -4,10 +4,10 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total FRs in SRS** | 160 |
-| **FRs with Tests** | 92 |
-| **Coverage** | **58%** |
-| **Total Test Cases** | 285 |
+| **Total FRs in SRS** | 165 |
+| **FRs with Tests** | 99 |
+| **Coverage** | **60%** |
+| **Total Test Cases** | 292 |
 | **Features Fully Tested** | 7/19 |
 
 ---
@@ -197,7 +197,7 @@
 
 ---
 
-## Feature 1.12 - Admin Panel (FR-53 to FR-62h) - 16 FRs
+## Feature 1.12 - Admin Panel (FR-53 to FR-62h) - 21 FRs
 
 | FR ID | Requirement | Priority | Test File | Test Coverage | Status |
 |-------|-------------|----------|-----------|---------------|--------|
@@ -215,11 +215,16 @@
 | FR-62c | Ban users | High | `test_admin_views.py`, `test_admin_resolve_views.py` | `test_ban_user_success`, `test_ban_user_with_duration`, `test_ban_user_cancels_group_offer_with_multiple_slots`, `test_ban_user_as_requester_in_group_offer` | ✅ |
 | FR-62d | Track warning count | High | `test_admin_views.py` | `test_warn_user_increments_count` | ✅ |
 | FR-62e | Banned users can't login | High | - | - | ❌ |
+| FR-62e1 | Banned users can't create offers | High | `test_offer_views.py` | `test_banned_user_cannot_create_offer`, `test_banned_user_cannot_create_want` | ✅ |
+| FR-62e2 | Banned users can't initiate exchanges | High | `test_exchange_views.py` | `test_banned_user_cannot_create_exchange` | ✅ |
+| FR-62e3 | Banned users' offers hidden from dashboard | High | `test_offer_views.py` | `test_banned_user_offers_not_shown_in_dashboard` | ✅ |
+| FR-62e4 | Cannot initiate exchange for banned user's offers | High | `test_exchange_views.py` | `test_cannot_create_exchange_for_banned_user_offer`, `test_cannot_create_exchange_for_banned_want_owner` | ✅ |
+| FR-62e5 | Cancel pending/accepted exchanges on ban | High | `test_admin_resolve_views.py` | `test_ban_user_cancels_all_active_exchanges` | ✅ |
 | FR-62f | Delete offers/wants | High | `test_admin_views.py`, `test_admin_resolve_views.py` | `test_delete_offer`, `test_remove_offer_deletes_offer_and_cancels_exchanges`, `test_remove_want_unblocks_owner_credits`, `test_remove_exchange_cancels_and_flags_offer` | ✅ |
 | FR-62g | Cancel exchanges | High | `test_admin_resolve_views.py` | `test_remove_exchange_cancels_and_flags_offer`, `test_ban_user_cancels_all_active_exchanges` | ✅ |
 | FR-62h | Notify affected users | Medium | `test_admin_resolve_views.py` | `test_warn_user_sends_notification` (mocked) | ⚠️ Partial |
 
-**Coverage: 9/16 (56%)**
+**Coverage: 14/21 (67%)**
 
 ---
 
@@ -350,7 +355,7 @@
 | 1.9 Map View | 12 | 3 | 25% | ⚠️ |
 | 1.10 User Profile | 4 | 4 | **100%** | ✅ |
 | 1.11 Other Profiles | 5 | 5 | **100%** | ✅ |
-| 1.12 Admin Panel | 16 | 9 | 56% | ⚠️ |
+| 1.12 Admin Panel | 21 | 14 | 67% | ⚠️ |
 | 1.13 Flag/Report | 3 | 2 | 67% | ⚠️ |
 | 1.14 Auth & Account | 11 | 3 | 27% | ⚠️ |
 | 1.15 Notifications | 6 | 6 | **100%** | ✅ |
@@ -358,7 +363,7 @@
 | 1.17 Password/Email | 4 | 4 | **100%** | ✅ |
 | 1.18 Forum | 13 | 0 | 0% | ❌ NOT IMPL |
 | 1.19 Achievement Tree | 9 | 0 | 0% | ❌ NOT IMPL |
-| **TOTAL** | **160** | **92** | **58%** | |
+| **TOTAL** | **165** | **99** | **60%** | |
 
 ---
 
@@ -381,8 +386,8 @@
 | File | Test Count | Focus |
 |------|------------|-------|
 | `test_models.py` | 12 | Model unit tests |
-| `test_offer_views.py` | 47 | Offer/Want CRUD, delete, filters, past date validation |
-| `test_exchange_views.py` | 37 | Exchange lifecycle, propose date validation |
+| `test_offer_views.py` | 50 | Offer/Want CRUD, delete, filters, past date validation, banned user restrictions |
+| `test_exchange_views.py` | 40 | Exchange lifecycle, propose date validation, banned user restrictions |
 | `test_profile_views.py` | 22 | Profile CRUD |
 | `test_admin_views.py` | 18 | Admin KPI, ban, warn |
 | `test_admin_resolve_views.py` | 19 | Admin report resolution (remove content, ban, warn, group offers) |
@@ -393,4 +398,4 @@
 | `test_exchange_flow.py` | 34 | Integration flows (exchange, want payment, offer edit/delete) |
 | `test_timebank_flow.py` | 15 | TimeBank integration |
 | `test_utils.py` | 8 | Utility functions |
-| **TOTAL** | **285** | |
+| **TOTAL** | **292** | |

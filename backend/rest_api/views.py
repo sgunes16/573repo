@@ -257,7 +257,8 @@ class OffersView(APIView):
         
         offers = Offer.objects.select_related('user', 'user__profile').prefetch_related('exchange_set').filter(
             status='ACTIVE',  # Only show active offers
-            is_flagged=False  # Exclude flagged offers from dashboard
+            is_flagged=False,  # Exclude flagged offers from dashboard
+            user__is_banned=False  # Exclude offers from banned/suspended users
         )
         
         # Filter out offers based on their exchange status
@@ -640,6 +641,13 @@ class CreateOfferView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
+        # Check if user is banned/suspended
+        if request.user.is_banned:
+            return Response({
+                "error": "Your account has been suspended. You cannot create offers.",
+                "code": "USER_BANNED"
+            }, status=403)
+        
         # Check if user has verified email
         if not request.user.is_verified:
             return Response({
@@ -875,6 +883,13 @@ class CreateExchangeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        # Check if user is banned/suspended
+        if request.user.is_banned:
+            return Response({
+                "error": "Your account has been suspended. You cannot create exchange requests.",
+                "code": "USER_BANNED"
+            }, status=403)
+        
         # Check if user has verified email
         if not request.user.is_verified:
             return Response({
@@ -888,6 +903,13 @@ class CreateExchangeView(APIView):
                 return Response({"error": "offer_id is required"}, status=400)
 
             offer = Offer.objects.select_related('user', 'user__timebank').get(id=offer_id)
+            
+            # Check if offer owner is banned/suspended
+            if offer.user.is_banned:
+                return Response({
+                    "error": "This offer is not available. The owner's account has been suspended.",
+                    "code": "OFFER_OWNER_BANNED"
+                }, status=403)
             
             # Check if user is requesting their own offer
             if offer.user == request.user:
@@ -2349,7 +2371,8 @@ class AdminReportResolveView(APIView):
             return False
         
         offer = exchange.offer
-        time_to_refund = exchange.time_spent or (offer.time_required if offer else 1)
+        # Use offer.time_required for pending/accepted exchanges (time_spent is usually 0)
+        time_to_refund = offer.time_required if offer else (exchange.time_spent or 1)
         
         # Determine who has blocked credits based on offer type
         # OFFER type: requester blocked credits

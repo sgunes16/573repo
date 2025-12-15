@@ -79,24 +79,29 @@ const TransactionsPage = () => {
 
         {/* TimeBank Summary Cards */}
         {isLoading ? (
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3} mb={6}>
+          <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mb={6}>
+            <Skeleton height="80px" borderRadius="lg" />
             <Skeleton height="80px" borderRadius="lg" />
             <Skeleton height="80px" borderRadius="lg" />
             <Skeleton height="80px" borderRadius="lg" />
           </SimpleGrid>
         ) : (
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3} mb={6}>
+          <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mb={6}>
             <Box bg="green.50" borderRadius="lg" p={4} border="1px solid" borderColor="green.100">
-              <Text fontSize="xs" color="gray.600" mb={1}>Available</Text>
+              <Text fontSize="xs" color="gray.600" mb={1}>Spendable</Text>
               <Text fontSize="xl" fontWeight="700" color="green.600">{timebank?.available_amount ?? 0}H</Text>
             </Box>
             <Box bg="orange.50" borderRadius="lg" p={4} border="1px solid" borderColor="orange.100">
               <Text fontSize="xs" color="gray.600" mb={1}>Blocked</Text>
               <Text fontSize="xl" fontWeight="700" color="orange.500">{timebank?.blocked_amount ?? 0}H</Text>
             </Box>
-            <Box bg="yellow.50" borderRadius="lg" p={4} border="1px solid" borderColor="yellow.200">
-              <Text fontSize="xs" color="gray.600" mb={1}>Total</Text>
-              <Text fontSize="xl" fontWeight="700" color="yellow.600">{timebank?.total_amount ?? 0}H</Text>
+            <Box bg="blue.50" borderRadius="lg" p={4} border="1px solid" borderColor="blue.100">
+              <Text fontSize="xs" color="gray.600" mb={1}>Total Balance</Text>
+              <Text fontSize="xl" fontWeight="700" color="blue.600">{timebank?.amount ?? 0}H</Text>
+            </Box>
+            <Box bg="purple.50" borderRadius="lg" p={4} border="1px solid" borderColor="purple.100">
+              <Text fontSize="xs" color="gray.600" mb={1}>All-time Spends or Earns</Text>
+              <Text fontSize="xl" fontWeight="700" color="purple.600">{timebank?.total_amount ?? 0}H</Text>
             </Box>
           </SimpleGrid>
         )}

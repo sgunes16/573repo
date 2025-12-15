@@ -410,8 +410,7 @@ class ExchangeConsumer(AuthenticatedWebsocketConsumer):
             return {
                 'id': str(exchange.id),
                 'status': exchange.status,
-                'proposed_date': exchange.proposed_date.isoformat() if exchange.proposed_date else None,
-                'proposed_time': str(exchange.proposed_time) if exchange.proposed_time else None,
+                'proposed_at': exchange.proposed_at.isoformat() if exchange.proposed_at else None,
                 'requester_confirmed': exchange.requester_confirmed,
                 'provider_confirmed': exchange.provider_confirmed,
                 'completed_at': exchange.completed_at.isoformat() if exchange.completed_at else None,

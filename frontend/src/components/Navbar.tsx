@@ -13,10 +13,12 @@ import {
   IconButton,
   Tooltip,
   VStack,
+  useToast,
 } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 import { profileService } from "@/services/profile.service";
+import { authService } from "@/services/auth.service";
 import UserAvatar from "@/components/UserAvatar";
 import {
   MdChevronRight,
@@ -27,6 +29,8 @@ import {
   MdTimeline,
   MdAdminPanelSettings,
   MdNotifications,
+  MdWarning,
+  MdEmail,
 } from "react-icons/md";
 import { TimeBank, UserProfile } from "@/types";
 import { useEffect, useState } from "react";
@@ -42,12 +46,38 @@ interface NavbarProps {
 
 const Navbar = ({ showUserInfo = false }: NavbarProps) => {
   const navigate = useNavigate();
+  const toast = useToast();
   const { user, logout } = useAuthStore();
   const [userProfile, setUserProfile] = useState<UserProfile | undefined>(undefined);
   const [timeBank, setTimeBank] = useState<TimeBank | undefined>(undefined);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
 
   const { setGeoLocation } = useGeoStore();
+
+  const handleResendVerification = async () => {
+    if (!user?.email || isResendingEmail) return;
+    
+    setIsResendingEmail(true);
+    try {
+      await authService.resendVerificationEmail(user.email);
+      toast({
+        title: 'Verification email sent!',
+        description: 'Please check your inbox and spam folder.',
+        status: 'success',
+        duration: 5000,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to send email',
+        description: error.response?.data?.error || 'Please try again later.',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setIsResendingEmail(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -108,7 +138,11 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
     navigate("/login");
   };
 
+  const isUnverified = user && !user.is_verified;
+  const isBanned = user && user.is_banned;
+
   return (
+    <>
     <Box
       as="nav"
       bg="white"
@@ -335,6 +369,69 @@ const Navbar = ({ showUserInfo = false }: NavbarProps) => {
         )}
       </Flex>
     </Box>
+
+    {/* Banned User Banner - Red, more prominent */}
+    {isBanned && (
+      <Box
+        bg="red.500"
+        position="sticky"
+        top="56px"
+        zIndex={99}
+        py={2}
+        px={4}
+      >
+        <Flex 
+          justify="center" 
+          align="center" 
+          gap={3}
+          maxW="container.xl"
+          mx="auto"
+        >
+          <Icon as={MdWarning} color="white" boxSize={4} />
+          <Text fontSize="sm" fontWeight="600" color="white">
+            ⚠️ Your account has been suspended. You can view content but cannot create offers, start exchanges, or interact with other users.
+          </Text>
+        </Flex>
+      </Box>
+    )}
+
+    {/* Unverified Email Banner - Only show if not banned */}
+    {isUnverified && !isBanned && (
+      <Box
+        bg="yellow.400"
+        position="sticky"
+        top={isBanned ? "96px" : "56px"}
+        zIndex={99}
+        py={2}
+        px={4}
+      >
+        <Flex 
+          justify="center" 
+          align="center" 
+          gap={3}
+          maxW="container.xl"
+          mx="auto"
+        >
+          <Icon as={MdWarning} color="yellow.900" boxSize={4} />
+          <Text fontSize="sm" fontWeight="500" color="yellow.900">
+            Please verify your email to start handshakes and create offers.
+          </Text>
+          <Button
+            size="xs"
+            leftIcon={<Icon as={MdEmail} boxSize={3} />}
+            bg="yellow.900"
+            color="yellow.50"
+            _hover={{ bg: 'yellow.800' }}
+            onClick={handleResendVerification}
+            isLoading={isResendingEmail}
+            loadingText="Sending..."
+          >
+            Resend Verification Email
+          </Button>
+        </Flex>
+      </Box>
+    )}
+    </>
   );
 };
 
