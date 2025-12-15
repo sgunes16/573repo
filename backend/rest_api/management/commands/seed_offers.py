@@ -680,5 +680,34 @@ class Command(BaseCommand):
             self.stdout.write('=' * 60)
             self.stdout.write('⚠️  These passwords are randomly generated and shown only once!')
             self.stdout.write('=' * 60)
+            
+            # Save credentials to test_users.txt
+            try:
+                import os
+                # In Docker: /app/data/test_users.txt (mounted to host ./data/)
+                # Local: project_root/data/test_users.txt
+                if os.path.exists('/app/data'):
+                    output_file = '/app/data/test_users.txt'
+                else:
+                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+                    data_dir = os.path.join(base_dir, 'data')
+                    os.makedirs(data_dir, exist_ok=True)
+                    output_file = os.path.join(data_dir, 'test_users.txt')
+                
+                with open(output_file, 'w') as f:
+                    f.write('=' * 60 + '\n')
+                    f.write('🔐 HIVE TEST USER CREDENTIALS\n')
+                    f.write(f'Generated: {timezone.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
+                    f.write('=' * 60 + '\n\n')
+                    for email, password in self.user_passwords.items():
+                        role = 'ADMIN' if email == 'admin@hive.com' else 'USER '
+                        f.write(f'{role} | {email:<35} | {password}\n')
+                    f.write('\n' + '=' * 60 + '\n')
+                    f.write('⚠️  Keep this file secure and do not commit to version control!\n')
+                    f.write('=' * 60 + '\n')
+                
+                self.stdout.write(f'\n📁 Credentials saved to: {output_file}')
+            except Exception as e:
+                self.stdout.write(f'\n⚠️  Could not save to file: {e}')
         else:
             self.stdout.write('\nℹ️  No new users created (all already exist)')

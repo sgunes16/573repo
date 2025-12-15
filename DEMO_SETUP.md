@@ -21,7 +21,13 @@ docker-compose -f docker-compose.prod.yml exec backend python manage.py seed_off
 
 ### Demo Users
 
-**⚠️ Passwords are randomly generated** when you run `seed_offers`. Check the terminal output for credentials!
+**⚠️ Passwords are randomly generated** when you run `seed_offers`. 
+
+Credentials are:
+- **Displayed in terminal** output
+- **Saved to `data/test_users.txt`** (auto-generated, gitignored)
+
+> **Note:** The `data/` folder is created automatically. `data/test_users.txt` is gitignored - never commit credentials to version control!
 
 | Email | Name | Location | Role |
 |-------|------|----------|------|
@@ -146,6 +152,18 @@ docker-compose -f docker-compose.prod.yml restart nginx
 ### Media Upload Permission Denied
 ```bash
 docker-compose exec backend chmod -R 755 /app/media
+```
+
+### MinIO Bucket Not Found (NoSuchBucket)
+MinIO bucket is automatically created on container startup. If you see this error:
+
+```bash
+# Restart backend to trigger bucket creation
+docker-compose restart backend
+
+# Or manually create via MinIO Console
+# Access: http://localhost:9001 (dev only)
+# Login with MINIO_ROOT_USER/MINIO_ROOT_PASSWORD from .env
 ```
 
 ---

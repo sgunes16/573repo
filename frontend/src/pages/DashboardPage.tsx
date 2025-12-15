@@ -189,15 +189,12 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
 
           {/* Tags */}
           {offer.tags && offer.tags.length > 0 && (
-            <HStack spacing={1}>
-              {offer.tags.slice(0, 2).map(tag => (
+            <HStack spacing={1} flexWrap="wrap">
+              {offer.tags.map(tag => (
                 <Badge key={tag} size="sm" variant="outline" colorScheme="gray" fontSize="9px">
                   {tag}
                 </Badge>
               ))}
-              {offer.tags.length > 2 && (
-                <Text fontSize="9px" color="gray.400">+{offer.tags.length - 2}</Text>
-              )}
             </HStack>
           )}
         </VStack>
@@ -403,13 +400,15 @@ const MapPanel = ({ offers, radiusKm }: { offers: Offer[]; radiusKm: number }) =
               longitude={offerLng}
               latitude={offerLat}
               anchor="center"
+              style={{ zIndex: 1 }}
             >
               <Popover trigger="hover" placement="top" isLazy>
                 <PopoverTrigger>
                   <Box
                     cursor="pointer"
-                    _hover={{ transform: 'scale(1.15)' }}
+                    _hover={{ transform: 'scale(1.15)', zIndex: 9999 }}
                     transition="transform 0.2s"
+                    position="relative"
                     onClick={() => {
                       if (!user) {
                         navigate('/login', { state: { from: `/offer/${offer.id}` } })
@@ -435,7 +434,8 @@ const MapPanel = ({ offers, radiusKm }: { offers: Offer[]; radiusKm: number }) =
                   maxW="280px"
                   border="1px solid"
                   borderColor="gray.200"
-                  zIndex={1000}
+                  zIndex={9999}
+                  style={{ zIndex: 9999 }}
                 >
                   <PopoverArrow />
                   <PopoverBody p={4}>
@@ -476,7 +476,7 @@ const MapPanel = ({ offers, radiusKm }: { offers: Offer[]; radiusKm: number }) =
                         <Badge bg="gray.100" color="gray.700" fontSize="xs">
                           {offer.activity_type === '1to1' ? '1-to-1' : 'Group'}
                         </Badge>
-                        {offer.tags && offer.tags.slice(0, 2).map(tag => (
+                        {offer.tags && offer.tags.map(tag => (
                           <Badge key={tag} bg="gray.600" color="white" fontSize="xs">
                             #{tag}
                           </Badge>

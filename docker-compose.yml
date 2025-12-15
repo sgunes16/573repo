@@ -58,6 +58,13 @@ services:
       # Redis Settings
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      # Auto Bootstrap (Superuser & Seed)
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
+      - RUN_SEED_OFFERS=${RUN_SEED_OFFERS:-true}
+    volumes:
+      - ./data:/app/data
     networks:
       - hive_network
   postgres:

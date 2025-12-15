@@ -9,11 +9,11 @@ cp .env.example .env
 cp frontend/.env.example frontend/.env
 
 # 2. Build & Run
-docker-compose up --build
+docker compose up --build
 
 # 3. Seed Database (optional)
-docker-compose exec backend python manage.py migrate
-docker-compose exec backend python manage.py seed_offers
+docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py seed_offers
 ```
 
 **Access:** 
@@ -85,7 +85,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 sudo apt install certbot
 
 # Get certificate (stop nginx first)
-docker-compose down
+docker compose down
 sudo certbot certonly --standalone -d yourdomain.com
 
 # Copy to nginx/ssl/
@@ -97,7 +97,9 @@ sudo chown $USER:$USER nginx/ssl/*.pem
 ```
 
 **Auto-renewal (cron):**
+
 ```bash
+crontab -e
 0 0 1 * * certbot renew --quiet && cp /etc/letsencrypt/live/yourdomain.com/*.pem /path/to/hive/nginx/ssl/
 ```
 
@@ -109,8 +111,11 @@ The container auto-runs via `backend/entrypoint.sh`:
 |---------|-------------|
 | `migrate --noinput` | Database migrations |
 | `collectstatic --noinput` | Static files |
+| `MinIO bucket setup` | Creates bucket if not exists (auto) |
 | `seed_offers` | Demo data (if `RUN_SEED_OFFERS=true`) |
 | `createsuperuser --noinput` | Admin user (if `DJANGO_SUPERUSER_*` vars set) |
+
+> **Note:** MinIO bucket is automatically created on first startup. The bucket policy is set to public-read for media files.
 
 **Optional `.env` for auto-admin:**
 ```env
@@ -123,15 +128,15 @@ RUN_SEED_OFFERS=false  # Skip demo data in production
 ### 4. Deploy
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 ### 5. Post-Deploy (Manual)
 
 ```bash
-docker-compose -f docker-compose.prod.yml exec backend python manage.py migrate
-docker-compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
-docker-compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
+docker compose -f docker-compose.prod.yml exec backend python manage.py migrate
+docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
 ```
 
 ---
@@ -280,22 +285,22 @@ Automatically configured via `DEPLOY_TYPE`:
 
 ```bash
 # Logs
-docker-compose logs -f backend
-docker-compose logs -f nginx
+docker compose logs -f backend
+docker compose logs -f nginx
 
 # Stop all
-docker-compose down
+docker compose down
 
 # Shell access
-docker-compose exec backend python manage.py shell
+docker compose exec backend python manage.py shell
 
 # Restart services
-docker-compose restart nginx
-docker-compose restart backend
+docker compose restart nginx
+docker compose restart backend
 
 # Database
-docker-compose exec backend python manage.py migrate
-docker-compose exec backend python manage.py createsuperuser
+docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py createsuperuser
 ```
 
 ---

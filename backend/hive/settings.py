@@ -30,6 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # Deployment configuration
 DEPLOY_TYPE = os.getenv('DEPLOY_TYPE', 'dev')
 IS_PRODUCTION = DEPLOY_TYPE == 'prod'
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
@@ -58,6 +59,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Serve static files in production
     "corsheaders.middleware.CorsMiddleware",  # CORS - Must be before CommonMiddleware
     "hive.middleware.RemoveTrailingSlashMiddleware",  # Remove trailing slashes from URLs
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -176,18 +178,33 @@ AWS_S3_SIGNATURE_VERSION = 's3v4'
 AWS_S3_REGION_NAME = 'us-east-1'
 AWS_QUERYSTRING_AUTH = False
 
+# Custom domain for public URLs (served via Nginx proxy)
+# In production: /hive-media/ is proxied to MinIO via Nginx
+AWS_S3_CUSTOM_DOMAIN = None  # Don't use custom domain, use URL_PROTOCOL + endpoint
+
 # Django 4.2+ uses STORAGES dict instead of DEFAULT_FILE_STORAGE
+# In production, files are served via Nginx proxy at /hive-media/
+_custom_domain = f"{FRONTEND_URL.replace('https://', '').replace('http://', '')}/hive-media" if IS_PRODUCTION else None
+
 STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        "OPTIONS": {
+            "bucket_name": MINIO_BUCKET_NAME,
+            "endpoint_url": AWS_S3_ENDPOINT_URL,
+            "custom_domain": _custom_domain,
+        },
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
-# Update MEDIA_URL for MinIO
-MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{MINIO_BUCKET_NAME}/"
+# Update MEDIA_URL for MinIO - use Nginx proxy path in production
+if IS_PRODUCTION:
+    MEDIA_URL = f"{FRONTEND_URL}/hive-media/"
+else:
+    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{MINIO_BUCKET_NAME}/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -212,9 +229,7 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME_LATE_USER': timedelta(days=30),
 }
 
-# CORS Settings
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
-
+# CORS Settings (FRONTEND_URL defined at top of file)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite default port
     "http://localhost:3000",  # React/Next.js default port

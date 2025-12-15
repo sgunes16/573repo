@@ -26,20 +26,18 @@ function App() {
   const { checkAuth, isLoading, user } = useAuthStore()
   const location = useLocation()
   
-  const isAuthPage = location.pathname === '/login' || 
-                     location.pathname === '/signup' ||
-                     location.pathname === '/' ||
-                     location.pathname.startsWith('/verify')
+  // Pages where we don't show loading spinner (but still check auth)
+  const isPublicAuthPage = location.pathname === '/login' || 
+                           location.pathname === '/signup' ||
+                           location.pathname.startsWith('/verify')
 
-  // Check auth status on app load (from cookies) - skip on auth pages
+  // Check auth status on app load and route changes (from cookies)
   useEffect(() => {
-    if (!isAuthPage) {
-      checkAuth()
-    }
-  }, []) // Only run once on mount
+    checkAuth()
+  }, [location.pathname]) // Run on mount and route changes
 
-  // Show loading spinner while checking auth (not on auth pages)
-  if (isLoading && !user && !isAuthPage) {
+  // Show loading spinner while checking auth (not on public auth pages)
+  if (isLoading && !user && !isPublicAuthPage) {
     return (
       <Center h="100vh">
         <Spinner size="xl" color="yellow.500" thickness="4px" />
