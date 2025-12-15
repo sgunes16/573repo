@@ -1044,7 +1044,7 @@ class MyExchangesView(APIView):
     def get(self, request):
         exchanges = Exchange.objects.filter(
             Q(provider=request.user) | Q(requester=request.user)
-        ).select_related('offer', 'provider', 'requester').order_by('-created_at')
+        ).select_related('offer', 'provider', 'requester', 'provider__profile', 'requester__profile').order_by('-created_at')
 
         exchanges_data = []
         for exchange in exchanges:
@@ -1059,11 +1059,19 @@ class MyExchangesView(APIView):
                     "id": exchange.provider.id,
                     "first_name": exchange.provider.first_name,
                     "last_name": exchange.provider.last_name,
+                    "profile": {
+                        "avatar": request.build_absolute_uri(exchange.provider.profile.avatar.url) if hasattr(exchange.provider, 'profile') and exchange.provider.profile.avatar else None,
+                        "rating": exchange.provider.profile.rating if hasattr(exchange.provider, 'profile') else 0.0,
+                    } if hasattr(exchange.provider, 'profile') else None
                 },
                 "requester": {
                     "id": exchange.requester.id,
                     "first_name": exchange.requester.first_name,
                     "last_name": exchange.requester.last_name,
+                    "profile": {
+                        "avatar": request.build_absolute_uri(exchange.requester.profile.avatar.url) if hasattr(exchange.requester, 'profile') and exchange.requester.profile.avatar else None,
+                        "rating": exchange.requester.profile.rating if hasattr(exchange.requester, 'profile') else 0.0,
+                    } if hasattr(exchange.requester, 'profile') else None
                 },
                 "status": exchange.status,
                 "proposed_at": exchange.proposed_at.isoformat() if exchange.proposed_at else None,

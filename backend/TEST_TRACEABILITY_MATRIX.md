@@ -4,7 +4,7 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total FRs in SRS** | 158 |
+| **Total FRs in SRS** | 160 |
 | **FRs with Tests** | 92 |
 | **Coverage** | **58%** |
 | **Total Test Cases** | 285 |
@@ -126,8 +126,10 @@
 | FR-36p | Display slot availability | Medium | - | - | ❌ |
 | FR-36q | Group only for offers | Medium | - | - | ❌ |
 | FR-36r | No cancel after provider confirm | High | `test_exchange_views.py` | `test_cancel_with_provider_confirmed_fails` | ✅ |
+| FR-36s | One-time offers (single exchange) | Medium | - | - | ❌ NOT IMPLEMENTED |
+| FR-36t | Recurring offers (multiple dates) | Medium | - | - | ❌ NOT IMPLEMENTED |
 
-**Coverage: 15/25 (60%)**
+**Coverage: 15/27 (56%)**
 
 ---
 
@@ -343,7 +345,7 @@
 | 1.3 View Offers/Wants | 8 | 3 | 38% | ⚠️ |
 | 1.4 User Onboarding | 5 | 4 | 80% | ✅ |
 | 1.5 Transaction History | 3 | 1 | 33% | ⚠️ |
-| 1.7 Handshake/Exchange | 25 | 17 | 68% | ⚠️ |
+| 1.7 Handshake/Exchange | 27 | 15 | 56% | ⚠️ |
 | 1.8 Time Bank | 6 | 5 | 83% | ✅ |
 | 1.9 Map View | 12 | 3 | 25% | ⚠️ |
 | 1.10 User Profile | 4 | 4 | **100%** | ✅ |
@@ -356,7 +358,7 @@
 | 1.17 Password/Email | 4 | 4 | **100%** | ✅ |
 | 1.18 Forum | 13 | 0 | 0% | ❌ NOT IMPL |
 | 1.19 Achievement Tree | 9 | 0 | 0% | ❌ NOT IMPL |
-| **TOTAL** | **158** | **92** | **58%** | |
+| **TOTAL** | **160** | **92** | **58%** | |
 
 ---
 

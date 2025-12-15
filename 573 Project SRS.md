@@ -398,6 +398,8 @@ This feature allows users to initiate a handshake and rating process with anothe
 | FR-36p | The system shall display slot availability status for group offers (e.g., "2/3 active, 1 done").                                       | Medium   |       |
 | FR-36q | Group activity type shall only be available for offers, not for wants.                                                                 | Medium   |       |
 | FR-36r | The requester shall not be able to cancel an exchange after the provider has confirmed completion.                                     | High     |       |
+| FR-36s | A user shall be able to create one-time offers that are available for a single exchange.                                               | Medium   | NOT IMPLEMENTED |
+| FR-36t | A user shall be able to create recurring offers that can be repeated on multiple dates.                                                | Medium   | NOT IMPLEMENTED |
 
 #### 3.1.7.5 Nonfunctional Requirements
 
@@ -1026,6 +1028,8 @@ This feature introduces a gamification system where users earn achievements (bad
 - **Requester** - The user who requests/receives a service in an exchange.
 - **Group Offer** - An offer that allows multiple participants (slots) to join simultaneously.
 - **Slot** - A participant position in a group offer; each slot corresponds to one exchange.
+- **One-time Offer** - An offer that is available for a single exchange only (NOT IMPLEMENTED).
+- **Recurring Offer** - An offer that can be repeated multiple times on different dates (NOT IMPLEMENTED).
 - **Credit Burning** - When time credits are deducted from a requester but not transferred to the provider (in group offers after first completion).
 - **Fuzzy Location** - An approximate/obfuscated location displayed to protect user privacy, hiding exact coordinates while showing general area.
 - **Forum** - A community discussion platform where users can create topics, reply, and engage with other members.

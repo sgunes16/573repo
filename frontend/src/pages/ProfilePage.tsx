@@ -195,7 +195,7 @@ const ProfilePage = () => {
                     </Box>
                   )}
                   <Box textAlign="center" flex="1">
-                    <Text fontSize="lg" fontWeight="700">{profile?.rating ?? 0}★</Text>
+                    <Text fontSize="lg" fontWeight="700">{(profile?.rating ?? 0).toFixed(1)}★</Text>
                     <Text fontSize="xs" color="gray.500">Rating</Text>
                   </Box>
                   <Box textAlign="center" flex="1">
@@ -594,11 +594,20 @@ const PaginatedHandshakesList = ({
                 onClick={() => navigate(`/handshake/exchange/${exchange.id}`)}
               >
                 <Flex justify="space-between" align="center">
-                  <HStack spacing={2}>
+                  <HStack spacing={3}>
                     <UserAvatar size="sm" user={user} />
                     <Box>
-                      <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
-                      <Text fontSize="xs" color="gray.500">{userLabel} {user?.first_name}</Text>
+                      <HStack spacing={2} mb={0.5}>
+                        <Text fontSize="sm" fontWeight="500">{exchange.offer?.title || 'Untitled'}</Text>
+                        <Badge 
+                          colorScheme={exchange.offer?.type === 'offer' ? 'green' : 'blue'} 
+                          fontSize="9px"
+                          textTransform="uppercase"
+                        >
+                          {exchange.offer?.type === 'offer' ? 'Offer' : 'Want'}
+                        </Badge>
+                      </HStack>
+                      <Text fontSize="xs" color="gray.500">{userLabel} {user?.first_name} {user?.last_name}</Text>
                     </Box>
                   </HStack>
                   {getStatusBadge(exchange)}

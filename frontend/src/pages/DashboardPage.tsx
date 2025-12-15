@@ -216,9 +216,6 @@ const OfferCard = ({ offer, locationAddress, myExchange }: { offer: Offer; locat
           <Text fontSize="10px" color="gray.500">
             {offer.activity_type === '1to1' ? '1-to-1' : 'Group'}
           </Text>
-          <Text fontSize="10px" color="gray.400">
-            {offer.offer_type === '1time' ? 'One-time' : 'Recurring'}
-          </Text>
         </VStack>
       </HStack>
     </Box>

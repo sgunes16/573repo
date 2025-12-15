@@ -594,18 +594,34 @@ const HandshakePage = () => {
               <Text fontWeight="500" fontSize="xs" color="gray.500" mb={2}>Participants</Text>
               <VStack spacing={2} align="stretch">
                 <Flex align="center" justify="space-between">
-                  <HStack spacing={2}>
+                  <HStack 
+                    spacing={2} 
+                    cursor="pointer" 
+                    onClick={() => navigate(`/profile/${provider.id}`)}
+                    _hover={{ opacity: 0.8 }}
+                    transition="opacity 0.2s"
+                  >
                     <UserAvatar size="xs" user={provider} />
-                    <Text fontSize="xs" fontWeight="500">{provider.first_name} {provider.last_name}</Text>
+                    <Text fontSize="xs" fontWeight="500" _hover={{ textDecoration: 'underline' }}>
+                      {provider.first_name} {provider.last_name}
+                    </Text>
                   </HStack>
                   <Badge colorScheme={offer.type === 'want' ? 'blue' : 'green'} fontSize="9px">
                     {offer.type === 'want' ? 'Requester' : 'Provider'}
                   </Badge>
                 </Flex>
                 <Flex align="center" justify="space-between">
-                  <HStack spacing={2}>
+                  <HStack 
+                    spacing={2} 
+                    cursor="pointer" 
+                    onClick={() => navigate(`/profile/${requester.id}`)}
+                    _hover={{ opacity: 0.8 }}
+                    transition="opacity 0.2s"
+                  >
                     <UserAvatar size="xs" user={requester} />
-                    <Text fontSize="xs" fontWeight="500">{requester.first_name} {requester.last_name}</Text>
+                    <Text fontSize="xs" fontWeight="500" _hover={{ textDecoration: 'underline' }}>
+                      {requester.first_name} {requester.last_name}
+                    </Text>
                   </HStack>
                   <Badge colorScheme={offer.type === 'want' ? 'green' : 'blue'} fontSize="9px">
                     {offer.type === 'want' ? 'Provider' : 'Requester'}
