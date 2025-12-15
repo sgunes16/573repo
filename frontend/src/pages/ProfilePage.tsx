@@ -70,14 +70,21 @@ const ProfilePage = () => {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const isOwnProfile = !userId || userId === currentUser?.id;
+  const isAdmin = currentUser?.is_admin === true;
+  const isViewingSuspendedUser = !isOwnProfile && viewingUser?.is_banned === true;
   
-  const activeOffers = offers.filter((o: any) => o.status === 'active')
-  const inProgressOffers = offers.filter((o: any) => o.status === 'in_progress')
-  const completedOffers = offers.filter((o: any) => o.status === 'completed')
+  // Filter out flagged offers for non-admin users viewing other profiles
+  const shouldShowFlagged = isOwnProfile || isAdmin;
+  const filteredOffers = shouldShowFlagged ? offers : offers.filter((o: any) => !o.is_flagged);
+  const filteredWants = shouldShowFlagged ? wants : wants.filter((w: any) => !w.is_flagged);
   
-  const activeWants = wants.filter((w: any) => w.status === 'active')
-  const inProgressWants = wants.filter((w: any) => w.status === 'in_progress')
-  const completedWants = wants.filter((w: any) => w.status === 'completed')
+  const activeOffers = filteredOffers.filter((o: any) => o.status === 'active')
+  const inProgressOffers = filteredOffers.filter((o: any) => o.status === 'in_progress')
+  const completedOffers = filteredOffers.filter((o: any) => o.status === 'completed')
+  
+  const activeWants = filteredWants.filter((w: any) => w.status === 'active')
+  const inProgressWants = filteredWants.filter((w: any) => w.status === 'in_progress')
+  const completedWants = filteredWants.filter((w: any) => w.status === 'completed')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -127,6 +134,7 @@ const ProfilePage = () => {
           setViewingUser({
             ...profileDetail.user,
             warning_count: profileDetail.user.warning_count || 0,
+            is_banned: (profileDetail.user as any).is_banned || false,
           } as User);
           setOffers(profileDetail.recent_offers);
           setWants(profileDetail.recent_wants);
@@ -166,8 +174,16 @@ const ProfilePage = () => {
       <Navbar showUserInfo={true} />
 
       <Box maxW="1100px" mx="auto" px={4} py={6}>
-        {/* Banned Banner */}
+        {/* Banned Banner - for own profile */}
         {isOwnProfile && <BannedBanner />}
+        
+        {/* Suspended User Alert - when viewing another suspended user's profile */}
+        {isViewingSuspendedUser && (
+          <Alert status="error" mb={4} borderRadius="md">
+            <AlertIcon />
+            <Text fontSize="sm">This account has been suspended.</Text>
+          </Alert>
+        )}
         
         <Grid templateColumns={{ base: "1fr", lg: "280px 1fr" }} gap={6} alignItems="start">
           {/* Sidebar */}
@@ -202,7 +218,8 @@ const ProfilePage = () => {
                     <Text fontSize="lg" fontWeight="700">{completedExchangesCount}</Text>
                     <Text fontSize="xs" color="gray.500">Done</Text>
                   </Box>
-                  {viewingUser?.warning_count !== undefined && viewingUser.warning_count > 0 && (
+                  {/* Only show warnings to admin or own profile */}
+                  {(isOwnProfile || isAdmin) && viewingUser?.warning_count !== undefined && viewingUser.warning_count > 0 && (
                     <Box textAlign="center" flex="1">
                       <Text fontSize="lg" fontWeight="700" color="yellow.600">
                         {viewingUser.warning_count}⚠️
@@ -296,7 +313,14 @@ const ProfilePage = () => {
                       <Button leftIcon={<MdAdd />} size="xs" variant="outline" onClick={() => navigate("/create-offer")}>New</Button>
                     )}
                   </Flex>
-                  {renderOffersList(isOwnProfile ? { inProgress: inProgressOffers, completed: completedOffers, active: activeOffers } : { all: offers }, navigate, isOwnProfile ? pendingCountByOffer : undefined)}
+                  {/* Hide offers for suspended users (unless admin) */}
+                  {isViewingSuspendedUser && !isAdmin ? (
+                    <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+                      <Text color="gray.500" fontSize="xs">Content not available</Text>
+                    </Box>
+                  ) : (
+                    renderOffersList(isOwnProfile ? { inProgress: inProgressOffers, completed: completedOffers, active: activeOffers } : { all: filteredOffers }, navigate, isOwnProfile ? pendingCountByOffer : undefined, isAdmin, isOwnProfile)
+                  )}
                 </TabPanel>
 
                 {/* Wants Tab */}
@@ -307,7 +331,14 @@ const ProfilePage = () => {
                       <Button leftIcon={<MdAdd />} size="xs" variant="outline" onClick={() => navigate("/wants")}>New</Button>
                     )}
                   </Flex>
-                  {renderOffersList(isOwnProfile ? { inProgress: inProgressWants, completed: completedWants, active: activeWants } : { all: wants }, navigate, isOwnProfile ? pendingCountByOffer : undefined)}
+                  {/* Hide wants for suspended users (unless admin) */}
+                  {isViewingSuspendedUser && !isAdmin ? (
+                    <Box bg="gray.50" borderRadius="md" p={4} textAlign="center">
+                      <Text color="gray.500" fontSize="xs">Content not available</Text>
+                    </Box>
+                  ) : (
+                    renderOffersList(isOwnProfile ? { inProgress: inProgressWants, completed: completedWants, active: activeWants } : { all: filteredWants }, navigate, isOwnProfile ? pendingCountByOffer : undefined, isAdmin, isOwnProfile)
+                  )}
                 </TabPanel>
 
                 {/* Handshakes Tab */}
@@ -376,11 +407,15 @@ const ProfilePage = () => {
 const PaginatedOffersList = ({
   data,
   navigate,
-  pendingCounts
+  pendingCounts,
+  isAdmin = false,
+  isOwnProfile = false
 }: {
   data: { inProgress?: any[]; completed?: any[]; active?: any[]; all?: any[] }
   navigate: any
   pendingCounts?: Record<string, number>
+  isAdmin?: boolean
+  isOwnProfile?: boolean
 }) => {
   const [currentPage, setCurrentPage] = useState(1)
   
@@ -413,7 +448,9 @@ const PaginatedOffersList = ({
             key={item.id} 
             item={item} 
             navigate={navigate} 
-            status={item._status} 
+            status={item._status}
+            isAdmin={isAdmin}
+            isOwnProfile={isOwnProfile}
             pendingCount={pendingCounts?.[String(item.id)]} 
           />
         ))}
@@ -463,13 +500,16 @@ const PaginatedOffersList = ({
 const renderOffersList = (
   data: { inProgress?: any[]; completed?: any[]; active?: any[]; all?: any[] },
   navigate: any,
-  pendingCounts?: Record<string, number>
+  pendingCounts?: Record<string, number>,
+  isAdmin: boolean = false,
+  isOwnProfile: boolean = false
 ) => {
-  return <PaginatedOffersList data={data} navigate={navigate} pendingCounts={pendingCounts} />
+  return <PaginatedOffersList data={data} navigate={navigate} pendingCounts={pendingCounts} isAdmin={isAdmin} isOwnProfile={isOwnProfile} />
 }
 
-const OfferCard = ({ item, navigate, status, pendingCount }: { item: any; navigate: any; status?: string; pendingCount?: number }) => {
-  const isFlagged = item.is_flagged === true
+const OfferCard = ({ item, navigate, status, pendingCount, isAdmin = false, isOwnProfile = false }: { item: any; navigate: any; status?: string; pendingCount?: number; isAdmin?: boolean; isOwnProfile?: boolean }) => {
+  // Show flagged status to admins or on own profile
+  const isFlagged = (isAdmin || isOwnProfile) && item.is_flagged === true
   
   return (
     <Box

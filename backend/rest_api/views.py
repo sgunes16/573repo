@@ -2106,6 +2106,7 @@ class UserProfileDetailView(APIView):
                 "first_name": target_user.first_name,
                 "last_name": target_user.last_name,
                 "warning_count": target_user.warning_count or 0,
+                "is_banned": target_user.is_banned,
             },
             "profile": {
                 "id": user_profile.id if user_profile else None,

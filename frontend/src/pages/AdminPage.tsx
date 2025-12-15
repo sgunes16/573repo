@@ -39,6 +39,7 @@ import {
   AlertIcon,
 } from '@chakra-ui/react'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import { adminService, type KPIData } from '@/services/admin.service'
 import type { Report } from '@/types'
@@ -55,6 +56,7 @@ import {
 
 const AdminPage = () => {
   const toast = useToast()
+  const navigate = useNavigate()
   const [kpiData, setKpiData] = useState<KPIData | null>(null)
   const [reports, setReports] = useState<Report[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -200,21 +202,6 @@ const AdminPage = () => {
 
   // Removed handleBanUser and handleWarnUser - now handled in resolve modal
   
-  const handleViewExchange = async (exchangeId: number) => {
-    setIsLoadingExchange(true)
-    onExchangeDetailOpen()
-    try {
-      const detail = await adminService.getExchangeDetail(exchangeId)
-      setExchangeDetail(detail)
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'An error occurred while sending the warning',
-        status: 'error',
-        duration: 3000,
-      })
-    }
-  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -363,19 +350,29 @@ const AdminPage = () => {
                     filteredReports.map((report) => (
                       <Tr key={report.id}>
                         <Td>
-                          <Text fontSize="sm">
-                            {report.reporter.first_name} {report.reporter.last_name}
-                          </Text>
-                          <Text fontSize="xs" color="gray.500">{report.reporter.email}</Text>
+                          <Box 
+                            cursor="pointer" 
+                            onClick={() => navigate(`/profile/${report.reporter.id}`)}
+                            _hover={{ opacity: 0.7 }}
+                          >
+                            <Text fontSize="sm" color="blue.600" textDecoration="underline">
+                              {report.reporter.first_name} {report.reporter.last_name}
+                            </Text>
+                            <Text fontSize="xs" color="gray.500">{report.reporter.email}</Text>
+                          </Box>
                         </Td>
                         <Td>
                           {report.reported_user ? (
-                            <>
-                              <Text fontSize="sm">
+                            <Box 
+                              cursor="pointer" 
+                              onClick={() => navigate(`/profile/${report.reported_user!.id}`)}
+                              _hover={{ opacity: 0.7 }}
+                            >
+                              <Text fontSize="sm" color="blue.600" textDecoration="underline">
                                 {report.reported_user.first_name} {report.reported_user.last_name}
                               </Text>
                               <Text fontSize="xs" color="gray.500">{report.reported_user.email}</Text>
-                            </>
+                            </Box>
                           ) : (
                             <Text fontSize="xs" color="gray.400">N/A</Text>
                           )}

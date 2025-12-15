@@ -27,7 +27,6 @@ import {
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
-import BannedBanner from '@/components/BannedBanner'
 import ImageUpload, { UploadedImage } from '@/components/ImageUpload'
 import { MdArrowBack, MdLocationOn, MdTag } from 'react-icons/md'
 import { activity_type, location_type } from '@/types'

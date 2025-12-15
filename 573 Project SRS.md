@@ -625,6 +625,16 @@ This feature allows admins to view the admin panel. Admins can view the admin pa
 | FR-62f | An admin shall be able to delete offers or wants.                                                                                   | High     |       |
 | FR-62g | An admin shall be able to cancel exchanges and return blocked credits.                                                              | High     |       |
 | FR-62h | The system shall notify affected users when content is removed or action is taken.                                                  | Medium   |       |
+| FR-62i | Banned users shall not be able to create offers or wants.                                                                           | High     |       |
+| FR-62j | Banned users shall not be able to initiate exchanges.                                                                               | High     |       |
+| FR-62k | Banned users' offers shall be hidden from the dashboard for non-admin users.                                                        | High     |       |
+| FR-62l | Exchanges cannot be initiated for offers belonging to banned users.                                                                 | High     |       |
+| FR-62m | When a user is banned, all their pending and accepted exchanges shall be cancelled with credit refunds.                             | High     |       |
+| FR-62n | Suspended user profiles shall display "This account has been suspended" message.                                                    | High     |       |
+| FR-62o | Suspended users' offers/wants shall be hidden from their profile page for non-admin users.                                          | High     |       |
+| FR-62p | Flagged offers shall only be visible to admins and the offer owner on profile pages.                                                | High     |       |
+| FR-62q | Warning count shall only be visible to admins and the user themselves.                                                              | Medium   |       |
+| FR-62r | Admins shall be able to view all user content including flagged/removed items.                                                      | High     |       |
 
 #### 3.1.12.5 Nonfunctional Requirements
 

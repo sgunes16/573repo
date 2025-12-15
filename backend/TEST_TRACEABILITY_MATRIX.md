@@ -4,9 +4,9 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total FRs in SRS** | 165 |
+| **Total FRs in SRS** | 174 |
 | **FRs with Tests** | 99 |
-| **Coverage** | **60%** |
+| **Coverage** | **57%** |
 | **Total Test Cases** | 292 |
 | **Features Fully Tested** | 7/19 |
 
@@ -197,7 +197,7 @@
 
 ---
 
-## Feature 1.12 - Admin Panel (FR-53 to FR-62h) - 21 FRs
+## Feature 1.12 - Admin Panel (FR-53 to FR-62r) - 30 FRs
 
 | FR ID | Requirement | Priority | Test File | Test Coverage | Status |
 |-------|-------------|----------|-----------|---------------|--------|
@@ -223,8 +223,18 @@
 | FR-62f | Delete offers/wants | High | `test_admin_views.py`, `test_admin_resolve_views.py` | `test_delete_offer`, `test_remove_offer_deletes_offer_and_cancels_exchanges`, `test_remove_want_unblocks_owner_credits`, `test_remove_exchange_cancels_and_flags_offer` | ✅ |
 | FR-62g | Cancel exchanges | High | `test_admin_resolve_views.py` | `test_remove_exchange_cancels_and_flags_offer`, `test_ban_user_cancels_all_active_exchanges` | ✅ |
 | FR-62h | Notify affected users | Medium | `test_admin_resolve_views.py` | `test_warn_user_sends_notification` (mocked) | ⚠️ Partial |
+| FR-62i | Banned users can't create offers | High | `test_offer_views.py` | `test_banned_user_cannot_create_offer`, `test_banned_user_cannot_create_want` | ✅ |
+| FR-62j | Banned users can't initiate exchanges | High | `test_exchange_views.py` | `test_banned_user_cannot_create_exchange` | ✅ |
+| FR-62k | Banned users' offers hidden from dashboard | High | `test_offer_views.py` | `test_banned_user_offers_not_shown_in_dashboard` | ✅ |
+| FR-62l | Cannot initiate exchange for banned user's offers | High | `test_exchange_views.py` | `test_cannot_create_exchange_for_banned_user_offer`, `test_cannot_create_exchange_for_banned_want_owner` | ✅ |
+| FR-62m | Cancel exchanges on ban with refunds | High | `test_admin_resolve_views.py` | `test_ban_user_cancels_all_active_exchanges` | ✅ |
+| FR-62n | Suspended user profile shows suspension message | High | - | Frontend implementation | ⚠️ UI only |
+| FR-62o | Suspended users' offers hidden on profile (non-admin) | High | - | Frontend implementation | ⚠️ UI only |
+| FR-62p | Flagged offers visible to admin/owner only | High | - | Frontend implementation | ⚠️ UI only |
+| FR-62q | Warning count visible to admin/owner only | Medium | - | Frontend implementation | ⚠️ UI only |
+| FR-62r | Admins can view all flagged/removed content | High | - | Frontend implementation | ⚠️ UI only |
 
-**Coverage: 14/21 (67%)**
+**Coverage: 14/30 (47%)**
 
 ---
 
@@ -355,7 +365,7 @@
 | 1.9 Map View | 12 | 3 | 25% | ⚠️ |
 | 1.10 User Profile | 4 | 4 | **100%** | ✅ |
 | 1.11 Other Profiles | 5 | 5 | **100%** | ✅ |
-| 1.12 Admin Panel | 21 | 14 | 67% | ⚠️ |
+| 1.12 Admin Panel | 30 | 14 | 47% | ⚠️ |
 | 1.13 Flag/Report | 3 | 2 | 67% | ⚠️ |
 | 1.14 Auth & Account | 11 | 3 | 27% | ⚠️ |
 | 1.15 Notifications | 6 | 6 | **100%** | ✅ |
@@ -363,7 +373,7 @@
 | 1.17 Password/Email | 4 | 4 | **100%** | ✅ |
 | 1.18 Forum | 13 | 0 | 0% | ❌ NOT IMPL |
 | 1.19 Achievement Tree | 9 | 0 | 0% | ❌ NOT IMPL |
-| **TOTAL** | **165** | **99** | **60%** | |
+| **TOTAL** | **174** | **99** | **57%** | |
 
 ---
 
