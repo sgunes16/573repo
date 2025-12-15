@@ -50,9 +50,11 @@ class ApiService {
             // Retry original request
             return this.client(originalRequest)
           } catch (refreshError) {
-            // Redirect to login only if refresh fails and not already on auth pages
+            // Redirect to login only if refresh fails and not on public/auth pages
             const currentPath = window.location.pathname
-            if (!currentPath.startsWith('/login') && !currentPath.startsWith('/signup') && !currentPath.startsWith('/verify')) {
+            const publicPaths = ['/', '/login', '/signup', '/verify', '/dashboard', '/offer']
+            const isPublicPath = publicPaths.some(p => currentPath === p || currentPath.startsWith(p + '/') || currentPath.startsWith('/verify'))
+            if (!isPublicPath) {
               window.location.href = '/login'
             }
             return Promise.reject(refreshError)
