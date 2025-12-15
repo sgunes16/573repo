@@ -129,6 +129,7 @@ class UserProfileView(APIView):
                 "badges": user_profile.badges,
                 "time_credits": user_profile.time_credits,
                 "avatar": request.build_absolute_uri(user_profile.avatar.url) if user_profile.avatar else None,
+                "is_onboarded": user_profile.is_onboarded,
             },
             "timebank": {
                 "id": timebank.id,
@@ -181,6 +182,8 @@ class UserProfileView(APIView):
         if 'avatar' in request.FILES:
             user_profile.avatar = request.FILES['avatar']
         
+        # Mark user as onboarded when they update their profile
+        user_profile.is_onboarded = True
         user_profile.save()
         
         timebank, _ = TimeBank.objects.get_or_create(

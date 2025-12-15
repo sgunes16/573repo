@@ -72,6 +72,7 @@ class UserProfile(models.Model):
     rating = models.FloatField(default=0.0)
     phone_number = models.CharField(max_length=20, blank=True)
     badges = models.JSONField(default=list)
+    is_onboarded = models.BooleanField(default=False)  # True when user completes onboarding
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

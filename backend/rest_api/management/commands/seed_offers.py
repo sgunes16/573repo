@@ -242,6 +242,7 @@ class Command(BaseCommand):
                     'location': profile_data.get('location', ''),
                     'skills': profile_data.get('skills', []),
                     'rating': profile_data.get('rating', 0.0),
+                    'is_onboarded': True,  # Seed users are already onboarded
                 }
             )
             

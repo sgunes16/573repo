@@ -63,6 +63,10 @@ services:
       - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
       - RUN_SEED_OFFERS=${RUN_SEED_OFFERS:-true}
+      # Email Settings (Resend)
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_CUSTOM_DOMAIN=${RESEND_CUSTOM_DOMAIN:-false}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-onboarding@resend.dev}
     volumes:
       - ./data:/app/data
     networks:

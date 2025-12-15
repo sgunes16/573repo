@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import AuthIllustration from '@/components/AuthIllustration'
 import { authService } from '@/services/auth.service'
+import { profileService } from '@/services/profile.service'
 import { useAuthStore } from '@/store/useAuthStore'
 
 type VerificationStatus = 'loading' | 'success' | 'error' | 'expired'
@@ -30,6 +31,7 @@ const VerifyEmailPage = () => {
   
   const [status, setStatus] = useState<VerificationStatus>('loading')
   const [errorMessage, setErrorMessage] = useState('')
+  const [isOnboarded, setIsOnboarded] = useState<boolean | null>(null)
 
   useEffect(() => {
     const verifyEmail = async () => {
@@ -42,8 +44,17 @@ const VerifyEmailPage = () => {
       try {
         await authService.verifyEmail(token)
         setStatus('success')
-        // Refresh user data
-        await checkAuth()
+        // Refresh user data (force refresh to get updated is_verified)
+        await checkAuth(true)
+        
+        // Check if user has completed onboarding
+        try {
+          const [profile] = await profileService.getUserProfile()
+          setIsOnboarded(profile?.is_onboarded ?? false)
+        } catch {
+          setIsOnboarded(false)
+        }
+        
         toast({
           title: 'Email verified!',
           description: 'Your account is now fully activated.',
@@ -129,7 +140,9 @@ const VerifyEmailPage = () => {
                 Email Verified!
               </Heading>
               <Text color="gray.600" maxW="300px">
-                Your email has been successfully verified. You can now access all features.
+                {isOnboarded 
+                  ? 'Your email has been successfully verified. You can now access all features.'
+                  : 'Your email has been verified! Let\'s set up your profile to get started.'}
               </Text>
             </VStack>
             <Button
@@ -140,9 +153,10 @@ const VerifyEmailPage = () => {
               fontSize="lg"
               fontWeight="600"
               _hover={{ bg: '#D69E2E' }}
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(isOnboarded ? '/dashboard' : '/onboarding')}
+              isDisabled={isOnboarded === null}
             >
-              Go to Dashboard
+              {isOnboarded === null ? 'Loading...' : isOnboarded ? 'Go to Dashboard' : 'Set Up Profile'}
             </Button>
           </>
         )

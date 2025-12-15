@@ -60,6 +60,10 @@ services:
       # Redis Settings
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      # Email Settings (Resend)
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_CUSTOM_DOMAIN=${RESEND_CUSTOM_DOMAIN:-false}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-onboarding@resend.dev}
       # Auto Bootstrap (Superuser & Seed)
       - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-}
       - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}

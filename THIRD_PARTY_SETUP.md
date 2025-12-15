@@ -56,9 +56,9 @@ Required for map features on the dashboard.
 
 ---
 
-## Gmail SMTP (Email)
+## Resend (Email)
 
-Required for email verification and notifications.
+Required for email verification and notifications. **Free tier: 3,000 emails/month + 1 custom domain.**
 
 ### Features
 - 📧 Email verification for new users
@@ -67,76 +67,89 @@ Required for email verification and notifications.
 
 ### Setup Steps
 
-1. **Enable 2-Factor Authentication**
-   - Go to [Google Account Security](https://myaccount.google.com/security)
-   - Enable **2-Step Verification**
+1. **Create Resend Account**
+   - Go to [resend.com](https://resend.com/) and sign up
+   - Free tier includes:
+     - 3,000 emails/month
+     - 1 custom domain
+     - API access
 
-2. **Generate App Password**
-   - Go to: [App Passwords](https://myaccount.google.com/apppasswords)
-   - Select app: **Mail**
-   - Select device: **Other** → Enter "Hive"
-   - Copy the 16-character password
+2. **Get API Key**
+   - Navigate to: [API Keys](https://resend.com/api-keys)
+   - Click **"Create API Key"**
+   - Name: `hive-backend`
+   - Permission: **Sending access**
+   - Click **"Add"**
+   - Copy the API key (starts with `re_`)
    
    ```
-   Example: abcd efgh ijkl mnop
+   Example: re_123abc456def_XXXXXXXXXXXXXXXXXX
    ```
 
 3. **Configure `.env`**
    ```env
-   EMAIL_HOST=smtp.gmail.com
-   EMAIL_PORT=465
-   EMAIL_HOST_USER=your-email@gmail.com
-   EMAIL_HOST_PASSWORD=abcdefghijklmnop
+   RESEND_API_KEY=re_your_api_key_here
+   RESEND_FROM_EMAIL=onboarding@resend.dev
    ```
-   
-   ⚠️ **No spaces in password!** Remove spaces from copied password.
 
 4. **Restart Backend**
    ```bash
-   docker-compose restart backend
+   docker-compose -f docker-compose.prod.yml up -d --build backend
+   ```
+
+### Custom Domain (Optional but Recommended)
+
+Using a custom domain improves email deliverability and looks more professional.
+
+1. **Add Domain in Resend**
+   - Go to: [Domains](https://resend.com/domains)
+   - Click **"Add Domain"**
+   - Enter your domain (e.g., `yourdomain.com` or `hive.yourdomain.com`)
+
+2. **Configure DNS Records**
+   
+   Resend will provide DNS records to add. Example for `hive.yourdomain.com`:
+   
+   | Type | Name | Content | Purpose |
+   |------|------|---------|---------|
+   | TXT | `resend._domainkey.hive` | `p=MIGfMA0GCS...` | DKIM (Domain Verification) |
+   | MX | `send.hive` | `feedback-smtp.eu-west-1.amazonses.com` | SPF - Enable Sending |
+   | TXT | `send.hive` | `v=spf1 include:amazonses.com ~all` | SPF - Enable Sending |
+   | MX | `hive` | `inbound-smtp.eu-west-1...` | Enable Receiving (optional) |
+   
+   > **Note:** Record names are relative to your root domain. If your domain is `hive.selmangunes.com`, the full DNS name for `send.hive` would be `send.hive.selmangunes.com`.
+
+3. **Verify Domain**
+   - Wait for DNS propagation (5-30 minutes)
+   - Click **"Verify"** in Resend dashboard
+
+4. **Update `.env`**
+   ```env
+   RESEND_CUSTOM_DOMAIN=true
+   # Email will be auto-generated: noreply@<your-frontend-domain>
    ```
 
 ### Test Email Configuration
 ```bash
-docker-compose exec backend python manage.py shell
+docker compose -f docker-compose.prod.yml exec backend python manage.py shell
 ```
 ```python
-from django.core.mail import send_mail
-send_mail('Test Subject', 'Test body', 'from@gmail.com', ['to@example.com'])
-# Returns 1 if successful
+import resend
+import os
+resend.api_key = os.getenv('RESEND_API_KEY')
+r = resend.Emails.send({
+    "from": "onboarding@resend.dev",
+    "to": "your-email@example.com",
+    "subject": "Test from Hive",
+    "html": "<p>Email is working!</p>"
+})
+print(r)  # Should show {'id': '...'}
 ```
 
 ### Without Email
 - ✅ Users can register
 - ❌ No verification emails sent
-- ❌ Unverified users cannot create offers/exchanges
-
----
-
-## Alternative Email Providers
-
-| Provider | Host | Port | Auth |
-|----------|------|------|------|
-| **Gmail** | smtp.gmail.com | 465 (SSL) | App Password |
-| **Outlook** | smtp.office365.com | 587 (TLS) | Account Password |
-| **SendGrid** | smtp.sendgrid.net | 587 | API Key |
-| **Mailgun** | smtp.mailgun.org | 587 | API Key |
-
-### SendGrid Example
-```env
-EMAIL_HOST=smtp.sendgrid.net
-EMAIL_PORT=587
-EMAIL_HOST_USER=apikey
-EMAIL_HOST_PASSWORD=SG.your-api-key-here
-```
-
-### Outlook Example
-```env
-EMAIL_HOST=smtp.office365.com
-EMAIL_PORT=587
-EMAIL_HOST_USER=your-email@outlook.com
-EMAIL_HOST_PASSWORD=your-password
-```
+- ❌ Unverified users may have limited access
 
 ---
 
@@ -155,19 +168,17 @@ EMAIL_HOST_PASSWORD=your-password
 
 | Problem | Solution |
 |---------|----------|
-| "Authentication failed" | Regenerate App Password |
-| "Less secure app" error | Enable 2FA and use App Password |
-| Emails in spam | Add SPF/DKIM records (production) |
-| Connection timeout | Check firewall allows port 465/587 |
+| "API key invalid" | Check RESEND_API_KEY in .env |
+| Email not received | Check spam folder |
+| "Domain not verified" | Complete domain verification in Resend |
+| Rate limit | Free tier: 3,000/month limit |
 
 ### Debug Email
 ```python
 # In Django shell
-from django.conf import settings
-print(f"Host: {settings.EMAIL_HOST}")
-print(f"Port: {settings.EMAIL_PORT}")
-print(f"User: {settings.EMAIL_HOST_USER}")
-print(f"SSL: {settings.EMAIL_USE_SSL}")
+import os
+print(f"API Key: {os.getenv('RESEND_API_KEY', 'NOT SET')[:10]}...")
+print(f"From Email: {os.getenv('RESEND_FROM_EMAIL', 'NOT SET')}")
 ```
 
 ---
@@ -178,11 +189,9 @@ print(f"SSL: {settings.EMAIL_USE_SSL}")
 # Mapbox (Frontend)
 VITE_MAPBOX_TOKEN=pk.eyJ1IjoiLi4u
 
-# Email (Backend)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=465
-EMAIL_HOST_USER=your-email@gmail.com
-EMAIL_HOST_PASSWORD=your-app-password
+# Resend (Backend)
+RESEND_API_KEY=re_your_api_key_here
+RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
 
 ---
@@ -191,4 +200,3 @@ EMAIL_HOST_PASSWORD=your-app-password
 
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment
 - **[DEMO_SETUP.md](./DEMO_SETUP.md)** - Demo configuration & test users
-

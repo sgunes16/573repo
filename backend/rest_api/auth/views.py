@@ -5,12 +5,17 @@ from rest_api.models import User, EmailVerificationToken, UserProfile, TimeBank
 from rest_api.auth.serializers import get_tokens_for_user
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
-from django.core.mail import send_mail
 from django.utils import timezone
 from datetime import timedelta
 import hashlib
 import re
 import secrets
+import threading
+import resend
+import os
+
+# Initialize Resend with API key
+resend.api_key = os.getenv('RESEND_API_KEY', '')
 
 
 def password_hash(password):
@@ -48,38 +53,64 @@ def generate_verification_token():
     return secrets.token_urlsafe(32)
 
 
+def get_resend_from_email():
+    """Get the from email for Resend based on configuration"""
+    # If custom domain is enabled, auto-generate from FRONTEND_URL
+    if os.getenv('RESEND_CUSTOM_DOMAIN', 'false').lower() == 'true':
+        frontend_url = os.getenv('FRONTEND_URL', '')
+        # Extract domain from URL (e.g., https://hive.example.com -> hive.example.com)
+        domain = frontend_url.replace('https://', '').replace('http://', '').split('/')[0]
+        return f"noreply@{domain}"
+    # Otherwise use explicit RESEND_FROM_EMAIL or default
+    return os.getenv('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
+
+
 def send_verification_email(user, token):
-    """Send verification email to user"""
-    verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    """Send verification email to user via Resend (runs in background thread)"""
+    def _send_email():
+        verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+        from_email = get_resend_from_email()
+        
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #ECC94B;">Welcome to The Hive! 🐝</h2>
+            <p>Hello {user.first_name},</p>
+            <p>Thanks for joining The Hive! Please verify your email address by clicking the button below:</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{verification_url}" 
+                   style="background-color: #ECC94B; color: #000; padding: 12px 30px; 
+                          text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Verify Email
+                </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">
+                Or copy and paste this link into your browser:<br>
+                <a href="{verification_url}" style="color: #ECC94B;">{verification_url}</a>
+            </p>
+            <p style="color: #666; font-size: 14px;">This link will expire in 24 hours.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px;">
+                If you didn't create an account, please ignore this email.
+            </p>
+        </div>
+        """
+        
+        try:
+            r = resend.Emails.send({
+                "from": from_email,
+                "to": user.email,
+                "subject": "Verify your email - The Hive",
+                "html": html_content
+            })
+            print(f"Verification email sent to {user.email} (id: {r.get('id', 'N/A')})")
+        except Exception as e:
+            print(f"Failed to send verification email to {user.email}: {e}")
     
-    subject = "Verify your email - The Hive"
-    message = f"""
-Hello {user.first_name},
-
-Welcome to The Hive! Please verify your email address by clicking the link below:
-
-{verification_url}
-
-This link will expire in 24 hours.
-
-If you didn't create an account, please ignore this email.
-
-Best regards,
-The Hive Team
-"""
-    
-    try:
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [user.email],
-            fail_silently=False,
-        )
-        return True
-    except Exception as e:
-        print(f"Failed to send verification email: {e}")
-        return False
+    # Run email sending in background thread to not block the request
+    thread = threading.Thread(target=_send_email)
+    thread.daemon = True
+    thread.start()
+    return True
 
 
 def get_cookie_settings(httponly=True):

@@ -109,10 +109,10 @@ const VerifyEmailSentPage = () => {
             <Button
               variant="ghost"
               color="gray.600"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/onboarding')}
               w="full"
             >
-              Continue to Dashboard
+              Skip to Onboarding
             </Button>
           </VStack>
 
@@ -131,7 +131,8 @@ const VerifyEmailSentPage = () => {
         </VStack>
       </Flex>
 
-      <AuthIllustration />
+      <AuthIllustration /
+      >
     </Grid>
   )
 }

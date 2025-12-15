@@ -15,7 +15,7 @@ interface AuthState {
   login: (credentials: LoginCredentials) => Promise<void>
   register: (registerData: RegisterData) => Promise<void>
   logout: () => void
-  checkAuth: () => Promise<void>
+  checkAuth: (force?: boolean) => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
@@ -79,10 +79,10 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ authUser: null, user: null, isAuthenticated: false, error: null })
   },
 
-  checkAuth: async () => {
-    // Don't check if already authenticated
+  checkAuth: async (force = false) => {
+    // Don't check if already authenticated (unless forced)
     const state = useAuthStore.getState()
-    if (state.isAuthenticated && state.user) {
+    if (!force && state.isAuthenticated && state.user) {
       return
     }
     

@@ -2,7 +2,7 @@
 
 ## Quick Start (Development)
 
-### Docker (Recommended)
+### Option 1: Full Docker (Recommended)
 ```bash
 # 1. Setup environment
 cp .env.example .env
@@ -21,8 +21,69 @@ docker compose exec backend python manage.py seed_offers
 - Backend API: http://localhost/api
 - Admin: http://localhost/admin
 
-### Local (Without Docker)
+### Option 2: Hybrid (Infra in Docker + Local Dev)
+
+Best for development - hot reload for both frontend and backend while infra runs in Docker.
+
 ```bash
+# 1. Setup environment
+cp .env.example .env
+cp frontend/.env.example frontend/.env
+
+# 2. Start infrastructure services (PostgreSQL, MinIO, Redis)
+docker compose -f docker-compose.infra.yml up -d
+
+# 3. Backend (Terminal 1)
+cd backend
+python -m venv myvenv
+source myvenv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+
+# 4. Frontend (Terminal 2)
+cd frontend
+npm install
+npm run dev
+```
+
+**Environment for Hybrid Setup:**
+
+Update `.env` for local backend:
+```env
+DB_HOST=localhost          # Changed from 'db' to 'localhost'
+REDIS_HOST=localhost       # Changed from 'redis' to 'localhost'
+```
+
+Update `frontend/.env`:
+```env
+VITE_API_URL=http://localhost:8000/api
+```
+
+**Access:**
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000/api
+- MinIO Console: http://localhost:9001 (minioadmin/minioadmin123)
+
+**Manage Infrastructure:**
+```bash
+# Start
+docker compose -f docker-compose.infra.yml up -d
+
+# Stop
+docker compose -f docker-compose.infra.yml down
+
+# View logs
+docker compose -f docker-compose.infra.yml logs -f
+
+# Reset (delete all data)
+docker compose -f docker-compose.infra.yml down -v
+```
+
+### Option 3: Fully Local (Without Docker)
+```bash
+# Requires: PostgreSQL, Redis, MinIO installed locally
+
 # Backend
 cd backend
 python -m venv myvenv
@@ -33,12 +94,11 @@ python manage.py runserver
 
 # Frontend (new terminal)
 cd frontend
-# Edit .env: VITE_API_URL=http://localhost:8000/api
 npm install
 npm run dev
 ```
 
-**Access:** Frontend: http://localhost:3000 | Backend: http://localhost:8000/api
+**Access:** Frontend: http://localhost:5173 | Backend: http://localhost:8000/api
 
 ---
 
@@ -162,11 +222,10 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 | `MINIO_ROOT_USER` | - | ✅ | `minioadmin` | MinIO admin username |
 | `MINIO_ROOT_PASSWORD` | ✅ | ✅ | - | MinIO admin password |
 | `MINIO_BUCKET_NAME` | - | - | `hive-media` | S3 bucket name |
-| **Email (SMTP)** |||||
-| `EMAIL_HOST` | - | ✅ | `smtp.gmail.com` | SMTP server host |
-| `EMAIL_PORT` | - | ✅ | `465` | SMTP port |
-| `EMAIL_HOST_USER` | - | ✅ | - | SMTP username/email |
-| `EMAIL_HOST_PASSWORD` | - | ✅ | - | SMTP password (App Password) |
+| **Email (Resend)** |||||
+| `RESEND_API_KEY` | - | ✅ | - | Resend API key (from resend.com) |
+| `RESEND_CUSTOM_DOMAIN` | - | ✅ | `false` | `true` = auto-generate from `FRONTEND_URL` |
+| `RESEND_FROM_EMAIL` | - | - | `onboarding@resend.dev` | Only used if `RESEND_CUSTOM_DOMAIN=false` |
 | **Auto Bootstrap** |||||
 | `DJANGO_SUPERUSER_USERNAME` | - | - | - | Auto-create admin username |
 | `DJANGO_SUPERUSER_EMAIL` | - | - | - | Auto-create admin email |
@@ -205,10 +264,9 @@ MINIO_ROOT_PASSWORD=miniodevpass
 MINIO_BUCKET_NAME=hive-media
 
 # Email (optional for dev)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=465
-EMAIL_HOST_USER=
-EMAIL_HOST_PASSWORD=
+RESEND_API_KEY=
+RESEND_CUSTOM_DOMAIN=false
+RESEND_FROM_EMAIL=onboarding@resend.dev
 
 # Mapbox
 VITE_MAPBOX_TOKEN=
@@ -241,10 +299,10 @@ MINIO_ROOT_USER=hiveadmin
 MINIO_ROOT_PASSWORD=very-strong-minio-password
 MINIO_BUCKET_NAME=hive-media
 
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=465
-EMAIL_HOST_USER=noreply@yourdomain.com
-EMAIL_HOST_PASSWORD=your-gmail-app-password
+# Email (Resend) - Free: 3,000 emails/month
+RESEND_API_KEY=re_your_api_key_here
+RESEND_CUSTOM_DOMAIN=true                     # Auto: noreply@mail.yourdomain.com
+RESEND_FROM_EMAIL=onboarding@resend.dev       # Ignored when RESEND_CUSTOM_DOMAIN=true
 
 VITE_MAPBOX_TOKEN=pk.eyJ1IjoieW91ci10b2tlbiIsImEiOiJjbGFiY2RlZiJ9.abc123
 
@@ -308,6 +366,6 @@ docker compose exec backend python manage.py createsuperuser
 ## Related Documentation
 
 - **[DEMO_SETUP.md](./DEMO_SETUP.md)** - Demo data, test users, testing guide
-- **[THIRD_PARTY_SETUP.md](./THIRD_PARTY_SETUP.md)** - Gmail & Mapbox configuration
+- **[THIRD_PARTY_SETUP.md](./THIRD_PARTY_SETUP.md)** - Resend & Mapbox configuration
 - **[TEST_TRACEABILITY_MATRIX.md](./backend/TEST_TRACEABILITY_MATRIX.md)** - Test coverage
 - **[573 Project SRS.md](./573%20Project%20SRS.md)** - Software Requirements Specification

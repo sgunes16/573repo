@@ -119,6 +119,7 @@ export interface UserProfile {
   rating?: number
   phone_number?: string
   badges?: string[]
+  is_onboarded?: boolean
 }
 
 export interface UserProfileResponse {
