@@ -48,6 +48,7 @@ npm run dev
 
 ```bash
 cp .env.example .env
+cp frontend/.env.example frontend/.env
 ```
 
 **Required `.env` settings:**
