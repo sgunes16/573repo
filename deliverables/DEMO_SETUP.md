@@ -1,0 +1,175 @@
+# Hive - Demo Setup Guide
+
+This guide covers demo data, test users, and testing.
+
+---
+
+## Seed Database
+
+### Run Seed Script
+```bash
+# Docker
+docker-compose exec backend python manage.py seed_offers
+
+# Local
+cd backend && source myvenv/bin/activate
+python manage.py seed_offers
+
+# Production
+docker-compose -f docker-compose.prod.yml exec backend python manage.py seed_offers
+```
+
+### Demo Users
+
+**⚠️ Passwords are randomly generated** when you run `seed_offers`. 
+
+Credentials are:
+- **Displayed in terminal** output
+- **Saved to `data/test_users.txt`** (auto-generated, gitignored)
+
+> **Note:** The `data/` folder is created automatically. `data/test_users.txt` is gitignored - never commit credentials to version control!
+
+| Email | Name | Location | Role |
+|-------|------|----------|------|
+| `admin@hive.com` | Admin User | - | Admin |
+| `ahmet.yilmaz@example.com` | Ahmet Yılmaz | Ümraniye | User |
+| `zeynep.kaya@example.com` | Zeynep Kaya | Bebek | User |
+| `mehmet.demir@example.com` | Mehmet Demir | Hisarüstü | User |
+| `ayse.sahin@example.com` | Ayşe Şahin | Sarıyer | User |
+| `can.ozturk@example.com` | Can Öztürk | Kadıköy | User |
+| `elif.arslan@example.com` | Elif Arslan | Ortaköy | User |
+| `burak.celik@example.com` | Burak Çelik | Moda | User |
+| `deniz.yildiz@example.com` | Deniz Yıldız | Beşiktaş | User |
+| `seda.kara@example.com` | Seda Kara | Maltepe | User |
+| `emre.bulut@example.com` | Emre Bulut | Üsküdar | User |
+
+**Example output after seeding:**
+```
+============================================================
+🔐 GENERATED LOGIN CREDENTIALS (Save these!)
+============================================================
+👑 ADMIN | admin@hive.com                    | xK9mP2nQ4rT7
+👤 USER  | ahmet.yilmaz@example.com          | aB3cD5eF7gH9
+...
+============================================================
+⚠️  These passwords are randomly generated and shown only once!
+============================================================
+```
+
+### Demo Content
+
+**Sample Offers (Community-focused):**
+- 📚 Free Tutoring for Kids (Ümraniye)
+- 🐱 Feeding Stray Cats Together (Bebek)
+- 📱 Tech Help for Seniors (Hisarüstü)
+- 📖 Neighborhood Book Club (Sarıyer)
+- 🔧 Free Minor Home Repairs (Kadıköy)
+- 🧘 Free Yoga in the Park (Ortaköy)
+- 💻 Coding for Beginners (Online)
+- 📸 Photography Walk (Beşiktaş)
+- 🎨 Kids Craft Workshop (Maltepe)
+- 🚲 Free Bike Checkup (Üsküdar)
+
+**Sample Wants:**
+- 🤝 Help Organizing Charity Bazaar (Sarıyer)
+- 🇩🇪 Language Tandem Partner - German (Hisarüstü)
+- 🎸 Guitar Lessons Wanted (Beşiktaş)
+- 🏃 Jogging Buddy Needed (Maltepe)
+- 🍞 Learn to Bake Bread (Kadıköy)
+
+### Reset & Re-seed
+```bash
+# Delete all offers
+docker-compose exec backend python manage.py shell -c "from rest_api.models import Offer; Offer.objects.all().delete()"
+
+# Re-seed
+docker-compose exec backend python manage.py seed_offers
+```
+
+---
+
+## Running Tests
+
+### All Tests
+```bash
+# Docker
+docker-compose exec backend python -m pytest tests/ -v
+
+# Local
+cd backend && source myvenv/bin/activate
+python -m pytest tests/ -v
+```
+
+### Specific Test File
+```bash
+docker-compose exec backend python -m pytest tests/test_views/test_offer_views.py -v
+```
+
+### With Coverage Report
+```bash
+docker-compose exec backend python -m pytest tests/ --cov=rest_api --cov-report=html
+# Open backend/htmlcov/index.html
+```
+
+### Test Categories
+```bash
+# Unit tests only
+python -m pytest tests/test_views/ -v
+
+# Integration tests only
+python -m pytest tests/integration/ -v
+```
+
+---
+
+## Troubleshooting
+
+### WebSocket Connection Failed
+```bash
+# Check Daphne is running
+docker-compose logs backend | grep -i daphne
+
+# Verify WebSocket endpoint
+curl -i http://localhost/ws/
+```
+
+### Database Connection Error
+```bash
+# Check PostgreSQL
+docker-compose ps db
+
+# Full reset
+docker-compose down -v
+docker-compose up -d
+```
+
+### Static Files Not Loading (Production)
+```bash
+docker-compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+docker-compose -f docker-compose.prod.yml restart nginx
+```
+
+### Media Upload Permission Denied
+```bash
+docker-compose exec backend chmod -R 755 /app/media
+```
+
+### MinIO Bucket Not Found (NoSuchBucket)
+MinIO bucket is automatically created on container startup. If you see this error:
+
+```bash
+# Restart backend to trigger bucket creation
+docker-compose restart backend
+
+# Or manually create via MinIO Console
+# Access: http://localhost:9001 (dev only)
+# Login with MINIO_ROOT_USER/MINIO_ROOT_PASSWORD from .env
+```
+
+---
+
+## Related Documentation
+
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide
+- **[THIRD_PARTY_SETUP.md](./THIRD_PARTY_SETUP.md)** - Gmail, Mapbox configuration
+- **[TEST_TRACEABILITY_MATRIX.md](./backend/TEST_TRACEABILITY_MATRIX.md)** - Test coverage matrix
