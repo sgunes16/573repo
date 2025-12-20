@@ -1,6 +1,6 @@
 # USE OF AI
 
-AI was used as a tool at every stage of this project. It was primarily used in the production of documentation, starting with software requirements, in the implementation phase for code generation and the development of the frontend and backend, in debug management, in deployment processes, in writing tests, and finally in the production of deliverables files.
+AI was used as a tool at every stage of this project. It was primarily used in the production of documentation, starting with software requirements, in the implementation phase for code generation and the development of the frontend and backend, commit messages, in debug management, in deployment processes, in writing tests, and finally in the production of deliverables files.
 
 ## Lessons learned for ai
 
